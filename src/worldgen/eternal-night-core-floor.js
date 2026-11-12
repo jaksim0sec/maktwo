@@ -18,7 +18,7 @@ export const CORE_FLOOR_DEFAULTS = Object.freeze({
   floorHeight: 540,
   slabThickness: 8,
   districtLuxuryMax: 0.94,
-  luxuryNoiseAmplitude: 0.035,
+  luxuryNoiseAmplitude: 0.080,
   luxuryNoiseDensity: 0.5,
   luxuryNoiseConcentration: 0.5,
   ratios: Object.freeze({
@@ -150,27 +150,21 @@ export function districtIdAt(layout, x, z) {
   return x < layout.centerX ? 2 : 3;
 }
 
-function gridValue(x, z, seed) {
-  let hash = Math.imul(x, 0x1f123bb5) ^ Math.imul(z, 0x5f356495) ^ seed;
-  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
-  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
-  return ((hash ^ (hash >>> 16)) >>> 0) / 0x80000000 - 1;
-}
-
-const NOISE_RESOLUTION = 192;
-const BRANCH_ATTACHMENTS = [0.25, 0.47, 0.69, 0.36, 0.58, 0.80];
-const branchFields = new WeakMap();
-
-function curvePoint(start, bend, end, t) {
-  const a = (1 - t) ** 2;
-  const b = 2 * t * (1 - t);
-  const c = t ** 2;
-  return [a * start[0] + b * bend[0] + c * end[0],
-    a * start[1] + b * bend[1] + c * end[1]];
-}
-
 function smoothstep(value) {
   return value * value * (3 - 2 * value);
+}
+
+function gradientAt(col, row, x, z, seed) {
+  let hash = Math.imul(col, 0x1f123bb5) ^ Math.imul(row, 0x5f356495) ^ seed;
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  const direction = (hash ^ (hash >>> 16)) & 7;
+  const dx = x - col;
+  const dz = z - row;
+  const u = direction & 1 ? dx : -dx;
+  const v = direction & 2 ? dz : -dz;
+  if (direction & 4) return (u + v) * Math.SQRT1_2;
+  return direction & 1 ? v : u;
 }
 
 function coherentNoise(x, z, seed) {
@@ -178,113 +172,60 @@ function coherentNoise(x, z, seed) {
   const row = Math.floor(z);
   const sx = smoothstep(x - col);
   const sz = smoothstep(z - row);
-  const a = gridValue(col, row, seed);
-  const b = gridValue(col, row + 1, seed);
-  const near = a + sx * (gridValue(col + 1, row, seed) - a);
-  const far = b + sx * (gridValue(col + 1, row + 1, seed) - b);
+  const a = gradientAt(col, row, x, z, seed);
+  const b = gradientAt(col, row + 1, x, z, seed);
+  const near = a + sx * (gradientAt(col + 1, row, x, z, seed) - a);
+  const far = b + sx * (gradientAt(col + 1, row + 1, x, z, seed) - b);
   return near + sz * (far - near);
 }
 
-function riverPoint([x, z], progress, radius, seed) {
-  const scale = (NOISE_RESOLUTION - 1) / 2;
-  const noiseX = x * 6;
-  const noiseZ = z * 6;
-  // A shared displacement field keeps a branch root at the same point on its trunk.
-  const bendX = coherentNoise(noiseX, noiseZ, seed ^ 0x1f123bb5) * 0.065;
-  const bendZ = coherentNoise(noiseX, noiseZ, seed ^ 0x5f356495) * 0.065;
-  const width = 0.96 + coherentNoise(noiseX, noiseZ, seed ^ 0x45d9f3b) * 0.30;
-  return [(x + bendX + 1) * scale, (z + bendZ + 1) * scale,
-    radius * scale * width * (1 - 0.55 * progress)];
+const NOISE_RESOLUTION = 192;
+const riverFields = new WeakMap();
+
+function riverBand(noise, width, coreWidth) {
+  const distance = Math.abs(noise) / width;
+  if (distance >= 1) return 0;
+  const shoulder = smoothstep(1 - distance);
+  const core = smoothstep(Math.max(0, 1 - distance / coreWidth));
+  return 0.42 * shoulder + 0.58 * core;
 }
 
-function stampCurve(field, start, bend, end, radius, strength, growth, coreWidth, seed) {
-  const steps = 20;
-  let [x, z, startBrush] = riverPoint(start, 0, radius, seed);
-  for (let step = 1; (step - 1) / steps < growth; step++) {
-    const progress = step / steps;
-    const fraction = Math.min(1, growth * steps - (step - 1));
-    const [targetX, targetZ, targetBrush] = riverPoint(curvePoint(start, bend, end, progress), progress, radius, seed);
-    const dx = (targetX - x) * fraction;
-    const dz = (targetZ - z) * fraction;
-    const nextX = x + dx;
-    const nextZ = z + dz;
-    const endBrush = startBrush + (targetBrush - startBrush) * fraction;
-    const lengthSq = dx * dx + dz * dz;
-    const brush = Math.max(startBrush, endBrush);
-    const minX = Math.max(0, Math.floor(Math.min(x, nextX) - brush));
-    const maxX = Math.min(NOISE_RESOLUTION - 1, Math.ceil(Math.max(x, nextX) + brush));
-    const minZ = Math.max(0, Math.floor(Math.min(z, nextZ) - brush));
-    const maxZ = Math.min(NOISE_RESOLUTION - 1, Math.ceil(Math.max(z, nextZ) + brush));
-    for (let row = minZ; row <= maxZ; row++) {
-      for (let col = minX; col <= maxX; col++) {
-        const along = lengthSq ? Math.max(0, Math.min(1, ((col - x) * dx + (row - z) * dz) / lengthSq)) : 0;
-        const distanceSq = (col - x - along * dx) ** 2 + (row - z - along * dz) ** 2;
-        const localBrush = startBrush + (endBrush - startBrush) * along;
-        if (distanceSq >= localBrush * localBrush) continue;
-        const distance = Math.sqrt(distanceSq) / localBrush;
-        // Like a river's shallow and deep bands, the core sits inside a wider shoulder.
-        const shoulder = smoothstep(1 - distance);
-        const core = smoothstep(Math.max(0, 1 - distance / coreWidth));
-        const index = row * NOISE_RESOLUTION + col;
-        field[index] = Math.max(field[index], strength * (0.34 * shoulder + 0.66 * core));
-      }
-    }
-    x = nextX;
-    z = nextZ;
-    startBrush = endBrush;
-  }
-}
-
-function getBranchField(layout) {
-  if (layout.luxuryNoiseAmplitude === 0 || layout.luxuryNoiseDensity === 0) return null;
-  let field = branchFields.get(layout);
+function getRiverField(layout) {
+  const density = layout.luxuryNoiseDensity;
+  if (layout.luxuryNoiseAmplitude === 0 || density === 0) return null;
+  let field = riverFields.get(layout);
   if (field) return field;
 
   field = new Float32Array(NOISE_RESOLUTION ** 2);
-  const spread = Math.max(0.45, Math.min(1.55, layout.noiseCellSize / (layout.halfWidth * 0.12)));
-  const density = layout.luxuryNoiseDensity;
-  const coreWidth = 0.84 - 0.54 * layout.luxuryNoiseConcentration;
-  for (let district = 0; district < 4; district++) {
-    const random = salt => gridValue(district, salt, layout.noiseSeed);
-    const x = (district === 0 || district === 3 ? 1 : -1) * (0.38 + 0.08 * random(0));
-    const z = (district < 2 ? 1 : -1) * (0.38 + 0.08 * random(1));
-    const angle = Math.PI * random(2);
-    const forwardX = Math.cos(angle);
-    const forwardZ = Math.sin(angle);
-    const offset = ([originX, originZ], forward, across) => [
-      originX + spread * (forward * forwardX - across * forwardZ),
-      originZ + spread * (forward * forwardZ + across * forwardX),
-    ];
-    const center = [x, z];
-    const start = offset(center, -0.26, 0.06 * random(3));
-    const end = offset(center, 0.28, 0.10 * random(4));
-    const bend = offset(center, 0, (random(5) < 0 ? -1 : 1) * (0.12 + 0.06 * random(6)));
-    // Grow the trunk first, then the same seeded branches in order as density rises.
-    const defaultBranchCount = random(7) > 0.30 ? 3 : 2;
-    const growth = density <= 0.5
-      ? density * 2 * (1 + defaultBranchCount)
-      : 1 + defaultBranchCount + (density * 2 - 1) * (BRANCH_ATTACHMENTS.length - defaultBranchCount);
-    const trunkGrowth = Math.min(1, growth);
-    stampCurve(field, start, bend, end, 0.047, trunkGrowth, trunkGrowth, coreWidth, layout.noiseSeed);
+  const seed = layout.noiseSeed;
+  const step = layout.width / ((NOISE_RESOLUTION - 1) * layout.noiseCellSize * 3.0);
+  const halfSpan = step * (NOISE_RESOLUTION - 1) / 2;
+  const bandWidth = 0.052 + density * 0.23;
+  const coreWidth = 0.85 - 0.58 * layout.luxuryNoiseConcentration;
+  const emergence = smoothstep(Math.min(1, density / 0.2));
 
-    const firstSide = random(8) < 0 ? -1 : 1;
-    for (let branch = 0; branch < growth - 1; branch++) {
-      const branchGrowth = Math.min(1, growth - 1 - branch);
-      const salt = branch < 3 ? branch : branch + 24;
-      const root = curvePoint(start, bend, end, BRANCH_ATTACHMENTS[branch] + 0.07 * random(9 + salt));
-      const side = branch % 2 === 0 ? firstSide : -firstSide;
-      const tip = offset(root, 0.09 + 0.12 * random(12 + salt), side * (0.16 + 0.07 * random(15 + salt)));
-      const turn = offset(root, 0.02 + 0.08 * random(18 + salt), side * 0.05);
-      const radius = branch >= 2 ? 0.023 : 0.031;
-      const strength = branch >= 2 ? 0.52 : 0.74;
-      stampCurve(field, root, turn, tip, radius, strength, branchGrowth, coreWidth, layout.noiseSeed);
+  for (let row = 0; row < NOISE_RESOLUTION; row++) {
+    const z = row * step - halfSpan;
+    for (let col = 0; col < NOISE_RESOLUTION; col++) {
+      const x = col * step - halfSpan;
+      // Offset the sampling coordinates with smooth, seeded noise so contours meander.
+      const u = x + 1.7 + 0.85 * coherentNoise(x * 0.52 + 1.2, z * 0.52, seed ^ 0x1f123bb5);
+      const v = z - 0.6 + 0.85 * coherentNoise(x * 0.52, z * 0.52 - 2.1, seed ^ 0x5f356495);
+      const width = bandWidth * (0.95 + 0.35 * coherentNoise(u * 0.75, v * 0.75, seed ^ 0x45d9f3b));
+      // Each layer follows a zero contour across the whole floor. Their contributions add at crossings.
+      const main = riverBand(coherentNoise(u, v, seed), width, coreWidth);
+      const cross = riverBand(coherentNoise(0.8 * u - 0.65 * v + 5.3, 0.65 * u + 0.8 * v, seed ^ 0x5bd1e995),
+        width * 0.82, coreWidth);
+      const fine = riverBand(coherentNoise(1.1 * u + 0.7 * v, -0.7 * u + 1.1 * v + 3.2, seed ^ 0x6c8e9cf5),
+        width * 0.64, coreWidth);
+      field[row * NOISE_RESOLUTION + col] = emergence * Math.min(1, 0.58 * main + 0.42 * cross + 0.22 * fine);
     }
   }
-  branchFields.set(layout, field);
+  riverFields.set(layout, field);
   return field;
 }
 
-function branchNoise(field, layout, x, z) {
+function sampleRiverField(field, layout, x, z) {
   const scale = (NOISE_RESOLUTION - 1) / 2;
   const u = (x / layout.halfWidth + 1) * scale;
   const v = (z / layout.halfWidth + 1) * scale;
@@ -310,7 +251,7 @@ function luxuryForZone(layout, x, z, ax, az, zone, field) {
   // Harmonic mean of the two axis fields 1 / (1 + distance² / falloff²).
   const base = layout.districtLuxuryMax / (1 + sumDistanceSq * layout.inverseDoubleFalloffSq);
   if (!field) return base;
-  const value = base + layout.luxuryNoiseAmplitude * branchNoise(field, layout, x, z);
+  const value = base + layout.luxuryNoiseAmplitude * sampleRiverField(field, layout, x, z);
   return Math.max(0, Math.min(layout.districtLuxuryMax, value));
 }
 
@@ -320,7 +261,7 @@ export function luxuryAt(layout, x, z) {
   const dz = z - layout.centerZ;
   const ax = Math.abs(dx);
   const az = Math.abs(dz);
-  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az), getBranchField(layout));
+  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az), getRiverField(layout));
 }
 
 /**
@@ -335,7 +276,7 @@ export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, st
     || zones.length < size || (weights != null && weights.length < size)) {
     throw new RangeError('Invalid core floor sample rectangle or output size');
   }
-  const field = weights == null ? null : getBranchField(layout);
+  const field = weights == null ? null : getRiverField(layout);
   let index = 0;
   for (let row = 0; row < depth; row++) {
     const z = z0 + row * step - layout.centerZ;
