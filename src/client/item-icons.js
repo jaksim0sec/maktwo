@@ -43,9 +43,9 @@ export function drawShapeIcon(ctx,id){
  const pr=(x,y,z)=>[32+(x-z)*22,43-y*29+(x+z)*7];
  for(const b of [...boxes].sort((a,b)=>(a.x+a.z+a.y*.3)-(b.x+b.z+b.y*.3))){
   const x=b.x,z=b.z,y=b.y,X=x+b.w,Z=z+b.d,Y=y+b.h;
-  face(ctx,id,1,[pr(x,y,Z),pr(X,y,Z),pr(X,Y,Z),pr(x,Y,Z)],.82);
-  face(ctx,id,0,[pr(X,y,z),pr(X,y,Z),pr(X,Y,Z),pr(X,Y,z)],.72);
-  face(ctx,id,2,[pr(x,Y,z),pr(X,Y,z),pr(X,Y,Z),pr(x,Y,Z)],1);
+  face(ctx,b.material??id,1,[pr(x,y,Z),pr(X,y,Z),pr(X,Y,Z),pr(x,Y,Z)],.82);
+  face(ctx,b.material??id,0,[pr(X,y,z),pr(X,y,Z),pr(X,Y,Z),pr(X,Y,z)],.72);
+  face(ctx,b.material??id,2,[pr(x,Y,z),pr(X,Y,z),pr(X,Y,Z),pr(x,Y,Z)],1);
  }
  return true;
 }

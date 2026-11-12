@@ -2,11 +2,11 @@ import {SIZE,HEIGHT} from '../core/chunk.js';
 import {integratedTerrain} from './integrated.js';
 import {stampArchitectureV3} from './architecture-v3.js';
 import {stampMaterialGallery} from './material-gallery.js';
-import {stampComponentBuilding} from './architectural-components.js';
+import {stampPartGallery} from './part-gallery.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17, GENERATION_VERSION=5;
 export const BIOMES={plains:{tree:.012},forest:{tree:.075},desert:{tree:0},mountains:{tree:.008},marsh:{tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
-const isStudioMode=mode=>mode==='materials'||mode.startsWith('building:');
+const isStudioMode=mode=>mode==='materials'||mode==='parts';
 function terrainAt(x,z,seed,mode){
  if(mode==='flat'||isStudioMode(mode))return {height:22,biome:'plains'};
  const profile=integratedTerrain(x,z,seed);
@@ -84,7 +84,7 @@ export function generateChunk(chunk,seed,mode='normal'){
  }
  if(mode==='ruins')stampArchitectureV3(chunk,seed);
  else if(mode==='materials')stampMaterialGallery(chunk);
- else if(mode.startsWith('building:'))stampComponentBuilding(chunk,seed,mode.slice('building:'.length));
+ else if(mode==='parts')stampPartGallery(chunk);
  chunk.dirty=true;return chunk;
 }
-export const GENERATORS={materials:'Architectural material gallery',normal:'Integrated ridges, canyons, marsh and biomes',flat:'Flat builder world',islands:'Scattered ocean islands',highlands:'Warped ridges, winding canyons and mountains',ruins:'Procedural stacked abandoned buildings'};
+export const GENERATORS={materials:'Architectural material gallery',parts:'Isolated architectural components',normal:'Integrated ridges, canyons, marsh and biomes',flat:'Flat builder world',islands:'Scattered ocean islands',highlands:'Warped ridges, winding canyons and mountains',ruins:'Procedural stacked abandoned buildings'};

@@ -20,7 +20,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -121,6 +121,16 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
   const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
   const variant=chunk.styles?.[idx]||0,state=variant?{variant,...authored}:authored;
+  if(BLOCKS[id].render==='part'){
+   for(const piece of shapeBoxes(id,wx,y,wz,state)||[]){
+    const color=COLORS[piece.material],target=piece.alpha?transparent:opaque;
+    for(let fi=0;fi<FACES.length;fi++){
+     const face=FACES[fi],vertices=face.corners.map(([a,b,c])=>[piece.x+a*piece.w,piece.y+b*piece.h,piece.z+c*piece.d]);
+     quad(target,vertices,color,face.shade+4*materialFor(piece.material,fi));
+    }
+   }
+   continue;
+  }
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state,transparent);continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent);continue}
   const start=opaque.length;

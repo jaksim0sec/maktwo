@@ -1,6 +1,7 @@
 import {FORMED,formedOverlap} from './construction.js';
 import {block,BLOCK as B,itemId} from './blocks.js';
 import {isDoor,doorIntersectsBody} from './door.js';
+import {partById,partGeometry} from './part-library.js';
 export const isStairs=id=>id===B.STONE_STAIRS||id===B.WOOD_STAIRS||id===B.CONCRETE_STAIRS;
 export const isSlab=id=>id===B.STONE_SLAB||id===B.WOOD_SLAB||id===B.CONCRETE_SLAB||id===B.UPPER_STAIR_TREAD||id===B.FLOOR_FINISH||id===B.CEILING_FINISH;
 export const isPanel=id=>itemId(id)===B.WINDOW_NS||itemId(id)===B.THIN_WALL_NS;
@@ -22,6 +23,7 @@ function rotateBoxes(boxes,x,z,facing){
 }
 export function shapeBoxes(id,x,y,z,state={}){
  const facing=((state.facing||0)%4+4)%4;
+ if(partById(id))return rotateBoxes(partGeometry(id).map(piece=>({...piece,x:x+piece.x,y:y+piece.y,z:z+piece.z})),x,z,facing);
  if(isPanel(id)&&state.panelTurn!==undefined){
   const base=itemId(id);
   id=(state.panelTurn&2)?(base===B.WINDOW_NS?B.WINDOW_EW:B.THIN_WALL_EW):base;

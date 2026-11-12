@@ -4,11 +4,7 @@ import {RECIPES} from './crafting.js';
 // Stable world names are storage keys: NEVER rename an existing entry.
 export const WORLD_PRESETS=Object.freeze([
  {name:'TextureGallery',seed:9999,mode:'materials',label:'텍스처 전시장'},
- {name:'BuildingShopHouse',seed:52771,mode:'building:shop-house',label:'부품 조합 · A'},
- {name:'BuildingOffice',seed:52771,mode:'building:office',label:'부품 조합 · B'},
- {name:'BuildingWalkup',seed:52771,mode:'building:walkup',label:'부품 조합 · C'},
- {name:'BuildingArcade',seed:52771,mode:'building:arcade',label:'부품 조합 · D'},
- {name:'BuildingService',seed:52771,mode:'building:service',label:'부품 조합 · E'},
+ {name:'PartsGallery',seed:9999,mode:'parts',label:'건축 부품 전시장'},
 ]);
 const placeables=new Set([
  ...LIGHTBAR,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.FLOWER_POT,
