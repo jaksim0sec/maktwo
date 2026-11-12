@@ -42,7 +42,12 @@ body.submerged #underwater-filter{opacity:1;backdrop-filter:blur(1.15px);-webkit
 /* A depleted quick-slot must vanish without leaving a reserved gutter. */
 #hotbar:empty{display:none}
 
-#shape-controls{display:flex;gap:5px}
-#shape-controls button{padding:4px 9px;background:#181c20cf;border:1px solid #ffffff28;border-radius:7px;font-size:11px;color:#f3eadb}
+#shape-controls{display:flex;gap:6px}
+#shape-controls button{touch-action:manipulation;padding:4px 9px;background:#181c20cf;border:1px solid #ffffff28;border-radius:7px;font-size:11px;color:#f3eadb}
 #shape-controls:has(button:not([hidden])){padding-bottom:3px}
 #flight-toggle[hidden],#shape-controls button[hidden]{display:none}
+
+body.ui-open #shape-controls{display:none}
+@media(any-pointer:coarse){
+ #shape-controls button{min-height:48px;min-width:76px;padding-inline:12px;font-size:13px}
+}

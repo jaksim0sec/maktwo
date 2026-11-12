@@ -11,7 +11,7 @@ const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.rotation=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.rotation=0;this.manualFacing=null;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  bindWorld(){
   this.stopMountEvents?.();
@@ -46,17 +46,25 @@ class Game{
   const id=this.paletteItems[this.selected],shape=$('build-form'),rotate=$('build-rotate');
   if(!shape||!rotate)return;
   shape.hidden=!supportsForms(id);
-  shape.textContent=FORMS[this.form]+' · R';
-  rotate.hidden=shape.hidden||this.form<3;
-  rotate.textContent=`${this.rotation*90}° · T`;
+  shape.textContent=FORMS[this.form];
+  const custom=this.rotatesForm(id);
+  rotate.hidden=!custom&&!this.rotatesBlock(id);
+  const facing=custom?this.rotation:this.manualFacing;
+  rotate.textContent=facing===null?'회전 · 자동':`회전 · ${facing*90}°`;
  }
+ rotatesForm(id){return supportsForms(id)&&this.form>=3}
+ rotatesBlock(id){return id===B.DOOR||isStairs(id)}
+ placementFacing(){return this.manualFacing??(Math.round(this.player.yaw/(Math.PI/2))&3)}
  changeForm(){
   if(!supportsForms(this.paletteItems[this.selected]))return;
   this.form=(this.form+1)%FORMS.length;this.updateFormControls();
  }
  rotateForm(){
-  if(!supportsForms(this.paletteItems[this.selected])||this.form<3)return;
-  this.rotation=(this.rotation+1)&3;this.updateFormControls();
+  const id=this.paletteItems[this.selected];
+  if(this.rotatesForm(id))this.rotation=(this.rotation+1)&3;
+  else if(this.rotatesBlock(id))this.manualFacing=(this.placementFacing()+1)&3;
+  else return;
+  this.updateFormControls();
  }
  get paletteItems(){return this.inventory.quickSlots}
  renderHotbar(){
@@ -265,7 +273,9 @@ class Game{
  }
  select(i,{toggle=true}={}){
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
+  const previous=this.paletteItems[this.selected];
   this.selected=toggle&&this.selected===i?-1:(i>=0&&(this.paletteItems[i]===null||this.inventory.count(this.paletteItems[i])===0)?-1:i);
+  if(this.paletteItems[this.selected]!==previous)this.manualFacing=null;
   this.mining.reset();this.showMining(0);
   document.querySelectorAll('.slot').forEach(el=>{const active=Number(el.dataset.slot)===this.selected;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
   $('block-name').textContent=this.selected<0?'':blockLabel(this.paletteItems[this.selected]);
@@ -320,14 +330,14 @@ class Game{
    const old=this.world.get(x,y,z);
    if(block(old).replaceable){
     if(id===B.DOOR){
-     const facing=((Math.round(p.yaw/(Math.PI/2))%4)+4)%4,upperOld=this.world.get(x,y+1,z);
+     const facing=this.placementFacing(),upperOld=this.world.get(x,y+1,z);
      if(this.world.placeDoor(x,y,z,facing,[p,...this.entities.entities])){
       if(collides(this.world,p.x,p.y,p.z,p.width,p.height)){this.world.removeDoor(x,y,z);if(old!==B.AIR)this.world.set(x,y,z,old);if(upperOld!==B.AIR)this.world.set(x,y+1,z,upperOld)}
       else{this.inventory.remove(id);this.refreshInventoryUI();this.status('나무 문 설치 · 클릭해서 열고 닫기')};
      }else this.status('문은 위로 두 칸의 공간이 필요해요');
     }else{
      const form=supportsForms(id)?formCode(this.form,this.rotation):0;
-     const facing=(Math.round(p.yaw/(Math.PI/2))+4)&3;
+     const facing=this.placementFacing();
      const state={facing,upper:isSlab(id)&&n.y===-1};
      if(!solidBlockOverlap({getShapeState:()=>state},x,y,z,id,p,1e-5,form)&&this.world.set(x,y,z,id,{form})){
       if(isStairs(id)||isSlab(id))this.world.setShapeState(x,y,z,state);

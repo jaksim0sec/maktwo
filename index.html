@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo | 끝나지 않는 밤</title>
- <link rel="stylesheet" href="./style.css?v=1.14.0">
+ <link rel="stylesheet" href="./style.css?v=1.14.1">
 </head>
 <body>
  <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
@@ -42,7 +42,7 @@
  <div id="control-hint" aria-live="polite">클릭 설치 · 누르고 채굴 · C 시점 · E 가방</div>
  <div id="build-controls">
   <div id="block-name" aria-live="polite"></div>
-  <div id="shape-controls"><button id="build-form" type="button" hidden></button><button id="build-rotate" type="button" aria-label="건축 방향 회전" hidden></button></div>
+  <div id="shape-controls"><button id="build-form" type="button" aria-label="건축 형태 변경" aria-keyshortcuts="R" title="건축 형태 변경 · R" hidden></button><button id="build-rotate" type="button" aria-keyshortcuts="T" title="건축 방향 회전 · T" hidden></button></div>
   <div id="hotbar-dock" aria-label="빠른 선택">
    <button id="bag-btn" class="dock-action" aria-label="공간형 가방 열기" title="가방 · E" aria-expanded="false"><svg class="bag-glyph" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8.5h14l1 11H4l1-11Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/><path d="M8 14h8"/></svg></button>
    <div id="hotbar" aria-label="아이템 바로가기"></div>
@@ -54,7 +54,7 @@
  </div>
  <div id="help" class="overlay hidden"><div class="help-card" role="dialog" aria-labelledby="help-title">
   <div class="help-top"><div><span class="eyebrow">GUIDE</span><h2 id="help-title">조작법</h2></div><button id="close-help" aria-label="도움말 닫기">✕</button></div>
-  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프 · 웅크리기</b><span>Space · Shift / 모바일 우측 버튼</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 길게 누르기</span><b>아이템</b><span>1–7 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>발견형 제작법</b><span>재료를 모으면 조합법이 나타나요</span><b>생존</b><span>채굴하면 아이템을 얻고 설치하면 1개 소모</span><b>소지품 제작</b><span>E → 제작(2×2) · 작업대를 설치하고 클릭하면 3×3 제작</span><b>건축 형태</b><span>R 형태 전환 · T 회전</span><b>비행</b><span>크리에이티브에서 F · 점프 상승 / 웅크리기 하강</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
+  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프 · 웅크리기</b><span>Space · Shift / 모바일 우측 버튼</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 길게 누르기</span><b>아이템</b><span>1–7 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>발견형 제작법</b><span>재료를 모으면 조합법이 나타나요</span><b>생존</b><span>채굴하면 아이템을 얻고 설치하면 1개 소모</span><b>소지품 제작</b><span>E → 제작(2×2) · 작업대를 설치하고 클릭하면 3×3 제작</span><b>건축 형태</b><span>R 형태 전환 · T 회전 / 모바일은 하단 버튼을 누른 뒤 설치할 면을 탭</span><b>비행</b><span>크리에이티브에서 F · 점프 상승 / 웅크리기 하강</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
  </div></div>
  <div id="rotate-screen" aria-live="polite"><span class="rotate-icon" aria-hidden="true">▱</span><strong>가로로 돌려주세요</strong><span>MakTwo는 가로 화면에서 플레이할 수 있어요</span></div>
  <div id="fatal" hidden></div>
@@ -64,6 +64,6 @@
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.14.0"></script>
+ <script type="module" src="./src/client/game.js?v=1.14.1"></script>
 </body>
 </html>
