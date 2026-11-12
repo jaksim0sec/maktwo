@@ -51,8 +51,8 @@ input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, sampleFloorRect, verticalSpansAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
 const noiseOptions = [
-  ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "줄기 길이와 가지 수"],
-  ["luxuryNoiseConcentration", "노이즈 집중도", 1, 0.01, "높을수록 선 중심에 집중"],
+  ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "물길의 폭과 분포 면적"],
+  ["luxuryNoiseConcentration", "노이즈 집중도", 1, 0.01, "높을수록 강한 중심부가 좁아짐"],
   ["luxuryNoiseAmplitude", "노이즈 강도", 0.20, 0.005, "호화도 증가폭의 상한"],
 ];
 const noiseInputs = Object.fromEntries(noiseOptions.map(([key, label, max, step, help]) => {
@@ -81,7 +81,7 @@ const ratioLabels = {
   centerRadius:"중앙부 반경",mainShaftRadius:"중앙 원통",gardenOffset:"정원 위치",
   gardenRadius:"정원 반경",miniShaftOffset:"미니 통로 위치",miniShaftRadius:"미니 통로 반경",
   roadHalfWidth:"동선 반폭",rimWidth:"외곽 여백",luxuryFalloff:"호화도 감소폭",
-  noiseCellSize:"가지 뻗는 범위"
+  noiseCellSize:"물길 굴곡 스케일"
 };
 const controlHost=document.querySelector("#ratio-controls");
 for (const [key, label] of Object.entries(ratioLabels)) {
