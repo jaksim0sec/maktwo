@@ -76,3 +76,13 @@ test('Input supplies missing canvasCursor and converts mobile client positions i
   input.setUiMode(true);assert.equal(input.canvasCursor(),null);
  }finally{globalThis.document=oldDocument;globalThis.window=oldWindow}
 });
+
+test('left mining hold is cancelled on movement rather than trapping input',()=>{
+ const s=new GestureState();s.down(7,60,160,180,1000,360);
+ assert.deepEqual(s.miningPoint(1500),{x:60,y:160});
+ s.move(7,90,160);
+ assert.equal(s.miningPoint(1600),null);
+ assert.ok(s.movement().x>0);
+ s.up(7,90,160,1700);
+ assert.equal(s.consumeTaps(),0);
+});

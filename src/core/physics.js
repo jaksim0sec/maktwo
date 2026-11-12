@@ -77,7 +77,7 @@ export function intersectDoor(origin,direction,x,y,z,state){
 }
 // 3D voxel DDA with face normal, also works through chunk boundaries.
 export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hitDecor=false}={}){let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z);const d=direction,step=[Math.sign(d.x),Math.sign(d.y),Math.sign(d.z)],coords=[x,y,z],dir=[d.x,d.y,d.z],pos=[origin.x,origin.y,origin.z];const tDelta=dir.map(v=>v===0?Infinity:Math.abs(1/v));const tMax=dir.map((v,i)=>v===0?Infinity:((step[i]>0?coords[i]+1-pos[i]:pos[i]-coords[i])/Math.abs(v)));let normal={x:0,y:0,z:0},t=0;
- for(let n=0;n<256&&t<=maxDistance;n++){const id=world.get(x,y,z);if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||id!==B.FLOWER)){
+ for(let n=0;n<256&&t<=maxDistance;n++){const id=world.get(x,y,z);if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
   if(isDoor(id)){
    const baseY=id===B.DOOR_TOP?y-1:y;
    const door=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));

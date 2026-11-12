@@ -31,7 +31,14 @@ function face(ctx,id,faceIndex,points,shade){
 // Item previews share the exact partial-voxel geometry with world meshing/collision.
 // Isometric box projection is applied once when the icon is cached, not per frame.
 export function drawShapeIcon(ctx,id){
- const boxes=shapeBoxes(id,0,0,0,{facing:0,upper:false});if(!boxes)return false;
+ let boxes=shapeBoxes(id,0,0,0,{facing:0,upper:false});
+ // Reuse the component proportions from the world mesh, not a generic cube.
+ if(id===B.WORKBENCH)boxes=[{x:.045,y:.77,z:.045,w:.91,h:.22,d:.91},...[.11,.72].flatMap(x=>[.11,.72].map(z=>({x,y:0,z,w:.17,h:.76,d:.17})))];
+ if(id===B.FENCE)boxes=[{x:.405,y:0,z:.405,w:.19,h:1.04,d:.19},...[.35,.72].flatMap(y=>[{x:.08,y,z:.442,w:.84,h:.13,d:.116},{x:.442,y,z:.08,w:.116,h:.13,d:.84}])];
+ if(id===B.PATH)boxes=[{x:.06,y:.013,z:.06,w:.88,h:.035,d:.88}];
+ if(id===B.GLOW_MUSHROOM)boxes=[{x:.45,y:.025,z:.45,w:.10,h:.23,d:.10},{x:.31,y:.235,z:.31,w:.38,h:.12,d:.38}];
+ if(id===B.DOOR)boxes=[{x:.05,y:0,z:.42,w:.90,h:.94,d:.12}];
+ if(!boxes)return false;
  const pr=(x,y,z)=>[32+(x-z)*22,43-y*29+(x+z)*7];
  for(const b of [...boxes].sort((a,b)=>(a.x+a.z+a.y*.3)-(b.x+b.z+b.y*.3))){
   const x=b.x,z=b.z,y=b.y,X=x+b.w,Z=z+b.d,Y=y+b.h;

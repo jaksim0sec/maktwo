@@ -12,7 +12,10 @@ class Game{
  get paletteItems(){return this.inventory.quickSlots}
  renderHotbar(){
   const bar=$('hotbar');bar.replaceChildren();for(let i=0;i<7;i++){
-   const id=this.inventory.quickSlots[i],el=document.createElement('button');el.className='slot';el.dataset.block=id===null?'':String(id);
+   const id=this.inventory.quickSlots[i];
+   // Empty or depleted slots have no button and occupy no space.
+   if(id===null||this.inventory.count(id)<=0)continue;
+   const el=document.createElement('button');el.className='slot';el.dataset.block=String(id);el.dataset.slot=String(i);
    const num=document.createElement('span');num.className='slot-number';num.textContent=String(i+1);
    el.append(num);
    if(id!==null&&this.inventory.count(id)>0){const image=document.createElement('img');image.className='item-icon';image.alt='';image.src=itemIconURL(id);el.append(image)}
@@ -20,14 +23,23 @@ class Game{
    el.title=id===null?'빈 칸':blockLabel(id);el.setAttribute('aria-label',`${i+1}번 ${id===null?'빈 칸':blockLabel(id)}`);
    el.onclick=()=>this.select(i);bar.append(el);
   }
-  if(this.selected>=0&&this.paletteItems[this.selected]===null)this.selected=-1;
+  if(this.selected>=0&&(this.paletteItems[this.selected]===null||this.inventory.count(this.paletteItems[this.selected])<=0))this.selected=-1;
   this.select(this.selected,{toggle:false});this.refreshInventoryUI();
 
  }
- refreshInventoryUI(){document.querySelectorAll('.slot').forEach(el=>{
-  const raw=el.dataset.block,id=raw===''?null:Number(raw),n=id===null?0:this.inventory.count(id),count=el.querySelector('.slot-count');
-  if(count)count.textContent=n?String(n):'';el.classList.toggle('empty',!n);el.title=id===null?'빈 칸':`${blockLabel(id)} · ${n}개`;
- });if(this.panel==='inventory')this.updateHologram()}
+ refreshInventoryUI(){
+  const expected=this.inventory.quickSlots.map((id,i)=>id!==null&&this.inventory.count(id)>0?i:-1).filter(i=>i!==-1);
+  const visible=[...$('hotbar').querySelectorAll('.slot')];
+  if(expected.length!==visible.length||expected.some((i,j)=>Number(visible[j].dataset.slot)!==i)){
+   this.renderHotbar();return;
+  }
+  for(const el of visible){
+   const id=Number(el.dataset.block),n=this.inventory.count(id),count=el.querySelector('.slot-count');
+   if(count)count.textContent=n>1?String(n):'';
+   el.title=`${blockLabel(id)} · ${n}개`;
+  }
+  if(this.panel==='inventory')this.updateHologram();
+ }
 
  // Inventory lives in the actual WebGL scene, not a DOM/modal overlay.
  get uiOpen(){return Boolean(this.panel)}
@@ -159,8 +171,11 @@ class Game{
    event.preventDefault();const hit=this.hologram.pickAt(this.player,tap.x,tap.y,this.canvas.getBoundingClientRect());this.inventoryClick(hit);this.hologram.pointer=null;
   });
   this.canvas.addEventListener('wheel',e=>{
-   e.preventDefault();if(this.panel==='inventory')return;if(this.uiOpen)return;
-   this.select((this.selected+(e.deltaY>0?1:-1)+this.paletteItems.length)%this.paletteItems.length,{toggle:false});
+   e.preventDefault();if(this.panel==='inventory'||this.uiOpen)return;
+   const occupied=this.paletteItems.map((id,i)=>id!==null&&this.inventory.count(id)>0?i:-1).filter(i=>i>=0);
+   if(!occupied.length)return;
+   const at=occupied.indexOf(this.selected),next=occupied[(at+(e.deltaY>0?1:-1)+occupied.length)%occupied.length];
+   this.select(next,{toggle:false});
   },{passive:false});
   document.addEventListener('keydown',e=>{
    if(e.repeat||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
@@ -190,9 +205,9 @@ class Game{
  }
  select(i,{toggle=true}={}){
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
-  this.selected=toggle&&this.selected===i?-1:(i>=0&&this.paletteItems[i]===null?-1:i);
+  this.selected=toggle&&this.selected===i?-1:(i>=0&&(this.paletteItems[i]===null||this.inventory.count(this.paletteItems[i])===0)?-1:i);
   this.mining.reset();this.showMining(0);
-  document.querySelectorAll('.slot').forEach((el,j)=>{el.classList.toggle('active',j===this.selected);el.setAttribute('aria-pressed',String(j===this.selected))});
+  document.querySelectorAll('.slot').forEach(el=>{const active=Number(el.dataset.slot)===this.selected;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
   $('block-name').textContent=this.selected<0?'':`${blockLabel(this.paletteItems[this.selected])} · ${this.inventory.count(this.paletteItems[this.selected])}개`;
   this.updateControlHint();if(this.panel==='inventory')this.updateHologram();
  }
@@ -219,7 +234,7 @@ class Game{
    this.interactTimer=.18;this.mining.reset();this.showMining(0);return;
   }
   // Cursor-specific entity targeting, checked before construction.
-  const hitMob=this.entities.hitRay(origin,ray,3.8,this.target?.distance??Infinity);
+  const hitMob=this.entities.hitRay(origin,ray,3.8,this.target?.distance??Infinity,.18);
   if((input.use||miningMode)&&this.interactTimer<=0&&hitMob){
    hitMob.hurt(4,p);this.effects.burst(hitMob.x,hitMob.y+hitMob.height*.6,hitMob.z,'#b8a08f',4);
    this.interactTimer=.38;this.mining.reset();this.showMining(0);return;

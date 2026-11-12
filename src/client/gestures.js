@@ -3,7 +3,7 @@
 export const HOLD_MS = 420;
 export const TAP_DRIFT_PX = 12;
 export const LOOK_START_PX = 14;
-export const HOLD_CANCEL_DRIFT_PX = 24;
+export const HOLD_CANCEL_DRIFT_PX = 18;
 export const MOVE_DEADZONE = 10;
 export const MOVE_FULL_SPEED_PX = 100;
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
@@ -21,8 +21,12 @@ export class GestureState {
  move(id,x,y){
   const f=this.fingers.get(id);if(!f)return;
   const dist=Math.hypot(x-f.startX,y-f.startY);
+  // A hold is not a camera mode. Moving beyond the wobble allowance releases
+  // the mine target; right-hand movement immediately becomes camera look.
+  if(f.holding&&dist>HOLD_CANCEL_DRIFT_PX){
+   f.holding=false;f.holdCancelled=true;if(f.side==='right')f.lookActive=true;
+  }
   if(f.side==='right'){
-   if(f.holding&&dist>HOLD_CANCEL_DRIFT_PX){f.holding=false;f.holdCancelled=true;f.lookActive=true;}
    if(!f.holding&&!f.holdCancelled&&dist>=LOOK_START_PX)f.lookActive=true;
    if(f.lookActive){
     const gain=clamp(1750/f.viewportWidth,2.8,5.6);

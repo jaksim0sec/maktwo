@@ -56,10 +56,12 @@ export class EntityManager{
   for(const e of this.entities)if(e.type!=='drop'&&Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
  }
 
- hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity){
+ hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity,padding=0){
   let choice=null,best=Math.min(maxDistance,blockDistance+1e-4);
+  const assist=Math.min(.24,Math.max(0,padding));
   for(const e of this.entities){if(e.dead||e.type==='drop')continue;
-   const r=e.width*.5,hit=intersectAabb(origin,direction,[e.x-r,e.y,e.z-r],[e.x+r,e.y+e.height,e.z+r]);
+   const r=e.width*.5+assist,vertical=assist*.5;
+   const hit=intersectAabb(origin,direction,[e.x-r,e.y-vertical,e.z-r],[e.x+r,e.y+e.height+vertical,e.z+r]);
    if(hit&&hit.distance>=0&&hit.distance<best){best=hit.distance;choice=e}
   }
   return choice;
