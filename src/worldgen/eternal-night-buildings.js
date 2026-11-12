@@ -36,6 +36,41 @@ export function stairRisers(volume,unit) {
   return volume.type===3 && v>=8 ? 20 : 16;
 }
 
+/** Give a kiosk the same entry direction as its actual exterior/roof port.
+ * The sales area and a separate back-of-house room share ONE doorway in a solid partition.
+ */
+export function orientShopModule(v,side=0) {
+ const p=v.ports?.[side],floor=v.floors?.[0];
+ if(!p||!floor)return false;
+ const {x0,x1,z0,z1}=v,pad=.55,cx=(x0+x1)/2,cz=(z0+z1)/2;
+ const alongZ=side===0||side===2,depth=alongZ?z1-z0:x1-x0;
+ const divider=side===0?z0+depth*.68:side===2?z1-depth*.68:side===1?x1-depth*.68:x0+depth*.68;
+ const sale=alongZ
+  ?{x0:x0+pad,x1:x1-pad,z0:side===0?z0+pad:divider,z1:side===0?divider:z1-pad}
+  :{x0:side===3?x0+pad:divider,x1:side===3?divider:x1-pad,z0:z0+pad,z1:z1-pad};
+ const store=alongZ
+  ?{x0:x0+pad,x1:x1-pad,z0:side===0?divider:z0+pad,z1:side===0?z1-pad:divider}
+  :{x0:side===3?divider:x0+pad,x1:side===3?x1-pad:divider,z0:z0+pad,z1:z1-pad};
+ const halfOpening=Math.min(.85,Math.max(.55,p.width/2-.3));
+ const entry=alongZ?{a:[p.x-halfOpening,p.z],b:[p.x+halfOpening,p.z]}
+  :{a:[p.x,p.z-halfOpening],b:[p.x,p.z+halfOpening]};
+ const backDoor=alongZ?{a:[cx-.7,divider],b:[cx+.7,divider]}
+  :{a:[divider,cz-.7],b:[divider,cz+.7]};
+ floor.rooms=[
+  {...sale,kind:v.program==='workshops'?'service':'shop',door:entry},
+  {...store,kind:'service',door:backDoor}
+ ];
+ floor.partitions=alongZ?[
+  {a:[x0+pad,divider],b:[cx-.7,divider],kind:'partition'},
+  {a:[cx+.7,divider],b:[x1-pad,divider],kind:'partition'}
+ ]:[
+  {a:[divider,z0+pad],b:[divider,cz-.7],kind:'partition'},
+  {a:[divider,cz+.7],b:[divider,z1-pad],kind:'partition'}
+ ];
+ v.frontSide=side;
+ return true;
+}
+
 export function designShopModule(v,unit,random) {
   const {x0,x1,z0,z1,y0}=v;
   if(x1-x0<4||z1-z0<4)return false;
@@ -47,14 +82,9 @@ export function designShopModule(v,unit,random) {
   }
   if(v.support===null){const p=ports[v.frontSide??Math.floor(random(22)*4)];p.open=true;doors.push(p);}
   const top=y0+Math.max(4,Math.round((3+random(44)*.75)*unit));
-  const room={x0:x0+.5,x1:x1-.5,z0:z0+1.2,z1:z1-.5,kind:v.program==='workshops'?'service':'shop',door:{a:[x-1,z0],b:[x+1,z0]}};
-  const partitions=[];
-  if(v.support===null&&x1-x0>5.5&&z1-z0>5.5) {
-    const back=z1-1.65;
-    partitions.push({a:[x0+.7,back],b:[x-.6,back]}, {a:[x+.6,back],b:[x1-.7,back]});
-  }
-  const floor={outline,holes:[],partitions,doors,rooms:[room],corridors:[],band:0,key:'shop',program:v.program,level:0,y:y0,top};
+  const floor={outline,holes:[],partitions:[],doors,rooms:[],corridors:[],band:0,key:'shop',program:v.program,level:0,y:y0,top};
   Object.assign(v,{y1:top,floors:[floor],ports,roof:{outline,y:top,holes:[]},storeyHeight:top-y0,stairs:[],entryLevel:0,typology:v.support===null?'골목 점포':'옥상 증축 점포'});
+  orientShopModule(v,v.frontSide??0);
   return true;
 }
 
@@ -123,22 +153,35 @@ export function designBuilding(volume, unit, random) {
     for (const side of [-1,1]) {
       if (side<0 && atrium&&(!highRise||program==='court')) continue;
       const wallU=side*passage, outer=side<0?(gallery?galleryEdge:-left):right;
-      const edgeU=highRise&&shop&&!(side<0&&gallery)?wallU+side*Math.min(Math.abs(outer-wallU),(3.6+.55*pattern)*unit):outer;
+      // Every market bay must own its complete footprint; never leave an
+      // enormous room-shaped void between the shop and the outside wall.
+      const edgeU=outer;
+      const storageSplit=highRise&&shop&&Math.abs(edgeU-wallU)>6*unit
+        ?wallU+side*Math.min(4.1*unit,Math.abs(edgeU-wallU)*.62):edgeU;
       if (Math.abs(edgeU-wallU)<1.2*unit) continue;
       for (let start=front+unit*1.6, bay=0; start+1.8*unit<=rear; bay++) {
         const end=Math.min(rear,start+roomLength*(highRise?.85+.14*((bay+pattern)%4):1));
         const next=end;
         if (side>0 && start<near+stair.landing && end>far-stair.landing){start=next;continue;}
         const door0=(start+end)/2-unit*.55+(highRise&&program==='housing'?(bay%2===0?.26:-.26)*unit:0),door1=door0+unit*1.1;
-        rooms.push({...rect(Math.min(wallU,edgeU),start,Math.max(wallU,edgeU),end,shop?'shop':program==='workshops'||volume.type===4?'service':'room'),
+        rooms.push({...rect(Math.min(wallU,storageSplit),start,Math.max(wallU,storageSplit),end,shop?'shop':program==='workshops'||volume.type===4?'service':'room'),
           door:wall(wallU,door0,wallU,door1,'door')});
         const frontage=shop?'shopfront':'partition';
         partitions.push(wall(wallU,start,wallU,door0,frontage),wall(wallU,door1,wallU,end,frontage),
           wall(wallU,end,edgeU,end,'partition'));
+        if(shop&&storageSplit!==edgeU) {
+          // Real rear store/workroom, divided from the customer-facing unit.
+          // A centered aperture is deliberately left free for circulation.
+          const backDoor0=(start+end)/2-unit*.49,backDoor1=(start+end)/2+unit*.49;
+          rooms.push({...rect(Math.min(storageSplit,edgeU),start,Math.max(storageSplit,edgeU),end,'service'),
+            door:wall(storageSplit,backDoor0,storageSplit,backDoor1,'door')});
+          partitions.push(wall(storageSplit,start,storageSplit,backDoor0,'partition'),
+            wall(storageSplit,backDoor1,storageSplit,end,'partition'));
+        }
         if (start===front+unit*1.6 || (side>0 && start-roomLength<near+stair.landing)) {
           partitions.push(wall(wallU,start,edgeU,start,'partition'));
         }
-        if(shop&&highRise&&Math.abs(edgeU-outer)>.8)partitions.push(wall(edgeU,start,edgeU,end,'partition'));
+        // The rear service partition is owned by the room pair above.
         if(gallery&&side<0&&shop) {
           const display=(start+end)/2;
           partitions.push(wall(edgeU,start,edgeU,display-unit*.65,'shopfront'),wall(edgeU,display+unit*.65,edgeU,end,'shopfront'));

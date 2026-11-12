@@ -1,5 +1,5 @@
 import {CORE_ZONE, zoneAt} from './eternal-night-core-floor.js';
-import {containsRect, insidePolygon, stairModule} from './eternal-night-buildings.js';
+import {containsRect, insidePolygon, stairModule, orientShopModule} from './eternal-night-buildings.js';
 
 const EPS=1e-7;
 const DIR=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
@@ -347,6 +347,8 @@ export function designRoofWalkway(b,parent,unit) {
     if(!route)continue;
     port.open=true;
     b.floors[port.level].doors.push(port);
+    // A rooftop shop's stockroom must not sit across the only bridge doorway.
+    if(b.floors[0]?.key==='shop')orientShopModule(b,b.ports.indexOf(port));
     return makeWalkway('roof',[port],dedup([p,...route]),width,unit);
   }
   return null;
