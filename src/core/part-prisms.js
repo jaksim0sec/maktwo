@@ -76,9 +76,10 @@ export function partPrisms(id,x,y,z,state={}){
    if(state.rail){
     const x=state.facing===2||state.facing===6?.065:.875;
     const railTop=h+.60;
-    for(const z of [.16,.80]){
-     geometry.push({x,y:h-.01,z,w:.055,h:.60,d:.07,material:106,solid:true});
-    }
+    // One post at the tread centre rather than two end posts on every metre.
+    // Its top follows the sloped rail so successive tread segments connect.
+    const slope=Math.max(0,Math.min(1,state.stairRise??.5));
+    geometry.push({x,y:h-.01,z:.47,w:.055,h:.63+slope*.5,d:.07,material:106,solid:true});
     geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:.45});
     geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:.45});
    }

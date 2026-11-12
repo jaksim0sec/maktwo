@@ -63,3 +63,21 @@ test('continuous bridge guard uses joined horizontal bars with one post per inte
  assert.equal(posted.length,joined.length+1);
  assert.ok(joined.every(p=>p.vertices.every(v=>v.x>=-.00001&&v.x<=1.00001)));
 });
+
+test('roof addition paths have guardrails outside their open portal and stair landing',()=>{
+ const plan=createCityPlan(9999),roof=plan.walkways.find(l=>l.kind==='roof'&&l.segments.some(s=>s.kind==='deck'&&s.length>7));
+ assert.ok(roof,'real roof addition needs a usable connection');
+ const segment=roof.segments.find(s=>s.kind==='deck'&&s.length>7);
+ const t=.5,at=[segment.from[0]+(segment.to[0]-segment.from[0])*t,
+   segment.from[1],segment.from[2]+(segment.to[2]-segment.from[2])*t];
+ const width=roof.width,dx=(segment.to[0]-segment.from[0])/segment.length,dz=(segment.to[2]-segment.from[2])/segment.length;
+ const x=Math.floor(at[0]-dz*(width/2-.3))+.5,z=Math.floor(at[2]+dx*(width/2-.3))+.5;
+ const world=new World({seed:9999,mode:'eternal-city-lab'});
+ const id=world.get(x,Math.round(at[1]),z);
+ // A path crossing an active building doorway can be legitimately open;
+ // elsewhere a guard is required and must share the designed deck level.
+ const nearPortal=roof.ports.some(p=>Math.hypot(p.x-x,p.z-z)<2.5) ||
+   Math.hypot(roof.points.at(-1)[0]-x,roof.points.at(-1)[2]-z)<2.5;
+ if(!nearPortal)assert.ok(id===B.AIR||partById(id)?.family==='passage',
+  'roof link does not place opaque walls in the crossing');
+});

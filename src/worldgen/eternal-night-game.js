@@ -242,10 +242,11 @@ function stampWalkway(link,part,x,z,put,empty) {
   const level=Math.round(part.y??segmentY(part,x,z));
   const style=link.architecture??'open';
   if(empty(level-1))put(level-1,style==='hung'?B.METAL_PANEL:B.FLOOR_TILE);
-  if(!part.from||link.kind==='roof')return;
+  if(!part.from)return;
   const dx=(part.to[0]-part.from[0])/part.length,dz=(part.to[2]-part.from[2])/part.length;
   const sx=x-part.from[0],sz=z-part.from[2],along=sx*dx+sz*dz,lateral=sz*dx-sx*dz;
-  const doorDistance=Math.min(...link.ports.map(p=>Math.hypot(p.x-x,p.z-z)));
+  const doorDistance=Math.min(...link.ports.map(p=>Math.hypot(p.x-x,p.z-z)),
+    ...(link.kind==='roof'?[Math.hypot(link.points.at(-1)[0]-x,link.points.at(-1)[2]-z)]:[]));
   const junction=walkwayJunction({along,span:part.length,width:link.width,
     doorDistance,sideDistance:Math.abs(lateral)});
   const edge=junction.parapet;
@@ -269,7 +270,7 @@ function stampWalkway(link,part,x,z,put,empty) {
       if(empty(level+2))put(level+2,cityPart(face.vent?'ventilation':'wall',1),turn,true);
     } else {
       // A continuous guardrail replaces three posts per independent module.
-      put(level,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(bay%3===0?8:0));
+      put(level,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(mod(Math.floor(along),3)===0?8:0));
       if(bay===0&&(style==='arcade'||style==='hung')){
         for(let y=level+1;y<level+(style==='hung'?4:3);y++)if(empty(y))put(y,cityPart('column',3),turn,true);
       }
