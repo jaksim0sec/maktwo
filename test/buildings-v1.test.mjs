@@ -33,7 +33,7 @@ test('ruin chunks and fixtures are deterministic regardless of generation order'
 test('new materials are append-only, textured, and fit the existing array format',()=>{
  assert.equal(B.CONCRETE,55);
  assert.equal(B.WARNING_STRIPE,76);
- assert.equal(BLOCKS.length,77);
+ assert.ok(BLOCKS.length>=77); // IDs 0-76 remain stable after v2 additions
  const tex=makeTextureLayers();
  assert.equal(tex.layers,MATERIALS.length);
  assert.equal(tex.layers,40);

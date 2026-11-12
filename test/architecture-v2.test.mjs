@@ -55,3 +55,23 @@ test('ground floor doors and a continuous side return for stairs exist',()=>{
  const c=generateChunk(new Chunk(Math.floor(p.x/16),Math.floor(p.z/16)),52771,'ruins',4);
  assert.ok(c.data.length>0);
 });
+
+test('real stair steps lead from floor 0 to the next landing with an open return',()=>{
+ const plan=buildingPlan(0,0,52771);
+ assert.ok(plan&&plan.floors>1);
+ const world=new Map();
+ const get=(x,y,z)=>{
+  const cx=Math.floor(x/16),cz=Math.floor(z/16),key=`${cx},${cz}`;
+  if(!world.has(key))world.set(key,generateChunk(new Chunk(cx,cz),52771,'ruins',4));
+  return world.get(key).get(x-cx*16,y,z-cz*16);
+ };
+ for(let step=0;step<4;step++){
+  const x=plan.x+3,y=plan.base+1+step,z=plan.z+2+step;
+  assert.equal(get(x,y,z),B.CONCRETE_STAIRS,`step ${step} must join next level`);
+  assert.equal(get(x,y+1,z),B.AIR,'stairs must have head clearance');
+ }
+ const landingY=plan.base+5;
+ assert.equal(get(plan.x+3,landingY,plan.z+6),B.FLOOR_TILE);
+ assert.equal(get(plan.x+5,landingY,plan.z+4),B.WALL_TILE);
+ assert.equal(get(plan.x+5,landingY+1,plan.z+4),B.AIR,'walkway returns to next flight');
+});
