@@ -11,6 +11,7 @@ export class Input{
   });
   document.addEventListener('keyup',e=>this.keys.delete(e.code));
   window.addEventListener('blur',()=>this.clear());
+  window.addEventListener('orientationchange',()=>this.clear());
   document.addEventListener('visibilitychange',()=>{if(document.hidden)this.clear()});
   document.addEventListener('pointerlockchange',()=>{
    this.locked=document.pointerLockElement===canvas;
@@ -42,7 +43,7 @@ export class Input{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
    if(this.uiMode)return;
    e.preventDefault();const rect=canvas.getBoundingClientRect();
-   if(this.gestures.down(e.pointerId,e.clientX,e.clientY,rect.left+rect.width/2,performance.now())){
+   if(this.gestures.down(e.pointerId,e.clientX,e.clientY,rect.left+rect.width/2,performance.now(),rect.width)){
     try{canvas.setPointerCapture(e.pointerId)}catch{}
    }
   });
@@ -74,8 +75,10 @@ export class Input{
   if(this.uiMode)return{forward:false,backward:false,left:false,right:false,moveX:0,moveY:0,jump:false,crouch:false,sprint:false,use:false,mine:false,place:false};
   const k=this.keys,m=this.gestures.movement();
   const taps=this.pendingTaps+this.gestures.consumeTaps();this.pendingTaps=0;
-  const fingerTap=this.gestures.consumeTapPoint();const picked=this.tapPoint||fingerTap;this.tapPoint=null;
-  const minePoint=this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:this.gestures.miningPoint(performance.now());
+  const rect=this.canvas.getBoundingClientRect();
+  const canvasAim=p=>p?{x:p.x-rect.left,y:p.y-rect.top}:null;
+  const fingerTap=canvasAim(this.gestures.consumeTapPoint());const picked=this.tapPoint||fingerTap;this.tapPoint=null;
+  const minePoint=this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:canvasAim(this.gestures.miningPoint(performance.now()));
   return{
    forward:k.has('KeyW')||k.has('ArrowUp'),backward:k.has('KeyS')||k.has('ArrowDown'),
    left:k.has('KeyA')||k.has('ArrowLeft'),right:k.has('KeyD')||k.has('ArrowRight'),

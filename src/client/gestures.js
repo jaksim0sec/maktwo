@@ -1,47 +1,67 @@
-// Deterministic gesture state, isolated from DOM so touch behavior can be unit-tested.
+// Mobile pointer-state machine. No on-screen joystick; each finger keeps its
+// starting role even when crossing the midline. DOM and game ticks stay separate.
 export const HOLD_MS = 420;
-export const TAP_DRIFT_PX = 11;
-export const MOVE_DEADZONE = 9;
+export const TAP_DRIFT_PX = 12;
+export const LOOK_START_PX = 14;
+export const HOLD_CANCEL_DRIFT_PX = 24;
+export const MOVE_DEADZONE = 10;
+export const MOVE_FULL_SPEED_PX = 100;
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+const smoothstep=t=>t*t*(3-2*t);
 export class GestureState {
- constructor(){this.fingers=new Map();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;this.tapPoints=[];}
- down(id,x,y,center,time){
+ constructor(){this.fingers=new Map();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.tapPoints=[];this.taps=0;}
+ down(id,x,y,center,time,viewportWidth=center*2){
   if(this.fingers.has(id))return false;
   const side=x<center?'left':'right';
   if(this[side]!==null)return false;
-  this.fingers.set(id,{side,x,y,startX:x,startY:y,time,dragged:false});
+  this.fingers.set(id,{side,x,y,startX:x,startY:y,time,dragged:false,holding:false,holdCancelled:false,lookActive:false,viewportWidth:Math.max(240,viewportWidth)});
   this[side]=id;
   return true;
  }
  move(id,x,y){
   const f=this.fingers.get(id);if(!f)return;
-  const distance=Math.hypot(x-f.startX,y-f.startY);
-  if(distance>TAP_DRIFT_PX)f.dragged=true;
+  const dist=Math.hypot(x-f.startX,y-f.startY);
   if(f.side==='right'){
-   this.lookX+=clamp(x-f.x,-65,65)*1.5;
-   this.lookY+=clamp(y-f.y,-65,65)*1.5;
+   if(f.holding){if(dist>HOLD_CANCEL_DRIFT_PX)f.holdCancelled=true;}
+   else if(!f.holdCancelled){
+    if(dist>=LOOK_START_PX)f.lookActive=true;
+    if(f.lookActive){
+     // CSS px, not device px; keep look sensitivity comparable on phones and tablets.
+     const gain=clamp(540/f.viewportWidth,0.85,2.2);
+     this.lookX+=clamp(x-f.x,-48,48)*gain;
+     this.lookY+=clamp(y-f.y,-48,48)*gain;
+    }
+   }
   }
+  if(dist>TAP_DRIFT_PX)f.dragged=true;
   f.x=x;f.y=y;
  }
  up(id,x,y,time,cancel=false){
   const f=this.fingers.get(id);if(!f)return;
-  if(!cancel&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX&&!f.dragged&&time-f.time<HOLD_MS){this.taps++;this.tapPoints.push({x,y});}
+  // The movement zone can never accidentally place or break a block.
+  if(!cancel&&f.side==='right'&&!f.dragged&&!f.holding&&!f.holdCancelled&&time-f.time<HOLD_MS&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX){
+   this.taps++;this.tapPoints.push({x,y});
+  }
   this.fingers.delete(id);this[f.side]=null;
  }
- miningPoint(now){const f=this.right===null?null:this.fingers.get(this.right);return f&&!f.dragged&&now-f.time>=HOLD_MS?{x:f.x,y:f.y}:null}
- consumeTapPoint(){this.taps=0;const p=this.tapPoints.at(-1)||null;this.tapPoints.length=0;return p}
- movement(){
-  if(this.left===null)return{x:0,y:0};
-  const f=this.fingers.get(this.left),dx=f.x-f.startX,dy=f.y-f.startY,r=Math.hypot(dx,dy);
-  if(r<=MOVE_DEADZONE)return{x:0,y:0};
-  const power=clamp((r-MOVE_DEADZONE)/75,0,1);
-  return{x:dx/r*power,y:dy/r*power};
- }
- mining(now){
+ miningPoint(now){
   const f=this.right===null?null:this.fingers.get(this.right);
-  return Boolean(f&&!f.dragged&&now-f.time>=HOLD_MS);
+  if(!f||f.lookActive||f.holdCancelled||(!f.holding&&f.dragged)||now-f.time<HOLD_MS)return null;
+  f.holding=true;
+  // Lock the target during a hold so subpixel finger wobble doesn't reset mining.
+  return{x:f.startX,y:f.startY};
+ }
+ mining(now){return Boolean(this.miningPoint(now))}
+ consumeTapPoint(){const p=this.tapPoints.at(-1)||null;this.tapPoints.length=0;return p}
+ movement(){
+  const f=this.left===null?null:this.fingers.get(this.left);
+  if(!f)return{x:0,y:0};
+  const dx=f.x-f.startX,dy=f.y-f.startY,r=Math.hypot(dx,dy);
+  if(r<=MOVE_DEADZONE)return{x:0,y:0};
+  const power=smoothstep(clamp((r-MOVE_DEADZONE)/(MOVE_FULL_SPEED_PX-MOVE_DEADZONE),0,1));
+  return{x:dx/r*power,y:dy/r*power};
  }
  consumeTaps(){const count=this.taps;this.taps=0;return count;}
  consumeLook(){const v=[this.lookX,this.lookY];this.lookX=0;this.lookY=0;return v;}
- reset(){this.tapPoints=[];this.fingers.clear();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;}
+ reset(){this.tapPoints.length=0;this.fingers.clear();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;}
 }

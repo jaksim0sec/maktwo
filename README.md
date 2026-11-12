@@ -1,3 +1,5 @@
+> v1.2.0: Mobile gesture overhaul. Left-zone drag moves without placing; right-zone tap builds/uses, right-zone long hold mines, right-zone drag looks around. Two fingers act independently. Minor finger jitter is filtered; interrupted gestures reset safely. The missing canvasCursor implementation is restored; pointer targeting uses CSS-pixel coordinates.
+
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
 # MakTwo · Endless Night v1.1.0

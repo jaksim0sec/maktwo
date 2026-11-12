@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo · The Endless Night</title>
- <link rel="stylesheet" href="./style.css?v=1.1.1">
+ <link rel="stylesheet" href="./style.css?v=1.2.0">
 </head>
 <body>
  <canvas id="screen" aria-label="복셀 월드"></canvas>
@@ -41,6 +41,6 @@
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면을 불러올 수 없음: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.1.1"></script>
+ <script type="module" src="./src/client/game.js?v=1.2.0"></script>
 </body>
 </html>
