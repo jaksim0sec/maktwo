@@ -2,7 +2,7 @@ import {GestureState,HOLD_MS} from './gestures.js';
 const cap=v=>Math.max(-180,Math.min(180,v));
 export class Input{
  constructor(canvas){
-  this.canvas=canvas;this.keys=new Set();this.held={};this.locked=false;this.uiMode=false;
+  this.canvas=canvas;this.keys=new Set();this.held={};this.locked=false;this.uiMode=false;this.inventoryMode=false;
   this.dx=0;this.dy=0;this.pointer={left:false,start:0,x:0,y:0};this.pendingTaps=0;this.tapPoint=null;this.mouseLook=false;this.lastMouse=null;this.gestures=new GestureState();
   document.addEventListener('keydown',e=>{
    if(this.uiMode||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
@@ -27,6 +27,7 @@ export class Input{
   // No automatic pointer lock: the user must be able to target off-center blocks.
   canvas.addEventListener('mousedown',e=>{
    if(this.uiMode)return;
+   if(this.inventoryMode&&e.button===0)return;
    if(e.button===2){e.preventDefault();this.mouseLook=true;this.lastMouse={x:e.clientX,y:e.clientY};return;}
    if(e.button!==0)return;
    const rect=canvas.getBoundingClientRect();this.pointer={left:true,start:performance.now(),x:e.clientX-rect.left,y:e.clientY-rect.top};
@@ -34,14 +35,14 @@ export class Input{
   document.addEventListener('mouseup',e=>{
    if(e.button===2){this.mouseLook=false;this.lastMouse=null;return;}
    if(e.button!==0||!this.pointer.left)return;
-   if(!this.uiMode&&performance.now()-this.pointer.start<HOLD_MS){this.pendingTaps++;this.tapPoint={x:this.pointer.x,y:this.pointer.y}}
+   if(!this.uiMode&&!this.inventoryMode&&performance.now()-this.pointer.start<HOLD_MS){this.pendingTaps++;this.tapPoint={x:this.pointer.x,y:this.pointer.y}}
    this.pointer.left=false;
   });
   canvas.addEventListener('contextmenu',e=>e.preventDefault());
   // Pointer events support simultaneous movement/look and handle interruptions.
   canvas.addEventListener('pointerdown',e=>{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
-   if(this.uiMode)return;
+   if(this.uiMode||this.inventoryMode)return;
    e.preventDefault();const rect=canvas.getBoundingClientRect();
    if(this.gestures.down(e.pointerId,e.clientX,e.clientY,rect.left+rect.width/2,performance.now(),rect.width)){
     try{canvas.setPointerCapture(e.pointerId)}catch{}
@@ -64,13 +65,18 @@ export class Input{
   });
  }
  canvasCursor(){
-  const p=this.lastMouse;if(!p||this.uiMode)return null;
+  const p=this.lastMouse;if(!p||this.uiMode||this.inventoryMode||this.locked)return null;
   const r=this.canvas.getBoundingClientRect();
   if(p.x<r.left||p.x>r.right||p.y<r.top||p.y>r.bottom)return null;
   return{x:p.x-r.left,y:p.y-r.top};
  }
  clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset()}
- setUiMode(open){this.uiMode=Boolean(open);this.clear()}
+ setUiMode(open){const next=Boolean(open);if(this.uiMode===next)return;this.uiMode=next;if(next)this.clear()}
+ setInventoryMode(open){this.inventoryMode=Boolean(open);this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.gestures.reset()}
+ toggleCameraMode(){
+  if(document.pointerLockElement===this.canvas){document.exitPointerLock?.();return}
+  try{const request=this.canvas.requestPointerLock?.();request?.catch?.(e=>console.warn('[MakTwo] Pointer lock unavailable',e))}catch(e){console.warn('[MakTwo] Pointer lock unavailable',e)}
+ }
  read(){
   if(this.uiMode)return{forward:false,backward:false,left:false,right:false,moveX:0,moveY:0,jump:false,crouch:false,sprint:false,use:false,mine:false,place:false};
   const k=this.keys,m=this.gestures.movement();
@@ -85,7 +91,7 @@ export class Input{
    moveX:m.x,moveY:-m.y,
    jump:Boolean(k.has('Space')||this.held.jump),crouch:Boolean(k.has('ShiftLeft')||this.held.crouch),
    sprint:k.has('ControlLeft')||k.has('ControlRight'),
-   use:taps>0,mine:Boolean(minePoint||this.held.mine),aim:(minePoint||picked),place:false
+   use:!this.inventoryMode&&taps>0,mine:!this.inventoryMode&&Boolean(minePoint||this.held.mine),aim:this.inventoryMode?null:(minePoint||picked),place:false
   };
  }
  consumeLook(){

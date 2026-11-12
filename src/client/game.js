@@ -13,7 +13,7 @@ class Game{
   const tile=document.createElement('span');tile.className='voxel';tile.style.setProperty('--tile',block(id).color);
   el.append(num,tile);el.title=`${blockLabel(id)} · ${i+1}`;el.setAttribute('aria-label',`${i+1}번 ${blockLabel(id)} 선택`);el.onclick=()=>this.select(i);bar.append(el);
  }this.select(Math.min(this.selected,this.paletteItems.length-1),{toggle:false});
- const paletteToggle=$('palette-toggle');if(paletteToggle){paletteToggle.textContent=this.palette==='lights'?'▦ 블록':'✦ 조명';paletteToggle.title='블록/조명 도구 전환 · L'}
+ const paletteToggle=$('palette-toggle');if(paletteToggle){paletteToggle.innerHTML=this.palette==='lights'?'<span class="dock-icon" aria-hidden="true">▥</span><span>블록</span>':'<span class="dock-icon" aria-hidden="true">✧</span><span>조명</span>';paletteToggle.title='블록/조명 도구 전환 · L'}
  }
  // Inventory lives in the actual WebGL scene, not a DOM/modal overlay.
  get uiOpen(){return Boolean(this.panel)}
@@ -25,7 +25,7 @@ class Game{
   $('bag-btn')?.setAttribute('aria-expanded',String(this.panel==='inventory'));
   document.body.classList.toggle('ui-open',this.uiOpen);
   document.body.classList.toggle('holo-open',this.panel==='inventory');
-  this.input.setUiMode(this.uiOpen);this.placeLatch=false;this.mining.reset();this.showMining(0);
+  this.input.setUiMode(this.uiOpen&&this.panel!=='inventory');this.input.setInventoryMode(this.panel==='inventory');this.placeLatch=false;this.mining.reset();this.showMining(0);
   if(this.panel==='inventory'){
    if(prior!=='inventory')this.hologram.open(this.player);
    this.updateHologram();
@@ -58,19 +58,22 @@ class Game{
   }
  }
  updateControlHint(){
-  const el=$('control-hint');if(!el)return;
+  this.updateCameraButton();const el=$('control-hint');if(!el)return;
   el.classList.toggle('ui-active',this.uiOpen);
-  el.textContent=this.panel==='inventory'?'떠 있는 카드를 클릭 · 월드 안에 그대로 위치 · E 닫기':
+  el.textContent=this.panel==='inventory'?'가방을 보며 이동 가능 · 카드 선택 후 E 닫기':
    this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 돌아가기로 복귀':
-   this.selected<0?'커서에서 길게 눌러 채굴 · 우클릭 드래그 시점 · E 가방':
-   '커서 클릭 설치 · 길게 눌러 채굴 · 우클릭 드래그 시점 · E 가방';
+   this.selected<0?'길게 클릭해 채굴 · 우클릭 드래그 또는 C 시점 고정 · E 가방':
+   '클릭 설치 · 길게 누르면 채굴 · 우클릭 드래그 / C 시점 고정 · E 가방';
  }
+ updateCameraButton(){const btn=$('camera-btn');if(!btn)return;const locked=Boolean(this.input?.locked);btn.setAttribute('aria-pressed',String(locked));btn.innerHTML=locked?'시점 고정 <kbd>C</kbd>':'자유 커서 <kbd>C</kbd>';}
+ toggleCameraMode(){this.input.toggleCameraMode();this.updateCameraButton()}
  showMining(ratio){const el=$('mine-progress');if(!el)return;el.style.setProperty('--progress',`${Math.round(ratio*100)}%`);el.classList.toggle('active',ratio>0)}
 
  bindUI(){
   this.renderHotbar();this.updateControlHint();
   bindClick('palette-toggle',()=>this.togglePalette());
   bindClick('menu-btn',()=>this.toggleMenu());
+  bindClick('camera-btn',()=>this.toggleCameraMode());
   bindClick('bag-btn',()=>this.togglePanel('inventory'));
   bindClick('resume',()=>this.requestGameFocus());
   bindClick('help-btn',()=>this.togglePanel('help'));
@@ -90,10 +93,11 @@ class Game{
    for(const n of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(n,()=>this.input.held[action]=false);
   }
   // Clicking the world closes menus and captures the mouse in one gesture.
-  this.canvas.addEventListener('mousedown',event=>{if(this.panel==='inventory'){event.preventDefault();if(event.button===0)this.inventoryClick();return}if(this.uiOpen)this.requestGameFocus()});
+  this.canvas.addEventListener('mousedown',event=>{if(this.panel==='inventory'){if(event.button===0){event.preventDefault();this.inventoryClick()}return}if(this.uiOpen)this.requestGameFocus()});
   document.addEventListener('pointerlockchange',()=>{
    // Esc may release pointer lock. Do not automatically spawn a menu over the scene.
-   this.updateControlHint();
+   if(this.input.locked)this.hologram.pointer=null;
+   this.updateControlHint();this.updateCameraButton();
   });
   this.canvas.addEventListener('pointermove',event=>{
    if(event.pointerType==='mouse'&&!this.uiOpen){const pos=canvasPoint(event,this.canvas);for(const id of ['crosshair','target','mine-progress']){const el=$(id);if(el){el.style.left=pos.x+'px';if(id==='crosshair')el.style.top=pos.y+'px';else el.style.top=(pos.y+(id==='target'?18:27))+'px'}}}
@@ -112,6 +116,7 @@ class Game{
    if(e.repeat||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
    if(e.code==='KeyE'||e.code==='KeyI'){e.preventDefault();this.togglePanel('inventory');return}
    if(e.code==='KeyM'){e.preventDefault();this.togglePanel('settings');return}
+   if(e.code==='KeyC'&&!this.menuOpen&&!this.helpOpen){e.preventDefault();this.toggleCameraMode();return}
    if(e.code==='KeyH'){e.preventDefault();this.togglePanel('help');return}
    if(e.code==='Escape'){
     if(this.uiOpen){e.preventDefault();this.setPanel(null)}
@@ -149,6 +154,7 @@ class Game{
  blast(){const p=this.player,d=p.direction(),hit=raycast(this.world,{x:p.x,y:p.y+p.eye,z:p.z},d,7);if(hit){const x=hit.x+.5,y=hit.y+.5,z=hit.z+.5;explode(this.world,this.entities.entities,this.effects,x,y,z,3);this.status('폭발')}}
  spawnMob(type='sheep'){const p=this.player,d=p.direction(),x=Math.floor(p.x+d.x*5),z=Math.floor(p.z+d.z*5);for(let y=55;y>0;y--){if(this.world.get(x,y,z)===B.AIR&&this.world.get(x,y-1,z)!==B.AIR){this.entities.spawn(type,x+.5,y,z+.5);this.status('동물이 나타났어요');break}}}
  interaction(dt,input){
+  if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
   this.interactTimer=Math.max(0,this.interactTimer-dt);
   const p=this.player,d=p.direction(),origin={x:p.x,y:p.y+p.eye,z:p.z};
   const miningMode=input.mine;

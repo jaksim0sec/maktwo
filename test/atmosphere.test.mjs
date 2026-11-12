@@ -27,7 +27,8 @@ test('hologram inventory renders in WebGL instead of a separate DOM overlay',()=
  for(const id of ['screen','bag-btn','hotbar','toolbar'])assert.match(html,new RegExp(`id="${id}"`));
  assert.doesNotMatch(html,/id="spatial-layer"/);
  assert.match(game,/e.code==='KeyE'\|\|e.code==='KeyI'/);
- assert.match(game,/this\.input\.setUiMode\(this\.uiOpen\)/);
+ assert.match(game,/this\.input\.setUiMode\(this\.uiOpen&&this\.panel!=='inventory'\)/);
+ assert.match(game,/this\.input\.setInventoryMode\(this\.panel==='inventory'\)/);
  assert.match(game,/this\.hologram\.open\(this\.player\)/);
  assert.match(hologram,/gl\.drawArrays\(gl\.TRIANGLES,0,this\.count\)/);
  assert.match(hologram,/gl\.enable\(gl\.DEPTH_TEST\)/);

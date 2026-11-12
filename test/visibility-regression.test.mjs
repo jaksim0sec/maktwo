@@ -11,7 +11,7 @@ test('world-space inventory remains visible as a faint occluded silhouette',()=>
 });
 test('PWA loads fresh online modules and falls back to cache offline',()=>{
  const sw=file('sw.js');
- assert.match(sw,/maktwo-shell-v1\.2\.0/);
+ assert.match(sw,/maktwo-shell-v1\.3\.0/);
  const pos=sw.indexOf('  // Network-first for source files');
  assert.ok(pos>=0);
  const network=sw.indexOf('await fetch\(request\)',pos); // literal index check in next assertion

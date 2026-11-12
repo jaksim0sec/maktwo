@@ -3,44 +3,63 @@
 <head>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
- <meta name="theme-color" content="#202529">
+ <meta name="theme-color" content="#171a1c">
  <meta name="apple-mobile-web-app-capable" content="yes">
  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
- <title>MakTwo · The Endless Night</title>
- <link rel="stylesheet" href="./style.css?v=1.2.0">
+ <title>MakTwo | 끝나지 않는 밤</title>
+ <link rel="stylesheet" href="./style.css?v=1.3.0">
 </head>
 <body>
- <canvas id="screen" aria-label="복셀 월드"></canvas>
- <header id="hud"><div class="game-title">MakTwo <span id="biome"></span></div><div class="stats"><span id="coords"></span><span id="fps"></span></div></header>
- <button id="menu-btn" aria-label="설정 열기" aria-expanded="false" title="설정 · M">☰</button>
+ <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
+ <header id="hud" aria-label="게임 정보">
+  <div class="brand" aria-label="MakTwo">
+   <span class="brand-mark" aria-hidden="true">☾</span>
+   <div class="brand-type"><strong>MakTwo</strong><span id="biome">영원한 밤</span></div>
+  </div>
+  <div class="stats" aria-live="off"><span id="coords"></span><span id="fps"></span></div>
+ </header>
+ <nav class="top-actions" aria-label="게임 도구">
+  <button id="camera-btn" class="action-button camera-mode" aria-label="시점 모드 전환" aria-pressed="false" title="C · 자유 커서 / 마우스 시점 전환">자유 커서 <kbd>C</kbd></button>
+  <button id="menu-btn" class="action-button menu-button" aria-label="설정 열기" aria-expanded="false" title="설정 · M"><span class="menu-glyph" aria-hidden="true">☰</span></button>
+ </nav>
  <aside id="toolbar" class="hidden" aria-label="게임 설정">
-  <button id="resume" class="resume">게임으로 돌아가기 · M</button>
-  <label>월드 <select id="world"><option value="Overworld">영원한 밤</option><option value="Flatlands">평지</option><option value="Islands">섬</option></select></label>
-  <button id="spawn">스폰으로 이동</button>
-  <button id="mode">비행 모드 · F</button>
-  <button id="save">저장 · P</button>
-  <button id="water-repair" title="주변에 직접 설치하거나 퍼진 물만 정리하고 자연 물과 건축물은 보존">주변 물 정리 · 24칸</button>
-  <button id="help-btn">조작법 · H</button>
-  <span>시드 <b id="seed"></b></span>
+  <div class="settings-heading"><div><span class="eyebrow">MAKTWO</span><h2>게임 설정</h2></div><button id="resume" class="close-control" title="설정 닫기">✕ <span>닫기</span></button></div>
+  <div class="settings-section"><span class="section-caption">월드</span><label class="field-label" for="world">이동할 세계</label><select id="world"><option value="Overworld">영원한 밤</option><option value="Flatlands">평지</option><option value="Islands">섬</option></select><span class="seed-line">월드 시드 <b id="seed"></b></span></div>
+  <div class="settings-section"><span class="section-caption">플레이</span><button id="spawn" class="setting-row"><span>⌖</span> 시작 위치로 이동</button><button id="mode" class="setting-row"><span>✦</span> 비행 모드 <kbd>F</kbd></button><button id="save" class="setting-row"><span>▣</span> 월드 저장 <kbd>P</kbd></button></div>
+  <div class="settings-section"><span class="section-caption">관리 및 도움말</span><button id="water-repair" class="setting-row" title="직접 설치한 물을 복구하고 자연 물과 건축물을 보호합니다"><span>◌</span> 설치된 물 정리</button><button id="help-btn" class="setting-row"><span>?</span> 조작법 확인 <kbd>H</kbd></button></div>
+  <div class="settings-foot">이 세계의 밤은 끝나지 않습니다</div>
  </aside>
- <div id="crosshair"><i></i><i></i></div><div id="mine-progress" aria-hidden="true"><span></span></div><div id="target"></div>
- <div id="toast"></div>
- <div id="health"></div><div id="flight"></div>
- <div id="control-hint" aria-live="polite">클릭 설치 · 길게 누르면 채굴 · E 공간 가방</div>
- <div id="block-name"></div><div id="hotbar-dock"><button id="bag-btn" aria-label="건축 가방 열기" title="가방 · E" aria-expanded="false">가방 <span class="bag-shortcut">E</span></button><button id="palette-toggle" aria-label="건축 및 조명 도구 전환" title="조명 전환 · L">✦ 조명</button><div id="hotbar"></div></div>
- <div id="mobile"><div class="touch-zones" aria-hidden="true"><span>왼쪽 드래그 · 이동</span><span>오른쪽 드래그 · 시점<br>탭 설치 · 길게 채굴</span></div><div class="touchbuttons"><button data-action="jump" aria-label="점프">점프</button><button data-action="crouch" aria-label="비행 중 하강">하강</button></div></div>
- <div id="help" class="overlay hidden"><div class="help-card"><h2>조작법</h2><div class="help-grid">
-  <b>이동</b><span>WASD · 모바일 왼쪽 드래그</span><b>시점</b><span>PC 우클릭 드래그 · 모바일 오른쪽 드래그</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>클릭 위치 길게 누르기 · 모바일 우측 길게 누르기</span><b>블록 설치</b><span>아이템 선택 후 원하는 곳을 짧게 클릭 또는 탭</span><b>블록 선택</b><span>1–0 / 스크롤 · Q 맨손</span><b>조명 도구</b><span>L / 아래 ✦ 조명 버튼</span><b>비행</b><span>F</span><b>양 생성</b><span>G</span><b>좀비 테스트</b><span>Shift+G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>물 복구</b><span>M 설정 → 주변 물 정리</span><b>UI 조작</b><span>E 실제 월드의 공간형 가방 / M 설정</span><b>게임으로 복귀</b><span>E 또는 홀로그램에서 닫기</span><b>마우스 해제</b><span>Esc / M 설정</span></div><button id="close-help">닫기</button></div></div>
+ <div id="crosshair" aria-hidden="true"><i></i><i></i></div>
+ <div id="mine-progress" aria-hidden="true"><span></span></div>
+ <div id="target" role="status"></div>
+ <div id="toast" role="status" aria-live="polite"></div>
+ <div id="player-status" aria-label="플레이어 상태"><div id="health"></div><div id="flight"></div></div>
+ <div id="control-hint" aria-live="polite">클릭 설치 · 누르고 채굴 · C 시점 · E 가방</div>
+ <div id="build-controls">
+  <div id="block-name" aria-live="polite"></div>
+  <div id="hotbar-dock" aria-label="빠른 선택">
+   <button id="bag-btn" class="dock-action" aria-label="공간형 가방 열기" title="가방 · E" aria-expanded="false"><span class="dock-icon" aria-hidden="true">▤</span><span>가방</span><kbd>E</kbd></button>
+   <div id="hotbar" aria-label="아이템 바로가기"></div>
+   <button id="palette-toggle" class="dock-action" aria-label="건축 및 조명 도구 전환" title="조명 · L"><span class="dock-icon" aria-hidden="true">✧</span><span>조명</span></button>
+  </div>
+ </div>
+ <div id="mobile" aria-label="모바일 조작">
+  <div class="touch-zones" aria-hidden="true"><span>↔ 이동 영역</span><span>시점 이동 · 탭 설치 · 길게 채굴 ↗</span></div>
+  <div class="touchbuttons"><button data-action="jump" aria-label="점프">↑<span>점프</span></button><button data-action="crouch" aria-label="하강">↓<span>하강</span></button></div>
+ </div>
+ <div id="help" class="overlay hidden"><div class="help-card" role="dialog" aria-labelledby="help-title">
+  <div class="help-top"><div><span class="eyebrow">GUIDE</span><h2 id="help-title">조작법</h2></div><button id="close-help" aria-label="도움말 닫기">✕</button></div>
+  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프</b><span>Space</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 우측 롱프레스</span><b>아이템</b><span>1–0 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>조명 도구</b><span>L</span><b>비행</b><span>F</span><b>동물 / 테스트</b><span>G / Shift+G</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
+ </div></div>
  <div id="fatal" hidden></div>
  <script>
- // Even a stale service worker cannot hide an updated page indefinitely.
  if(navigator.serviceWorker){const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController&&!window.__maktwoReloading){window.__maktwoReloading=true;location.reload()}})}
- window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면을 불러올 수 없음: '+event.message;fatal.hidden=false});
+ window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.2.0"></script>
+ <script type="module" src="./src/client/game.js?v=1.3.0"></script>
 </body>
 </html>

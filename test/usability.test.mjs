@@ -66,7 +66,7 @@ test('UI documents explain placement and expose a one-click resume path',()=>{
  const controller=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
  assert.match(page,/id="resume"/);
  assert.match(page,/id="control-hint"/);
- assert.match(page,/아이템 선택 후 원하는 곳을 짧게 클릭 또는 탭/);
+ assert.match(page,/아이템 선택 후 짧게 클릭 또는 탭/);
  assert.match(controller,/e\.code==='KeyE'/);
  assert.match(controller,/this\.requestGameFocus\(\)/);
 });
