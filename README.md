@@ -1,4 +1,4 @@
-# MakTwo · Endless Night v0.5.1
+# MakTwo · Endless Night v0.6.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -24,7 +24,7 @@ npm test
 | Space | Jump |
 | Shift | Crouch / descend while flying |
 | Ctrl | Sprint |
-| Left click | Break block / attack mob |
+| Left click | Break block (including placed water) / attack mob |
 | Right click or R | Place a block against the face you are looking at |
 | 1..0 or scroll | Select from the current hotbar |
 | L or the light button | Switch between the original building hotbar and three light fixtures |
@@ -36,10 +36,19 @@ npm test
 | P | Save edited blocks |
 | E or I | Open the floating building bag, releasing the pointer; choose an item to return directly |
 | M | Open/close settings (separate from the building bag) |
+| Settings → 주변 물 정리 | Clear only player-edited water within 24 blocks and save automatically |
 | H | Open/close help |
 | Escape | Release the pointer; E reopens the bag or M opens settings |
 
 Touch users: left side drag to walk, right side drag to look; the buttons offer jumping, placing and breaking blocks.
+
+## v0.6.0: Step-up and water recovery
+
+- The voxel grid and existing saves are **unchanged**. Player collision height is 1.90 vs 1.80 previously; eye height 1.70 vs 1.62, so blocks look roughly 5% smaller relative to the player.
+- Grounded entities can automatically climb obstacles up to one full block using a 0.125-step collision clearance sweep. Two-block walls and low ceilings still block passage.
+- Water is now directly targetable when breaking blocks. The settings panel includes **주변 물 정리**. It restores only saved water edits within 24 blocks of the player (including old spilled water), keeping natural water and placed solids intact. Unloaded chunks are handled via saved edit records.
+- Before recovery, the current full edit snapshot is backed up under `localStorage['mcweb:<world>:before-water-cleanup']`, then the recovered world is saved automatically.
+- The old source-unaware water-spread code made permanent water copies. **Further water spreading is temporarily disabled**, until a source/flow-level implementation can retract liquid safely. Water blocks can still be placed, removed and rendered.
 
 ## Architecture
 

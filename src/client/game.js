@@ -90,6 +90,10 @@ class Game{
   bindClick('help-btn',()=>this.togglePanel('help'));
   bindClick('close-help',()=>this.requestGameFocus());
   bindClick('save',()=>{this.world.save();this.status('월드 저장 완료')});
+  bindClick('water-repair',()=>{
+   const count=this.world.drainPlacedWater(this.player.x,this.player.y,this.player.z,24);
+   this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
+  });
   bindClick('mode',()=>{this.player.fly=!this.player.fly;this.player.vy=0;this.status(this.player.fly?'비행 모드':'걷기 모드')});
   $('world').addEventListener('change',e=>this.travel(e.target.value));
   bindClick('spawn',()=>{const t=this.world.spawn();Object.assign(this.player,t,{vx:0,vy:0,vz:0});this.status('시작 위치로 이동')});
@@ -137,7 +141,7 @@ class Game{
  spawnMob(type='sheep'){const p=this.player,d=p.direction(),x=Math.floor(p.x+d.x*5),z=Math.floor(p.z+d.z*5);for(let y=55;y>0;y--){if(this.world.get(x,y,z)===B.AIR&&this.world.get(x,y-1,z)!==B.AIR){this.entities.spawn(type,x+.5,y,z+.5);this.status('Mob spawned');break}}}
  interaction(dt,input){this.interactTimer-=dt;const p=this.player,d=p.direction(),origin={x:p.x,y:p.y+p.eye,z:p.z};this.target=raycast(this.world,origin,d,6);
  if(this.interactTimer>0)return;
- if(input.mine){const entity=this.entities.attack(p,3.4);if(entity){this.effects.burst(entity.x,entity.y+1,entity.z,'#f15d59',9);this.interactTimer=.32;return}if(this.target){const t=this.target;if(t.id!==B.BEDROCK){this.world.set(t.x,t.y,t.z,B.AIR);this.effects.burst(t.x+.5,t.y+.5,t.z+.5,block(t.id).color,16);this.interactTimer=.18}}}
+ if(input.mine){const entity=this.entities.attack(p,3.4);if(entity){this.effects.burst(entity.x,entity.y+1,entity.z,'#f15d59',9);this.interactTimer=.32;return}const waterTarget=raycast(this.world,origin,d,6,{hitWater:true});const t=waterTarget||this.target;if(t&&t.id!==B.BEDROCK){this.world.set(t.x,t.y,t.z,B.AIR);this.effects.burst(t.x+.5,t.y+.5,t.z+.5,block(t.id).color,16);this.interactTimer=.18}}
  else if(input.place&&this.target){const t=this.target,x=t.x+t.normal.x,y=t.y+t.normal.y,z=t.z+t.normal.z,id=this.paletteItems[this.selected],old=this.world.get(x,y,z);if(block(old).replaceable){this.world.set(x,y,z,id);if(collides(this.world,p.x,p.y,p.z,p.width,p.height)){this.world.set(x,y,z,old)}else{this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5)}this.interactTimer=.18}}}
  tick(dt){this.portalCooldown=Math.max(0,this.portalCooldown-dt);const p=this.player,input=this.input.read(),[mx,my]=this.input.consumeLook();p.yaw-=mx*.0023;p.pitch=clamp(p.pitch-my*.0023,-1.53,1.53);p.update(this.world,dt,input);if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){const names=[...this.manager.worlds.keys()];this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;}this.world.tick();this.entities.tick(dt,p);this.effects.tick(dt);this.interaction(dt,input);if(p.dead){p.hp=20;p.dead=false;Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0});this.status('Respawned')}}
  frame(time){const elapsed=time-this.last,dt=Math.min(elapsed/1000,.06);this.last=time;this.lastFrameMs=elapsed;this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,3,2);this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects);if(time-this.lastHud>150){this.hud();this.lastHud=time}requestAnimationFrame(t=>this.frame(t))}

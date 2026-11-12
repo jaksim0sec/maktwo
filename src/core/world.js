@@ -18,21 +18,47 @@ export class World{
    this.queued.delete(k);const id=this.get(x,y,z);
    if(id===B.SAND&&block(this.get(x,y-1,z)).replaceable){
     this.set(x,y-1,z,B.SAND,{simulate:true});this.set(x,y,z,B.AIR,{simulate:true});
-   }else if(id===B.WATER){
-    if(this.get(x,y-1,z)===B.AIR){this.set(x,y-1,z,B.WATER,{simulate:false})}
-    else if(this.tickCount%5===0){
-     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const nx=x+dx,nz=z+dz;
-      if(this.get(nx,y,nz)===B.AIR&&this.get(nx,y-1,nz)!==B.AIR)this.set(nx,y,nz,B.WATER,{simulate:false});
-     }
-    }
-   }
+   } // Water stays contained until source/flow states can be simulated reversibly.
   }
  }
 
+
+ // Undo accidental floods without erasing natural lakes or any placed solid blocks.
+ // Water from old simulated flow was saved as WATER edits, so it is recoverable too.
+ drainPlacedWater(x,y,z,radius=20){
+  const radius2=radius*radius,selected=[];
+  for(const [k,edits] of this.edits){
+   const [cx,cz]=k.split(',').map(Number),ox=cx*SIZE,oz=cz*SIZE;
+   for(const [idx,id] of edits){
+    if(id!==B.WATER)continue;
+    const bx=ox+idx%SIZE,by=Math.floor(idx/(SIZE*SIZE)),bz=oz+Math.floor(idx/SIZE)%SIZE;
+    if((bx+.5-x)**2+(bz+.5-z)**2>radius2||Math.abs(by+.5-y)>radius)continue;
+    selected.push({k,idx,cx,cz,bx,by,bz});
+   }
+  }
+  if(!selected.length)return 0;
+  // Keep the entire current edit snapshot available before modifying anything.
+  if(this.storage)this.storage.setItem('mcweb:'+this.name+':before-water-cleanup',this.snapshot());
+  const originals=new Map();
+  for(const entry of selected){
+   let base=originals.get(entry.k);
+   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz),this.seed,this.mode);originals.set(entry.k,base)}
+   const bx=entry.bx,by=entry.by,bz=entry.bz;
+   const original=base.get(bx-entry.cx*SIZE,by,bz-entry.cz*SIZE);
+   this.edits.get(entry.k)?.delete(entry.idx);
+   if(this.edits.get(entry.k)?.size===0)this.edits.delete(entry.k);
+   const loaded=this.chunks.get(entry.k);
+   if(loaded)this.set(bx,by,bz,original,{simulate:false,record:false});
+  }
+  // Old queued water events are now harmless; preserve all other block updates.
+  this.save();
+  return selected.length;
+ }
+ snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,time:this.time,edits})}
+
  stream(x,z,radius=3,budget=2){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r)continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.lights.unloadChunk(k);this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  spawn(){let x=0,z=0;for(let r=0;r<20;r++){x=r*3;z=r*2;const y=surfaceAt(x,z,this.seed,this.mode);if(y>=SEA+1)return{x:x+.5,y:y+2,z:z+.5}}return{x:.5,y:30,z:.5}}
- save(){if(!this.storage)return false;const changes={};for(const [k,m] of this.edits)changes[k]=[...m];this.storage.setItem('mcweb:'+this.name,JSON.stringify({seed:this.seed,mode:this.mode,time:this.time,edits:changes}));return true}
+ save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.name,this.snapshot());return true}
  loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.name)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr))}}catch{}}
 }
 export class WorldManager{constructor(storage=null){this.storage=storage;this.worlds=new Map();this.active=null}add(name,seed,mode='normal'){const w=new World({name,seed,mode,storage:this.storage});this.worlds.set(name,w);if(!this.active)this.active=w;return w}travel(name){const dest=this.worlds.get(name);if(!dest)throw Error('Unknown world '+name);this.active.save();this.active=dest;return dest}}
