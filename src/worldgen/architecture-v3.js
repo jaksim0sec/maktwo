@@ -20,10 +20,12 @@ export function blueprintFor(rx,rz,seed){
  if(maxFloors<2)return null;
  const floors=Math.min(2+Math.floor(n(5)*3),maxFloors);
  const form=type==='arcade'?'L':n(6)>.66?'L':n(7)>.78?'notched':'rectangle';
- return {x,z,width,depth,base,floors,type,form,mirror:n(8)>.5,
+ // A wing may borrow a different program while sharing the same shell.
+ const annexType=form==='rectangle'?null:ARCHETYPES[(ARCHETYPES.indexOf(type)+1+Math.floor(n(12)*4))%ARCHETYPES.length];
+ return {x,z,width,depth,base,floors,type,form,annexType,mirror:n(8)>.5,
   facade:FINISHES[Math.floor(n(9)*FINISHES.length)],damage:n(10),
   salt:Math.floor(n(11)*0x7fffffff),
-  modules:['side-stair','corridor',type,...(form==='rectangle'?[]:['shared-wing'])]};
+  modules:['side-stair','corridor',type,...(annexType?['shared-wing',annexType]:[])]};
 }
 export function footprint(p,u,v){
  if(u<0||v<0||u>=p.width||v>=p.depth)return false;
@@ -73,6 +75,18 @@ function outsideWall(p,story,u,v,dy){
 }
 function roomPartition(p,story,u,v,dy){
  if(dy<2||dy>4)return B.AIR;
+ // Wing's internal program may differ from the base building type. A doorway
+ // joins its cells to the main hall; the facade remains globally consistent.
+ if(p.annexType&&u>=p.width-7&&v>=7){
+  const crossing=p.depth-7;
+  if(v===crossing&&u>=p.width-7&&u<=p.width-2){
+   if(u===p.width-4)return B.AIR;
+   return p.annexType==='service'?B.METAL_PANEL:
+    p.annexType==='arcade'?B.SHOP_SHUTTER:B.THIN_WALL_NS;
+  }
+  if(p.annexType==='walkup'&&u===p.width-4&&v>7&&v<p.depth-3)
+   return v===p.depth-5?B.AIR:B.THIN_WALL_EW;
+ }
  if(u===8&&v>=2&&v<p.depth-2){
   if(v===4||v===10||v===p.depth-5)return B.AIR;
   return story.use==='plant'?B.METAL_PANEL:B.THIN_WALL_EW;
