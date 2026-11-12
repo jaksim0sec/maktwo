@@ -7,6 +7,7 @@ import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
 import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
+import {encodeCityStair,stairOuterRail,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 
 export const CITY_MODE='eternal-city-lab';
@@ -195,10 +196,16 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
     }
     if(atAccess&&empty(ceiling-1)&&mod(xi+zi+v.id,5)===0)put(ceiling-1,B.FLUORESCENT,stairWallTurn>>1);
     if(step>=0) {
-      const surface=f.y+stairs[step].y-v.y0;
+      const tread=stairs[step];
+      const surface=f.y+tread.y-v.y0;
       const facing=mod(v.stairFacing+(step>=stairs.length/2?4:0),8);
-      const base=Math.max(floor,Math.floor(surface-.18));
-      put(base,cityPart('staircase',kit.staircase),facing);
+      const outerRail=stairOuterRail(tread,step,stairs.length,stairAlongX,x,z);
+      const profile=encodeCityStair(surface,facing,outerRail);
+      // Each voxel gets ONE tread whose top coincides with the floor plan.
+      // A legacy showroom staircase contains three independent treads and
+      // should never be stamped repeatedly for a multi-storey stairwell.
+      put(profile.base,cityPart('staircase',kit.staircase),facing,outerRail,
+       CITY_STAIR_STYLE|(profile.quarter<<3));
     }
     if(onLanding) {
       const surface=Math.round((f.y+landing.y-v.y0)*2)/2,base=Math.floor(surface);
@@ -276,13 +283,13 @@ export function stampCityChunk(chunk,seed) {
     const index=gz*size+gx,zone=zoneAt(layout,x,z);
     const cell=y=>(y*SIZE+lz)*SIZE+lx;
     const empty=y=>y>=0&&y<chunk.height&&!chunk.data[cell(y)];
-    const put=(y,id,turn,exterior=false)=>{
+    const put=(y,id,turn,exterior=false,flags=0)=>{
       if(y<0||y>=chunk.height)return;
       const i=cell(y);
       chunk.data[i]=id;
       if(turn!==undefined){
         chunk.styles??=new Uint8Array(chunk.data.length);
-        chunk.styles[i]=TURN_STYLE|turn|(exterior?EXTERIOR_STYLE:0);
+        chunk.styles[i]=TURN_STYLE|turn|(exterior?EXTERIOR_STYLE:0)|flags;
       } else if(chunk.styles)chunk.styles[i]=0;
     };
     if(zone!==CORE_ZONE.OUTSIDE&&zone!==CORE_ZONE.SKY_GARDEN&&zone!==CORE_ZONE.MAIN_SHAFT&&zone!==CORE_ZONE.MINI_SHAFT) {
