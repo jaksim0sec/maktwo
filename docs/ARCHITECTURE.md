@@ -67,7 +67,7 @@ Creative mode has independent quick slots, unlimited materials, and access to al
 
 ## Legacy ruined city architecture v5 (compatibility only)
 
-The active `building:*` studios now use `src/worldgen/architectural-components.js`: reusable part families, independent storey footprints, per-cell architectural style bytes, connected stair rail geometry, and material variants. The five old floor-plan archetypes described below remain for old `ruins` generation and regression compatibility, not as the primary studio generator.
+The selectable worlds are now `TextureGallery` and `PartsGallery`. The former shows one block per material; the latter places 65 separately selectable architectural part blocks in isolated category rows using `src/core/part-library.js` and `src/worldgen/part-gallery.js`. Building-wide composition is no longer part of the selectable studio. The historical generator described below remains solely for compatibility with old `ruins` data.
 
 Architectural floor-plan references (structural organization only, no copyrighted drawings or facade copies):
 1. **Shop-house**: [former rice-store narrow house in Seoul](https://www.imwood.co.kr/news/articleView.html?idxno=22839), shop and entry alongside a separated stair core
