@@ -5,7 +5,8 @@ import {partPrisms,prismFaces,partOverlaps,partRaycast} from '../src/core/part-p
 import {World} from '../src/core/world.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {buildType,placementRotation} from '../src/core/construction.js';
-import {meshChunk,fanRotorMesh} from '../src/client/mesher.js';
+import {meshChunk,meshChunkData,fanRotorMesh} from '../src/client/mesher.js';
+import {Chunk} from '../src/core/chunk.js';
 import {shapeBoxes} from '../src/core/shapes.js';
 
 const part=(family,variant=0)=>PARTS.find(p=>p.family===family&&p.variant===variant);
@@ -95,4 +96,13 @@ test('all new parts keep their block ID and orientation through save/load',()=>{
  const reloaded=new World({mode:'parts',name,seed:9999,storage});
  assert.equal(reloaded.get(60,24,60),id);
  assert.equal(reloaded.getShapeState(60,24,60).facing,7);
+});
+
+test('stair joints remove hidden faces across 16x16 chunk borders',()=>{
+ const id=part('staircase',0).id,left=new Chunk(0,0),right=new Chunk(1,0),y=24,z=8;
+ left.data[(y*16+z)*16+15]=id;
+ right.data[(y*16+z)*16]=id;
+ const solo=meshChunkData(right,{states:new Map()});
+ const joined=meshChunkData(right,{neighbors:[[-1,0,left.data]],states:new Map()});
+ assert.ok(joined.opaque.length<solo.opaque.length,'contacting rail and side are not duplicated');
 });
