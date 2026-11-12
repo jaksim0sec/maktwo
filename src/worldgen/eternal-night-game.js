@@ -241,7 +241,7 @@ function stampWalkway(link,part,x,z,put,empty) {
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
   const surface=part.y??segmentY(part,x,z);
   const level=Math.round(surface),style=link.architecture??'open';
-  if(part.kind==='deck'){
+  if(part.kind==='deck'||!part.from||!part.to){
     if(empty(level-1))put(level-1,style==='hung'?B.METAL_PANEL:B.FLOOR_TILE);
   }else{
     // Graded bridge sections also receive ONE real tread rather than a
