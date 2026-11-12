@@ -7,6 +7,7 @@ import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
 import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
+import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 
 export const CITY_MODE='eternal-city-lab';
 export const CITY_BASE_Y=8;
@@ -121,8 +122,15 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
     }
     lastShape=shape;
     const {edge,corridor,room,door,doorKind,partition}=shape;
+    const partitionWall=interiorWallFinish(f,kit.roomWall);
     const hole=f.holes.some(h=>containsRect(h,x,z));
-    if(!hole)put(floor-1,kit.floor);
+    if(!hole)put(floor-1,floorFinish(f,shape,x,z,kit.floor));
+    // An independent suspended surface lives BELOW the upper structural slab,
+    // and is absent at roof openings, stairwells and bridge clearances.
+    const ceilingY=ceiling-1;
+    const hasCeiling=!hole&&step<0&&!onLanding&&!atAccess&&!shaftSide
+      &&!reservedPassage(ceilingY)&&hasDropCeiling(f,shape);
+    if(hasCeiling)put(ceilingY,ceilingFixture(f,corridor,x,z,v.id));
     // An exposed underside still needs a slab even where the next storey steps back.
     const next=v.floors[f.level+1];
     if((!next||!inside(next.outline,x,z))&&!(shaft&&containsRect(shaft,x,z)))put(ceiling,kit.body);
@@ -156,18 +164,18 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
       }
     } else if(!hole && step<0 && !onLanding && !atAccess) {
       if(shaftSide&&!corridor) {
-        for(let y=floor;y<ceiling;y++)put(y,kit.roomWall);
+        for(let y=floor;y<ceiling;y++)put(y,partitionWall);
       } else if(partition) {
         const turn=lineTurn(partition.a,partition.b);
         for(let y=floor;y<ceiling;y++) {
           if(partition.kind==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)put(y,cityPart('window',3),turn);
-          else put(y,kit.roomWall);
+          else put(y,partitionWall);
         }
       } else if(door) {
         const turn=lineTurn(door.a,door.b);
         // Shops open onto an actual corridor; private rooms and storage have
         // a single usable door. Signage belongs outside, never on a back wall.
-        for(let y=floor+2;y<ceiling;y++)put(y,kit.roomWall);
+        for(let y=floor+2;y<ceiling;y++)put(y,partitionWall);
         const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
         const atDoor=midX===xi&&midZ===zi;
         if(atDoor&&doorKind!=='shop') {
@@ -175,11 +183,10 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
           put(floor+1,B.DOOR_TOP);
         }
       } else if(corridor) {
-        const alongX=corridor.x1-corridor.x0>=corridor.z1-corridor.z0;
-        const center=alongX?(corridor.z0+corridor.z1)/2:(corridor.x0+corridor.x1)/2;
-        if(Math.floor(alongX?z:x)===Math.floor(center)&&mod((alongX?xi:zi)+v.id,6)===0) {
-          put(ceiling-1,B.FLUORESCENT,alongX?0:1);
-        }
+        // Older, low-headroom corridors keep their legacy ceiling light;
+        // enclosed high corridors use the suspended integrated light panel.
+        if(!hasCeiling&&ceilingFixture(f,corridor,x,z,v.id)===B.FLUORESCENT)
+          put(ceilingY,B.FLUORESCENT);
       } else if(room) {
         const item=furnishRoom(room,x,z,kit,seed);
         if(item)put(floor,cityPart('interior',item.variant),item.turn);
