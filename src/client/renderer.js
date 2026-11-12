@@ -1,7 +1,7 @@
 import {meshChunk,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
-import {cameraEyeY,dampStepOffset} from './camera.js?v=1.1.0';
+import {cameraEyeY,dampStepOffset} from './camera.js';
 import {makeTextureLayers} from './textures.js';
 const VERT=`#version 300 es
 precision highp float;
@@ -73,7 +73,7 @@ export class Renderer{
  gl.activeTexture(gl.TEXTURE0);
  this.lightTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);this.lightOrigin=[0,0,0];this.lightAppliedKey='';this.lightRequestedKey='';this.lightBusy=false;this.lightSerial=0;this.lightWorker=null;this.lightLastRequest=0;this.hologram=null;this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,matchMedia?.('(pointer:coarse)').matches?1:1.2);
  try{if(typeof Worker==='function'){
-  this.worker=new Worker(new URL('./mesh.worker.js?v=1.1.0',import.meta.url),{type:'module'});
+  this.worker=new Worker(new URL('./mesh.worker.js',import.meta.url),{type:'module'});
   this.worker.onmessage=({data})=>{const task=this.inflight.get(data.key);if(!task||task.token!==data.token)return;this.inflight.delete(data.key);if(data.error){console.error('Mesher worker:',data.error);task.chunk.dirty=true;this.disableWorker();return}this.completed.push({task,data})};
   this.worker.onerror=(event)=>{console.warn('Worker unavailable, using fallback mesher',event.message);this.disableWorker()};
  }}catch(error){console.warn('Worker unavailable',error)}

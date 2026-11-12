@@ -1,4 +1,4 @@
-import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js?v=1.1.0';import {generateChunk,surfaceAt,SEA} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';import {LightIndex} from './lighting.js';
+import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 export class World{
  constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}

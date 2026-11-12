@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.3.4';
+const CACHE_NAME='maktwo-shell-v1.4.0';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
@@ -10,7 +10,8 @@ const APP_FILES=[
  './src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/physics.js',
  './src/core/scale.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
- './src/entities/entities.js','./src/util/math.js','./src/worldgen/generators.js'
+ './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
+ './src/worldgen/generators.js','./src/worldgen/landforms.js'
 ];
 // Install a complete and versioned app snapshot. NEVER mutate it at runtime.
 // A slow connection cannot partially overwrite code in a previously working build.

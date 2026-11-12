@@ -31,13 +31,14 @@ function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
 function cardGeometry(palette,items,compact=false){
  const cards=[
-  {id:'tab:blocks',name:'건축',x:-.76,y:.53,w:.43,h:.22,depth:-.02},
-  {id:'tab:lights',name:'조명',x:-.27,y:.53,w:.43,h:.22,depth:-.035},
-  {id:'hand',name:'맨손',x:.27,y:.53,w:.43,h:.22,depth:-.035},
-  {id:'close',name:'닫기',x:.76,y:.53,w:.43,h:.22,depth:-.02},
+  {id:'tab:blocks',name:'건축',x:-.87,y:.53,w:.35,h:.22,depth:-.02},
+  {id:'tab:lights',name:'조명',x:-.44,y:.53,w:.35,h:.22,depth:-.035},
+  {id:'tab:garden',name:'정원',x:0,y:.53,w:.35,h:.22,depth:-.035},
+  {id:'hand',name:'맨손',x:.44,y:.53,w:.35,h:.22,depth:-.035},
+  {id:'close',name:'닫기',x:.87,y:.53,w:.35,h:.22,depth:-.02},
  ];
  if(compact){
-  cards.forEach((card,i)=>{card.x=[-.56,-.18,.18,.56][i];card.w=.33});
+  cards.forEach((card,i)=>{card.x=[-.62,-.31,0,.31,.62][i];card.w=.29});
  }
  for(let i=0;i<items.length;i++){
   const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));

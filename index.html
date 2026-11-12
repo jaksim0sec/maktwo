@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo | 끝나지 않는 밤</title>
- <link rel="stylesheet" href="./style.css?v=1.3.4">
+ <link rel="stylesheet" href="./style.css?v=1.4.0">
 </head>
 <body>
  <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
@@ -26,7 +26,7 @@
  </nav>
  <aside id="toolbar" class="hidden" aria-label="게임 설정">
   <div class="settings-heading"><div><span class="eyebrow">MAKTWO</span><h2>게임 설정</h2></div><button id="resume" class="close-control" title="설정 닫기">✕ <span>닫기</span></button></div>
-  <div class="settings-section"><span class="section-caption">월드</span><label class="field-label" for="world">이동할 세계</label><select id="world"><option value="Overworld">영원한 밤</option><option value="Flatlands">평지</option><option value="Islands">섬</option></select><span class="seed-line">월드 시드 <b id="seed"></b></span></div>
+  <div class="settings-section"><span class="section-caption">월드</span><label class="field-label" for="world">이동할 세계</label><select id="world" aria-label="이동할 세계"></select><span class="seed-line">월드 시드 <b id="seed"></b></span></div>
   <div class="settings-section"><span class="section-caption">플레이</span><button id="spawn" class="setting-row"><span>⌖</span> 시작 위치로 이동</button><button id="mode" class="setting-row"><span>✦</span> 비행 모드 <kbd>F</kbd></button><button id="save" class="setting-row"><span>▣</span> 월드 저장 <kbd>P</kbd></button></div>
   <div class="settings-section"><span class="section-caption">관리 및 도움말</span><button id="water-repair" class="setting-row" title="직접 설치한 물을 복구하고 자연 물과 건축물을 보호합니다"><span>◌</span> 설치된 물 정리</button><button id="help-btn" class="setting-row"><span>?</span> 조작법 확인 <kbd>H</kbd></button></div>
   <div class="settings-foot">이 세계의 밤은 끝나지 않습니다</div>
@@ -60,6 +60,6 @@
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.3.4"></script>
+ <script type="module" src="./src/client/game.js?v=1.4.0"></script>
 </body>
 </html>

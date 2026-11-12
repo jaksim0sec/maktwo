@@ -1,4 +1,4 @@
-import {moveBody,collides,inWater} from '../core/physics.js?v=1.1.0';import {dist2,hash} from '../util/math.js';
+import {moveBody,collides,inWater} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels} from '../core/scale.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}

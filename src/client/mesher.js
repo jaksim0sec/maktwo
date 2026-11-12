@@ -1,5 +1,5 @@
 import {SIZE, HEIGHT} from '../core/chunk.js';
-import {BLOCK as B, BLOCKS, block} from '../core/blocks.js?v=1.1.0';
+import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds} from '../core/door.js';
@@ -17,7 +17,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>render==='cross'||render==='fixture'||render==='door'||render==='door-top');
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -79,9 +79,12 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH&&id!==B.LANTERN&&id!==B.CAMPFIRE&&id!==B.DOOR)continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
+  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
+  if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
+  if(id===B.FENCE){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
   const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
   const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
@@ -125,4 +128,24 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
  // Inlaid handle: small warm metal knob on the visible side.
  const acrossX=b.w>b.d;
  cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb('#cdbd8f'));
+}
+
+export function gardenMesh(dest,id,x,y,z){
+ const box=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
+ if(id===B.PATH){
+  const color=rgb('#8b897d'),layer=materialFor(B.STONE,2);
+  for(const f of FACES){const vertices=f.corners.map(([a,b,c])=>[x+.06+a*.88,y+.013+b*.035,z+.06+c*.88]);quad(dest,vertices,color,f.shade+4*layer)}
+  for(const [dx,dz] of [[.17,.21],[.63,.28],[.39,.62]])box(dx,.053,dz,.13,.009,.1,'#a9a596');
+ }else if(id===B.GLOW_MUSHROOM){
+  box(.45,.025,.45,.10,.23,.10,'#c4b49a');
+  box(.31,.235,.31,.38,.12,.38,'#dcac81',-1.13);
+  box(.38,.36,.38,.24,.065,.24,'#f5d6ab',-1.22);
+ }else if(id===B.FENCE){
+  box(.405,0,.405,.19,1.04,.19,'#80694f');
+  for(const height of [.35,.72]){
+   box(.08,height,.442,.84,.13,.116,'#937755');
+   box(.442,height,.08,.116,.13,.84,'#937755');
+  }
+  box(.375,1.04,.375,.25,.08,.25,'#a48a65');
+ }
 }

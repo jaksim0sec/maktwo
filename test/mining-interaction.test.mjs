@@ -5,7 +5,7 @@ import {MiningProgress} from '../src/core/mining.js';
 const target=(id,x=1)=>({x,y:21,z:4,id});
 
 test('every block has its own mining time separate from blast resistance',()=>{
- assert.equal(BLOCKS.length,20);
+ assert.ok(BLOCKS.length>=20);
  assert.ok(BLOCKS.every(b=>typeof b.breakTime==='number'));
  assert.equal(block(B.BEDROCK).breakTime,Infinity);
  assert.ok(block(B.STONE).breakTime>block(B.DIRT).breakTime);

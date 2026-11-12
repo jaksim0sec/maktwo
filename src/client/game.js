@@ -1,12 +1,13 @@
-import {WorldManager} from '../core/world.js?v=1.1.0';import {Player,EntityManager} from '../entities/entities.js?v=1.1.0';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js?v=1.1.0';import {block,blockLabel,BLOCK as B,HOTBAR,LIGHTBAR} from '../core/blocks.js?v=1.1.0';import {Renderer} from './renderer.js?v=1.1.0';import {applyCameraLook} from './camera.js?v=1.1.0';import {Hologram} from './hologram.js?v=1.1.0';import {Input} from './input.js?v=1.2.0';import {clamp} from '../util/math.js';import {explode} from '../core/systems.js';import {MiningProgress} from '../core/mining.js?v=1.1.0';
+import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {clamp} from '../util/math.js';import {explode} from '../core/systems.js';import {MiningProgress} from '../core/mining.js';
 import {registerPWA} from './pwa.js';
+import {WORLD_PRESETS,PALETTES,paletteItems,worldLabel} from '../core/catalog.js';
 import {screenRay,canvasPoint} from './picking.js';
 const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.world=this.manager.add('Overworld',17331,'normal');this.manager.add('Flatlands',9901,'flat');this.manager.add('Islands',45716,'islands');this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.status('영원한 밤 · L 조명 도구 · WASD 이동');this.scheduleFrame()}
- get paletteItems(){return this.palette==='lights'?LIGHTBAR:HOTBAR}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);for(const preset of WORLD_PRESETS)this.manager.add(preset.name,preset.seed,preset.mode);this.world=this.manager.active;this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.status('영원한 밤 · L 조명 도구 · WASD 이동');this.scheduleFrame()}
+ get paletteItems(){return paletteItems(this.palette)}
  renderHotbar(){const bar=$('hotbar');bar.replaceChildren();for(let i=0;i<this.paletteItems.length;i++){
   const id=this.paletteItems[i],el=document.createElement('button');el.className='slot';
   const num=document.createElement('span');num.className='slot-number';num.textContent=String((i+1)%10);
@@ -43,7 +44,7 @@ class Game{
  togglePalette(){
   this.palette=this.palette==='lights'?'blocks':'lights';this.selected=-1;
   this.renderHotbar();if(this.panel==='inventory')this.updateHologram();
-  this.status(this.palette==='lights'?'조명 도구 · 1 횃불  2 랜턴  3 모닥불':'건축 블록');
+  this.status(PALETTES[this.palette].label+' 도구');
  }
  updateHologram(){this.hologram.setInventory(this.palette,this.paletteItems.map(id=>({...block(id),name:blockLabel(id)})),this.selected)}
  inventoryClick(hit=this.hologram.click()){
@@ -51,7 +52,7 @@ class Game{
   if(hit==='close'){this.requestGameFocus();return}
   if(hit==='hand'){this.select(-1,{toggle:false});this.requestGameFocus();return}
   if(hit.startsWith('tab:')){
-   const palette=hit.slice(4);if(palette!==this.palette)this.togglePalette();return;
+   const palette=hit.slice(4);if(PALETTES[palette]&&palette!==this.palette){this.palette=palette;this.selected=-1;this.renderHotbar();this.updateHologram()}return;
   }
   if(hit.startsWith('item:')){
    const index=Number(hit.slice(5));if(index>=0&&index<this.paletteItems.length){this.select(index,{toggle:false});this.requestGameFocus()}
@@ -84,7 +85,8 @@ class Game{
    this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
   });
   bindClick('mode',()=>{this.player.fly=!this.player.fly;this.player.vy=0;this.status(this.player.fly?'비행 모드':'걷기 모드')});
-  $('world').addEventListener('change',e=>this.travel(e.target.value));
+  const selectWorld=$('world');selectWorld.replaceChildren(...WORLD_PRESETS.map(preset=>{const option=document.createElement('option');option.value=preset.name;option.textContent=preset.label;return option}));
+  selectWorld.addEventListener('change',e=>this.travel(e.target.value));
   bindClick('spawn',()=>{const t=this.world.spawn();Object.assign(this.player,t,{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('시작 위치로 이동')});
   $('seed').textContent=String(this.world.seed);
   for(const b of document.querySelectorAll('[data-action]')){
@@ -153,7 +155,7 @@ class Game{
  }
 
  status(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2100)}
- travel(name){this.manager.active.save();this.world=this.manager.travel(name);this.entities=new EntityManager(this.world);this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('월드 이동: '+({'Overworld':'끝나지 않는 밤','Flatlands':'평지','Islands':'섬'}[name]||name))}
+ travel(name){this.manager.active.save();this.world=this.manager.travel(name);this.entities=new EntityManager(this.world);this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('월드 이동: '+worldLabel(name))}
  blast(){const p=this.player,d=p.direction(),hit=raycast(this.world,{x:p.x,y:p.y+p.eye,z:p.z},d,7);if(hit){const x=hit.x+.5,y=hit.y+.5,z=hit.z+.5;explode(this.world,this.entities.entities,this.effects,x,y,z,3);this.status('폭발')}}
  spawnMob(type='sheep'){const p=this.player,d=p.direction(),x=Math.floor(p.x+d.x*5),z=Math.floor(p.z+d.z*5);for(let y=55;y>0;y--){if(this.world.get(x,y,z)===B.AIR&&this.world.get(x,y-1,z)!==B.AIR){this.entities.spawn(type,x+.5,y,z+.5);this.status('동물이 나타났어요');break}}}
  interaction(dt,input){
@@ -212,7 +214,7 @@ class Game{
  tick(dt){this.portalCooldown=Math.max(0,this.portalCooldown-dt);const p=this.player,input=this.input.read();p.update(this.world,dt,input);if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){const names=[...this.manager.worlds.keys()];this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;}this.world.tick();this.entities.tick(dt,p);this.effects.tick(dt);this.interaction(dt,input);if(p.dead){p.hp=20;p.dead=false;Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('시작 지점으로 돌아왔어요')}}
  frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.panel==='inventory'){this.hologram.facePlayer(this.player);if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
- hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${({'Overworld':'영원한 밤','Flatlands':'평지','Islands':'섬'}[this.world.name]||this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';$('health').textContent='♥'.repeat(Math.ceil(p.hp/2))+'♡'.repeat(10-Math.ceil(p.hp/2));$('flight').textContent=p.fly?'비행 중':'걷는 중'}
+ hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';$('health').textContent='♥'.repeat(Math.ceil(p.hp/2))+'♡'.repeat(10-Math.ceil(p.hp/2));$('flight').textContent=p.fly?'비행 중':'걷는 중'}
 }
 try{new Game()}catch(err){console.error(err);$('fatal').textContent='Cannot start: '+err.message;$('fatal').hidden=false}
 registerPWA();

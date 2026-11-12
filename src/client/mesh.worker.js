@@ -1,5 +1,5 @@
 import {Chunk} from '../core/chunk.js';
-import {meshChunk} from './mesher.js?v=1.1.0';
+import {meshChunk} from './mesher.js';
 
 // Worker-side snapshots keep world generation and block edits owned by the main thread.
 self.onmessage=({data:job})=>{
