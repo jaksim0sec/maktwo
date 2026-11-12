@@ -192,7 +192,7 @@ function riverBand(noise, width, coreWidth) {
 
 function getRiverField(layout) {
   const density = layout.luxuryNoiseDensity;
-  if (layout.luxuryNoiseAmplitude === 0 || density === 0) return null;
+  if (density === 0) return null;
   let field = riverFields.get(layout);
   if (field) return field;
 
@@ -229,8 +229,8 @@ function sampleRiverField(field, layout, x, z) {
   const scale = (NOISE_RESOLUTION - 1) / 2;
   const u = (x / layout.halfWidth + 1) * scale;
   const v = (z / layout.halfWidth + 1) * scale;
-  const col = Math.floor(u);
-  const row = Math.floor(v);
+  const col = Math.min(NOISE_RESOLUTION - 2, Math.max(0, Math.floor(u)));
+  const row = Math.min(NOISE_RESOLUTION - 2, Math.max(0, Math.floor(v)));
   const index = row * NOISE_RESOLUTION + col;
   const sx = u - col;
   const sz = v - row;
@@ -261,22 +261,22 @@ export function luxuryAt(layout, x, z) {
   const dz = z - layout.centerZ;
   const ax = Math.abs(dx);
   const az = Math.abs(dz);
-  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az), getRiverField(layout));
+  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az), layout.luxuryNoiseAmplitude ? getRiverField(layout) : null);
 }
 
 /**
- * Fill Uint8Array zones and optional Float32Array weights in row order (x changes fastest).
+ * Fill zones, optional luxury weights and optional raw district noise in row order (x changes fastest).
  * x0 and z0 are the coordinates of the first sample. Use block centers for voxel columns.
  */
-export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, step = 1) {
+export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, step = 1, noise = null) {
   const size = width * depth;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(depth) || !Number.isSafeInteger(size)
     || width < 1 || depth < 1 || !Number.isFinite(step) || step <= 0
     || !Number.isFinite(x0) || !Number.isFinite(z0)
-    || zones.length < size || (weights != null && weights.length < size)) {
+    || zones.length < size || (weights != null && weights.length < size) || (noise != null && noise.length < size)) {
     throw new RangeError('Invalid core floor sample rectangle or output size');
   }
-  const field = weights == null ? null : getRiverField(layout);
+  const field = noise != null || (weights != null && layout.luxuryNoiseAmplitude) ? getRiverField(layout) : null;
   let index = 0;
   for (let row = 0; row < depth; row++) {
     const z = z0 + row * step - layout.centerZ;
@@ -286,6 +286,7 @@ export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, st
       const ax = Math.abs(x);
       const zone = classify(layout, ax, az);
       zones[index] = zone;
+      if (noise != null) noise[index] = field && zone === CORE_ZONE.DISTRICT ? sampleRiverField(field, layout, x, z) : 0;
       if (weights != null) weights[index] = luxuryForZone(layout, x, z, ax, az, zone, field);
       index++;
     }

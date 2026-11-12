@@ -5,36 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>영원한 밤 · 단일 코어층</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#16191e;color:#e9edf2}
-*{box-sizing:border-box}body{margin:0;padding:12px;min-height:100dvh}
-main{max-width:1100px;margin:auto}header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-h1{font-size:19px;letter-spacing:-.04em;margin:0 0 8px}small{color:#9ca8b7}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
-canvas{display:block;width:100%;background:#111419;border:1px solid #35404c;border-radius:8px}#map{width:min(100%,61dvh,640px);height:auto;aspect-ratio:1}#section{height:15dvh;max-height:150px}
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}label{display:grid;gap:2px;font-size:11px;color:#c9d4dc}label span{display:flex;justify-content:space-between;gap:4px;font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
-
-.grid{display:contents}
-.legend{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:5px;color:#b9c4cf;font-size:11px}
-.legend span::before{content:"";width:9px;height:9px;display:inline-block;background:var(--dot);border-radius:2px;margin-right:6px}
-#readout{height:15px;font-variant-numeric:tabular-nums;color:#b9c4cf;font-size:11px;margin:3px 0}
-#error{color:#ff9a9a;font-size:12px;min-height:16px}
-@media(max-width:700px){body{padding:7px}.layout{grid-template-columns:1fr;gap:5px}#map{width:min(100%,33dvh);height:auto}#section{height:12dvh}.controls{gap:2px 8px}h1{font-size:16px;margin-bottom:3px}header small,aside>small{display:none}}
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#16191e;color:#e9edf2}
+*{box-sizing:border-box}body{margin:0;padding:14px}main{max-width:1320px;margin:auto}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:8px 18px;flex-wrap:wrap;margin-bottom:10px}
+h1{font-size:20px;margin:0;letter-spacing:-.045em}small{color:#a2afbb}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,310px);gap:14px;align-items:start}
+.scan{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,28%);gap:10px}
+.figure{min-width:0;margin:0}figcaption{font-size:11px;color:#bdcad7;margin:3px 0 5px}
+canvas{display:block;width:100%;height:auto;background:#111419;border:1px solid #35404c;border-radius:6px;cursor:crosshair;touch-action:manipulation}
+#map{aspect-ratio:1}#profile{height:100%;min-height:160px}.profile{display:grid;grid-template-rows:auto minmax(0,1fr)}
+.slices{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px}
+label{display:grid;gap:2px;font-size:11px;color:#c9d4dc}label span{display:flex;justify-content:space-between;gap:4px;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{display:contents}
+.toolbar{grid-column:1/-1;display:flex;gap:9px;align-items:center;font-size:12px}.toolbar label{display:flex;align-items:center;gap:5px}
+#height-scan{flex:1}select{font:inherit;padding:4px;color:inherit;background:#262d36;border:1px solid #546171;border-radius:4px}
+#readout{grid-column:1/-1;font-variant-numeric:tabular-nums;color:#dbe5ed;font-size:12px;line-height:1.45;margin:0;min-height:2.9em}
+.legend{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px 10px;color:#b9c4cf;font-size:10px}
+.legend span::before{content:"";width:8px;height:8px;display:inline-block;background:var(--dot);border-radius:2px;margin-right:4px}
+#error{color:#ff9a9a;font-size:12px;grid-column:1/-1}
+@media(max-width:760px){body{padding:8px}.layout{grid-template-columns:1fr;gap:12px}.scan{width:min(100%,66vh);margin:auto;gap:7px}.slices{gap:7px}.controls{gap:3px 12px}h1{font-size:17px}}
 </style>
 </head>
 <body>
 <main>
-<header><h1>단일 코어층 · XZ 평면 / XY 단면</h1><small>한 층의 구역과 호화도</small></header>
+<header><h1>영원한 밤 · 도시 단면</h1><small>평면에서 위치 선택 · 단면에서 높이 선택</small></header>
 <div class="layout">
-<section>
-<canvas id="map" width="512" height="512" aria-label="코어층 배치와 호화도 지도"></canvas>
-<canvas id="section" width="512" height="150" aria-label="선택한 Z 위치의 X-Y 수직 단면"></canvas>
-<p id="readout">Z 0 · X-Y 단면</p>
-<div class="legend">
-<span style="--dot:#8794a0">바닥</span><span style="--dot:#e33c45">중앙 통로</span>
-<span style="--dot:#25a7d7">공중정원</span><span style="--dot:#438de9">미니 통로</span>
-<span style="--dot:#a35ad6">주 동선 · 호화도 1</span><span style="--dot:#6b9f73">대단지 · 밝을수록 호화</span>
+<section class="scan">
+<div class="toolbar">
+<label>평면 <select id="view-mode"><option value="city">현재 높이</option><option value="district">섹션 범위</option><option value="luxury">상위 호화도</option><option value="noise">상위 노이즈</option></select></label>
+<label for="height-scan">Y</label><input id="height-scan" type="range" min="0" max="539" step="1" value="24"><output id="scan-height">24</output>
 </div>
+<figure class="figure"><figcaption>XZ · 수평 단면</figcaption><canvas id="map" width="512" height="512" aria-label="위치를 선택하는 수평 단면"></canvas></figure>
+<figure class="figure profile"><figcaption>선택 좌표 · Y별 호화도</figcaption><canvas id="profile" width="150" height="512" aria-label="높이를 선택하는 호화도 단면 그래프"></canvas></figure>
+<div class="slices">
+<figure class="figure"><figcaption id="xy-label">XY · 고정 Z</figcaption><canvas id="section" width="512" height="240" aria-label="고정 Z에서의 수직 단면"></canvas></figure>
+<figure class="figure"><figcaption id="yz-label">ZY · 고정 X</figcaption><canvas id="side-section" width="512" height="240" aria-label="고정 X에서의 수직 단면"></canvas></figure>
+</div>
+<p id="readout" aria-live="polite"></p>
+<div class="legend" id="legend"></div>
 </section>
 <aside class="controls">
 <label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
@@ -43,12 +52,14 @@ input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
 <div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
 <div id="error" role="status"></div>
-<small>가로폭과 층고는 시험용 기본값입니다. 지형 색은 생성기의 구역 ID와 호화도에 대응합니다.</small>
+<small>가로폭과 층고는 시험용 기본값입니다. 건물의 색은 유형, 밝기는 높이별 호화도를 나타냅니다.</small>
 </aside>
 </div>
 </main>
 <script type="module">
-import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, sampleFloorRect, verticalSpansAt } from "../../src/worldgen/eternal-night-core-floor.js";
+import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, verticalSpansAt, zoneAt } from "../../src/worldgen/eternal-night-core-floor.js";
+
+import { BUILDING_TYPES, createDistrictPlan, districtColumn, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
 
 const noiseOptions = [
   ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "물길의 폭과 분포 면적"],
@@ -105,97 +116,228 @@ for (const [key, label] of Object.entries(ratioLabels)) {
   input.addEventListener("input",()=>{value.textContent=input.value});
   item.append(line,input);controlHost.append(item);
 }
-const canvas=document.querySelector("#map"),ctx=canvas.getContext("2d",{alpha:false});
-const readout=document.querySelector("#readout"),error=document.querySelector("#error");
-const section=document.querySelector("#section"),sectionCtx=section.getContext("2d",{alpha:false});
-const sectionImage=sectionCtx.createImageData(section.width,section.height);
-const span=new Float64Array(3);
-let sectionZ=0;
-let layout,queued=false;
-const width=canvas.width,height=canvas.height;
-const zones=new Uint8Array(width*height),weights=new Float32Array(width*height);
-const frame=ctx.createImageData(width,height);
-const palette=[
-  [17,20,25],[134,146,158],[227,60,69],[37,167,215],
-  [67,141,233],[163,90,214],[0,0,0],[85,98,112]
-];
-function paint(){
-  queued=false;
-  const ratios={};
-  for(const input of controlHost.querySelectorAll("input"))ratios[input.dataset.ratio]=Number(input.value);
-  try{
-    layout=createFloorLayout({
-      width:Number(document.querySelector("#width").value),
-      floorHeight:Number(document.querySelector("#height").value),
-      seed:Number(document.querySelector("#seed").value),
-      luxuryNoiseDensity:noiseInputs.luxuryNoiseDensity.valueAsNumber,
-      luxuryNoiseConcentration:noiseInputs.luxuryNoiseConcentration.valueAsNumber,
-      luxuryNoiseAmplitude:noiseInputs.luxuryNoiseAmplitude.valueAsNumber,
-      ratios
+const get = id => document.getElementById(id);
+const canvas = get("map"), section = get("section"), side = get("side-section"), profile = get("profile");
+const scanHeight = get("height-scan"), mode = get("view-mode");
+const contexts = new Map([canvas, section, side, profile].map(c=>[c,c.getContext("2d",{alpha:false})]));
+const zoneColors = ["#111419","#51606a","#d05e6e","#1f8ba9","#5589ca","#72579c","#283a3e","#4c5a66"];
+const zoneNames = ["허공","공용 구조","중앙 통로","공중정원","미니 통로","주 동선","대단지","중앙부"];
+const worldSpan = new Float64Array(3);
+let layout, plan, queued = false;
+let x = null, y = Number(scanHeight.value), z = null;
+
+for (const {label,color} of BUILDING_TYPES) {
+  const swatch = document.createElement("span");
+  swatch.textContent = label;
+  swatch.style.setProperty("--dot",`rgb(${color.join(",")})`);
+  get("legend").append(swatch);
+}
+for (const [label,color] of [["코어 통로","#d05e6e"],["공중정원","#1f8ba9"]]) {
+  const swatch = document.createElement("span");
+  swatch.textContent = label;
+  swatch.style.setProperty("--dot",color);
+  get("legend").append(swatch);
+}
+
+function regenerate() {
+  queued = false;
+  const ratios = Object.fromEntries([...controlHost.querySelectorAll("input")].map(input=>[input.dataset.ratio,Number(input.value)]));
+  try {
+    const next = createFloorLayout({
+      width:Number(get("width").value), floorHeight:Number(get("height").value), seed:Number(get("seed").value),
+      ...Object.fromEntries(Object.entries(noiseInputs).map(([key,input])=>[key,input.valueAsNumber])), ratios,
     });
-    error.textContent="";
-  }catch(e){error.textContent=e.message;return}
-  const step=layout.width/width;
-  const left=layout.centerX-layout.halfWidth+step/2;
-  const top=layout.centerZ-layout.halfWidth+step/2;
-  sampleFloorRect(layout,left,top,width,height,zones,weights,step);
-  const pixels=frame.data;
-  for(let i=0;i<zones.length;i++){
-    const zone=zones[i],o=i*4;
-    if(zone===CORE_ZONE.DISTRICT){
-      const t=weights[i];
-      pixels[o]=36+Math.round(t*125);
-      pixels[o+1]=70+Math.round(t*108);
-      pixels[o+2]=46+Math.round(t*80);
-    }else{
-      const c=palette[zone];
-      pixels[o]=c[0];pixels[o+1]=c[1];pixels[o+2]=c[2];
+    const city = createDistrictPlan(next);
+    if (layout && x !== null) {
+      x = next.centerX + (x-layout.centerX)*next.width/layout.width;
+      z = next.centerZ + (z-layout.centerZ)*next.width/layout.width;
     }
-    pixels[o+3]=255;
+    layout = next;
+    plan = city;
+    if (x === null) {
+      const first = plan.volumes.reduce((best,v)=>v.type!==6&&v.y0<=y&&y<v.y1&&(!best||v.y1>best.y1)?v:best,null);
+      x = first ? (first.x0+first.x1)/2 : layout.centerX;
+      z = first ? (first.z0+first.z1)/2 : layout.centerZ;
+    }
+    scanHeight.min = layout.slabBottom;
+    scanHeight.max = layout.floorTop - 1;
+    scanHeight.value = y;
+    y = scanHeight.valueAsNumber;
+    get("error").textContent = "";
+    draw();
+  } catch (error) {
+    get("error").textContent = error.message;
   }
-  ctx.putImageData(frame,0,0);
-  drawSection();
 }
-function drawSection(){
-  if(!layout)return;
-  const sw=section.width,sh=section.height,data=sectionImage.data;
-  const topY=layout.floorTop,bottomY=layout.slabBottom,extent=topY-bottomY;
-  for(let xPixel=0;xPixel<sw;xPixel++){
-    const x=layout.centerX-layout.halfWidth+(xPixel+0.5)*layout.width/sw;
-    const count=verticalSpansAt(layout,x,sectionZ,span);
-    for(let yPixel=0;yPixel<sh;yPixel++){
-      const y=topY-(yPixel+0.5)*extent/sh;
-      const inside=count && y>=span[0] && y<span[1];
-      const structure=inside?span[2]:0;
-      const color=structure===CORE_STRUCTURE.MAIN_SHAFT?[227,60,69]
-        :structure===CORE_STRUCTURE.MINI_SHAFT?[67,141,233]
-        :structure===CORE_STRUCTURE.SLAB?[134,146,158]:[17,20,25];
-      const index=(yPixel*sw+xPixel)*4;
-      data[index]=color[0];data[index+1]=color[1];data[index+2]=color[2];data[index+3]=255;
+
+function shade(volume, height) {
+  const value = volumeLuxury(plan,volume,height);
+  const light = .36 + .64*value;
+  return `rgb(${BUILDING_TYPES[volume.type].color.map(c=>Math.round(c*light)).join(",")})`;
+}
+
+function crosshair(ctx,w,h,cx,cy) {
+  ctx.strokeStyle = "#b8e6f2bf";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(cx,0);ctx.lineTo(cx,h);
+  ctx.moveTo(0,cy);ctx.lineTo(w,cy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "#f4f8fb";
+  ctx.strokeRect(cx-3,cy-3,6,6);
+}
+
+function mapView() {
+  const ctx = contexts.get(canvas), w = canvas.width, cell = w/plan.size;
+  for (let i=0; i<plan.zones.length; i++) {
+    const zone = plan.zones[i], label = plan.labels[i];
+    let color = zoneColors[zone];
+    if (zone === CORE_ZONE.DISTRICT) {
+      const weight = plan.luxury[i]/layout.districtLuxuryMax;
+      const n = plan.noise[i];
+      if (mode.value === "district") color = `hsl(${(label*137.508)%360} 34% ${20+30*weight}%)`;
+      else if (mode.value === "luxury") color = `hsl(153 31% ${14+62*weight}%)`;
+      else if (mode.value === "noise") color = `hsl(185 50% ${12+62*n}%)`;
+      else {
+        const volume = plan.columns[i].find(v=>v.y0<=y&&y<v.y1);
+        color = volume ? shade(volume,y) : "#192128";
+      }
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect((i%plan.size)*cell,Math.floor(i/plan.size)*cell,cell,cell);
+  }
+  if (mode.value === "city") {
+    ctx.strokeStyle = "#101419b0";
+    for (const v of plan.volumes) if (v.y0<=y&&y<v.y1) {
+      ctx.strokeRect((v.x0-plan.left)*w/layout.width,(v.z0-plan.top)*w/layout.width,
+        (v.x1-v.x0)*w/layout.width,(v.z1-v.z0)*w/layout.width);
     }
   }
-  sectionCtx.putImageData(sectionImage,0,0);
+  crosshair(ctx,w,w,(x-plan.left)*w/layout.width,(z-plan.top)*w/layout.width);
 }
-function queue(){if(!queued){queued=true;requestAnimationFrame(paint)}}
-document.querySelectorAll("input").forEach(input=>input.addEventListener("input",()=>{
-  const output=document.querySelector("#"+input.id+"-value");
-  if(output)output.textContent=input.value;
+
+const heightRatio = h => (layout.floorTop-h)/(layout.floorTop-layout.slabBottom);
+function sliceView(target, axis) {
+  const ctx = contexts.get(target), w = target.width, h = target.height;
+  const alongX = axis === "x";
+  const left = alongX ? plan.left : plan.top, fixed = alongX ? z : x;
+  const px = v => (v-left)*w/layout.width;
+  const py = v => heightRatio(v)*h;
+  ctx.fillStyle = "#111419";
+  ctx.fillRect(0,0,w,h);
+  for (let i=0; i<w; i++) {
+    const along = left+(i+.5)*layout.width/w;
+    const count = verticalSpansAt(layout,alongX?along:fixed,alongX?fixed:along,worldSpan);
+    if (!count) continue;
+    const type = worldSpan[2];
+    ctx.fillStyle = type===CORE_STRUCTURE.SLAB ? "#61717d" :
+      type===CORE_STRUCTURE.MAIN_SHAFT ? "#783f4d" : "#385a84";
+    ctx.fillRect(i,py(worldSpan[1]),1,py(worldSpan[0])-py(worldSpan[1]));
+  }
+  for (const v of plan.volumes) {
+    if (alongX ? fixed<v.z0||fixed>=v.z1 : fixed<v.x0||fixed>=v.x1) continue;
+    const l=px(alongX?v.x0:v.z0), r=px(alongX?v.x1:v.z1);
+    for (let low=v.y0; low<v.y1; low+=6) {
+      const high = Math.min(v.y1,low+6);
+      ctx.fillStyle=shade(v,low);
+      ctx.fillRect(l,py(high),r-l,py(low)-py(high));
+    }
+    ctx.strokeStyle = "#0e131bd0";
+    ctx.strokeRect(l,py(v.y1),r-l,py(v.y0)-py(v.y1));
+  }
+  ctx.font = "10px system-ui";
+  ctx.fillStyle = "#b4c0cc";
+  const interval = layout.floorHeight > 400 ? 120 : 60;
+  for (let level=layout.floorY; level<layout.floorTop; level+=interval) {
+    const line = py(level);
+    ctx.fillStyle = "#a6bbc42b";
+    ctx.fillRect(0,line,w,1);
+    ctx.fillStyle = "#c0cdd5";
+    ctx.fillText(level,4,line-3);
+  }
+  crosshair(ctx,w,h,px(alongX?x:z),py(y));
+}
+
+function profileView(column) {
+  const ctx = contexts.get(profile), w = profile.width, h = profile.height;
+  const origin = 15, chart = w-origin-10;
+  ctx.fillStyle = "#111419";
+  ctx.fillRect(0,0,w,h);
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "#aebdca";
+  for (const [v,label] of [[0,"0"],[.5,"0.5"],[1,"1"]]) {
+    const px = origin+chart*v;
+    ctx.fillStyle = "#a3b8c031";ctx.fillRect(px,0,1,h);
+    ctx.fillStyle = "#aebdca";ctx.fillText(label,px-5,h-6);
+  }
+  for (const v of column?.volumes ?? []) {
+    for (let low=v.y0; low<v.y1; low+=6) {
+      const high=Math.min(v.y1,low+6), bar=chart*volumeLuxury(plan,v,low);
+      const top=heightRatio(high)*h, bottom=heightRatio(low)*h;
+      ctx.fillStyle = shade(v,low);
+      ctx.fillRect(origin,top,bar,Math.max(1,bottom-top-.5));
+    }
+  }
+  ctx.fillStyle = "#d3eef4";
+  ctx.fillRect(0,heightRatio(y)*h,w,1);
+}
+
+function draw() {
+  if (!plan) return;
+  const {column,volume,luxury} = districtSample(plan,x,y,z);
+  const zone = zoneAt(layout,x,z);
+  const value = v => Number(v).toFixed(3);
+  const location = `X ${x.toFixed(1)} · Y ${y} · Z ${z.toFixed(1)}`;
+  const info = volume ? `${BUILDING_TYPES[volume.type].label} #${volume.id+1} · 호화도 ${value(luxury)}` :
+    zone===CORE_ZONE.DISTRICT&&y>=layout.floorY ? "빈 공간 · 호화도 없음" : zoneNames[zone];
+  const sectionName = column?.section>=0 ? `섹션 ${column.section+1} · 상위 호화도 ${value(column.luxury)} · 노이즈 ${value(column.noise)}` : "";
+  get("readout").replaceChildren(location+"  /  "+info,document.createElement("br"),sectionName);
+  get("scan-height").textContent = y;
+  get("xy-label").textContent = `XY · Z ${z.toFixed(1)}`;
+  get("yz-label").textContent = `ZY · X ${x.toFixed(1)}`;
+  mapView(); sliceView(section,"x"); sliceView(side,"z"); profileView(column);
+}
+
+function point(event, target) {
+  const bounds = target.getBoundingClientRect();
+  const clampRatio = value => Math.max(0,Math.min(.999999,value));
+  return [clampRatio((event.clientX-bounds.left)/bounds.width),clampRatio((event.clientY-bounds.top)/bounds.height)];
+}
+function setHeight(fraction) {
+  const next = Math.floor(layout.floorTop-fraction*(layout.floorTop-layout.slabBottom));
+  scanHeight.value = Math.max(layout.slabBottom,Math.min(layout.floorTop-1,next));
+  y = scanHeight.valueAsNumber;
+}
+canvas.addEventListener("click",event=>{
+  if (!plan) return;
+  const [u,v] = point(event,canvas);
+  x=plan.left+u*layout.width;z=plan.top+v*layout.width;draw();
+});
+for (const [target,axis] of [[section,"x"],[side,"z"]]) {
+  target.addEventListener("click",event=>{
+    if (!plan) return;
+    const [u,v] = point(event,target);
+    if (axis==="x") x=plan.left+u*layout.width;
+    else z=plan.top+u*layout.width;
+    setHeight(v);draw();
+  });
+}
+profile.addEventListener("click",event=>{
+  if (!plan) return;
+  setHeight(point(event,profile)[1]);draw();
+});
+scanHeight.addEventListener("input",()=>{y=scanHeight.valueAsNumber;draw();});
+mode.addEventListener("change",draw);
+function queue() {
+  if (!queued) {queued = true;requestAnimationFrame(regenerate);}
+}
+document.querySelectorAll("aside input").forEach(input=>input.addEventListener("input",()=>{
+  const output = get(input.id+"-value");
+  if (output) output.textContent=input.value;
   queue();
 }));
-canvas.addEventListener("pointermove",event=>{
-  if(!layout)return;
-  const bounds=canvas.getBoundingClientRect();
-  const col=Math.floor((event.clientX-bounds.left)*width/bounds.width);
-  const row=Math.floor((event.clientY-bounds.top)*height/bounds.height);
-  if(col<0||row<0||col>=width||row>=height)return;
-  const x=(layout.centerX-layout.halfWidth+(col+0.5)*layout.width/width).toFixed(1);
-  const z=(layout.centerZ-layout.halfWidth+(row+0.5)*layout.width/height).toFixed(1);
-  const i=row*width+col;
-  sectionZ=Number(z);drawSection();
-  const names=["허공","공용 바닥","중앙 통로","공중정원","미니 통로","주 동선","대단지","중앙부"];
-  readout.textContent="x "+x+" · z "+z+" · y "+layout.slabBottom+"~"+layout.floorTop+" · "+names[zones[i]]+" · 호화도 "+weights[i].toFixed(3);
-});
-canvas.addEventListener("pointerleave",()=>{readout.textContent="Z "+sectionZ.toFixed(1)+" · X-Y 단면 · y "+layout.slabBottom+"~"+layout.floorTop});
 queue();
 </script>
 </body>
