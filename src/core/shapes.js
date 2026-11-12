@@ -1,12 +1,22 @@
 import {block,BLOCK as B} from './blocks.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 export const isStairs=id=>id===B.STONE_STAIRS||id===B.WOOD_STAIRS||id===B.CONCRETE_STAIRS;
-export const isSlab=id=>id===B.STONE_SLAB||id===B.WOOD_SLAB||id===B.CONCRETE_SLAB;
+export const isSlab=id=>id===B.STONE_SLAB||id===B.WOOD_SLAB||id===B.CONCRETE_SLAB||id===B.UPPER_STAIR_TREAD||id===B.FLOOR_FINISH||id===B.CEILING_FINISH;
 export function shapeBoxes(id,x,y,z,state={}){
  const facing=((state.facing||0)%4+4)%4;
+ if(id===B.UPPER_STAIR_TREAD)return [
+   {x,y:y+.5,z,w:1,h:.5,d:1},
+   {x:x+.04,y:y+.95,z:z-.035,w:.92,h:.045,d:.09}
+  ];
+ if(id===B.FLOOR_FINISH)return [{x,y,z,w:1,h:.5,d:1}];
+ if(id===B.CEILING_FINISH)return [{x,y:y+.5,z,w:1,h:.5,d:1}];
  if(isSlab(id))return [{x,y:y+(state.upper?.5:0),z,w:1,h:.5,d:1}];
  if(isStairs(id)){
   const riser=facing===0?{x,y:y+.5,z:z+.5,w:1,h:.5,d:.5}:facing===1?{x:x+.5,y:y+.5,z,w:.5,h:.5,d:1}:facing===2?{x,y:y+.5,z,w:1,h:.5,d:.5}:{x,y:y+.5,z,w:.5,h:.5,d:1};
+  if(id===B.CONCRETE_STAIRS)return [
+    {x,y,z,w:1,h:.5,d:1},riser,
+    {x:x+.03,y:y+.94,z:z+.03,w:.94,h:.045,d:.94}
+   ];
   return [{x,y,z,w:1,h:.5,d:1},riser];
  }
  // These architectural blocks are only partial-depth geometry. The exact same

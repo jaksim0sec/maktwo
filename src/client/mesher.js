@@ -80,7 +80,7 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.CONCRETE_SLAB,B.CONCRETE_STAIRS,B.THIN_WALL_NS,B.THIN_WALL_EW,B.WINDOW_NS,B.WINDOW_EW].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.CONCRETE_SLAB,B.CONCRETE_STAIRS,B.THIN_WALL_NS,B.THIN_WALL_EW,B.WINDOW_NS,B.WINDOW_EW,B.UPPER_STAIR_TREAD,B.FLOOR_FINISH,B.CEILING_FINISH].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
