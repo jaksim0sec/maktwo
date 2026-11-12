@@ -5,6 +5,7 @@ import {containsRect,insidePolygon} from './eternal-night-buildings.js';
 import {CORE_ZONE,createFloorLayout,zoneAt} from './eternal-night-core-floor.js';
 import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
+import {facadeBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
 
 export const CITY_MODE='eternal-city-lab';
@@ -127,21 +128,28 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
     if(edge>=0) {
       const a=f.outline[edge],b=f.outline[(edge+1)%f.outline.length],turn=lineTurn(a,b);
       const exit=f.doors.find(d=>Math.abs((x-d.x)*d.dz-(z-d.z)*d.dx)<d.width/2+.38&&Math.abs((x-d.x)*d.dx+(z-d.z)*d.dz)<1.20);
-      const bay=mod(Math.floor(Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1])?x-a[0]:z-a[1]),kit.wall===4?6:5);
-      if(exit) {
+      const stride=kit.wall===4?6:5;
+      const bay=mod(Math.floor(Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1])?x-a[0]:z-a[1]),stride);
+      const frontEdge=f.key==='shop'?(f.doors[0]?.edge??0):0;
+      const facade=facadeBay({program:f.program,level:f.level,entryLevel:v.entryLevel,
+        edge,bay,stride,frontEdge});
+      if(exit){
+        // Preserve the physical 2-block exit, but give it an actual wall/lintel
+        // above instead of an isolated floating 'entrance' voxel.
+        for(let y=floor+3;y<ceiling-1;y++)put(y,kit.body);
         put(ceiling-1,cityPart('entrance',kit.entrance),turn,true);
-      } else {
-        const column=bay===0 && edge%2===0;
-        const blank=f.program==='workshops'?bay<3:f.program==='housing'?bay%2===0:bay===4;
-        for(let y=floor;y<ceiling;y++) {
-          const window=!column&&!blank&&y===floor+(f.program==='workshops'?2:1)&&y<=ceiling-2;
-          const id=column?kit.body:window?cityPart('window',kit.window):kit.body;
+      }else{
+        for(let y=floor;y<ceiling;y++){
+          let id=kit.body;
+          if(facade.opening==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)
+            id=cityPart('window',y===floor+2?3:kit.window);
+          else if(facade.opening==='window'&&y===floor+2&&y<ceiling-1)
+            id=cityPart('window',f.program==='housing'?4:kit.window);
+          else if(facade.vent&&y===floor+2&&y<ceiling-1)
+            id=cityPart('ventilation',kit.ventilation);
+          else if(facade.sign&&y===ceiling-1)
+            id=cityPart('sign',kit.sign);
           put(y,id,turn,true);
-        }
-        if(columnHash>.985 && f.level%5===2)put(ceiling-1,cityPart('ventilation',kit.ventilation),turn,true);
-        if((f.level===v.entryLevel||f.doors.length)&&f.doors.some(d=>Math.abs((x-d.x)*d.dx+(z-d.z)*d.dz)<1.2&&Math.abs((x-d.x)*d.dz-(z-d.z)*d.dx)<4)) {
-          put(ceiling-1,cityPart('sign',kit.sign),turn,true);
-          if(bay===0&&ceiling-floor>=5)put(ceiling-2,cityPart('sign',(kit.sign+1)%5),turn,true);
         }
       }
     } else if(!hole && step<0 && !onLanding && !atAccess) {
@@ -150,21 +158,19 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
       } else if(partition) {
         const turn=lineTurn(partition.a,partition.b);
         for(let y=floor;y<ceiling;y++) {
-          if(partition.kind==='shopfront'&&y===floor+1)put(y,cityPart('window',3),turn);
+          if(partition.kind==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)put(y,cityPart('window',3),turn);
           else put(y,kit.roomWall);
         }
       } else if(door) {
         const turn=lineTurn(door.a,door.b);
+        // Shops open onto an actual corridor; private rooms and storage have
+        // a single usable door. Signage belongs outside, never on a back wall.
         for(let y=floor+2;y<ceiling;y++)put(y,kit.roomWall);
-        if(room && room.kind!=='shop' && columnHash>.57 &&
-           Math.floor((door.a[0]+door.b[0])/2)===xi && Math.floor((door.a[1]+door.b[1])/2)===zi) {
+        const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
+        const atDoor=midX===xi&&midZ===zi;
+        if(atDoor&&room?.kind!=='shop') {
           put(floor,B.DOOR,turn>>1);
           put(floor+1,B.DOOR_TOP);
-        } else if(f.program==='shops'||f.program==='market'||f.program==='exchange') {
-          put(ceiling-1,cityPart('sign',kit.sign),turn);
-          // Some stores are shuttered, leaving the shared market aisle free.
-          if(columnHash>.93)put(floor,cityPart('door',3),turn);
-          if(columnHash>.81&&ceiling-floor>=4)put(ceiling-2,cityPart('sign',(kit.sign+1)%5),turn);
         }
       } else if(corridor) {
         const alongX=corridor.x1-corridor.x0>=corridor.z1-corridor.z0;

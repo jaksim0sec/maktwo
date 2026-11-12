@@ -26,7 +26,7 @@ test('all four small shop fronts face their true lane and split a rear service c
   assert.ok(shop&&store,'shop and rear storage must be separate');
   const mid=lineMid(shop.door);
   assert.ok(Math.hypot(mid[0]-port.x,mid[1]-port.z)<.2,'shop door faces lane');
-  assert.ok(floor.partitions.length>=3,'closed rear wall except door');
+  assert.equal(floor.partitions.length,2,'two wall halves flank one service door');
  }
 });
 
