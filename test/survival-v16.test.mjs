@@ -21,7 +21,7 @@ test('survival starts with finite resources and persists independently from worl
 test('harvesting turns stone into cobblestone, grass into dirt, doors into one drop',()=>{
  assert.equal(harvestDrop(B.STONE),B.COBBLE);
  assert.equal(harvestDrop(B.GRASS),B.DIRT);
- assert.equal(harvestDrop(B.DOOR_TOP),null);
+ assert.equal(harvestDrop(B.DOOR_TOP),B.DOOR);
  assert.equal(harvestDrop(B.DOOR),B.DOOR);
  assert.equal(harvestDrop(B.BEDROCK),null);
  const inv=new SurvivalInventory();assert.equal(inv.recordHarvest(B.STONE),1);assert.equal(inv.count(B.COBBLE),1);
@@ -36,7 +36,7 @@ test('crafting requires all ingredients, adds output once, and survives reload',
  const reloaded=new SurvivalInventory(storage,'World');assert.deepEqual([...reloaded.items],[...inv.items]);
 });
 test('invalid stacks, nonpositive counts and overflows cannot mint resources',()=>{
- const inv=new SurvivalInventory();assert.equal(inv.add(B.TORCH,-3),0);assert.equal(inv.add(B.AIR,5),0);
+ const inv=new SurvivalInventory();assert.equal(inv.add(B.TORCH,-3),0);assert.equal(inv.add(B.AIR,5),0);assert.equal(inv.add(-2,5),0);assert.equal(inv.add(999,5),0);
  assert.equal(inv.remove(B.PLANKS,0),false);assert.equal(inv.add(B.TORCH,2000),999-6);
  assert.equal(inv.add(B.TORCH,1),0);assert.equal(inv.count(B.TORCH),999);
 });
@@ -59,7 +59,7 @@ test('landscape installed PWA and readable portrait fallback, with atomic offlin
  assert.equal(manifest.orientation,'landscape-primary');assert.match(css,/@media\(pointer:coarse\) and \(orientation:portrait\)/);
  assert.match(read('index.html'),/id="rotate-screen"/);assert.match(pwa,/screen\.orientation\.lock\('landscape'\)/);
  for(const name of ['src/core/inventory.js','src/client/item-icons.js'])assert.ok(sw.includes(name),name);
- assert.match(sw,/maktwo-shell-v1\.6\.0/);
+ assert.match(sw,/maktwo-shell-v1\.6\.1/);
 });
 test('scene stays unobstructed and warm light shader is restrained',()=>{
  const css=read('style.css'),shader=read('src/client/renderer.js');

@@ -15,8 +15,8 @@ export const RECIPES=Object.freeze([
 ]);
 export const MAX_STACK=999;
 export function harvestDrop(id){
- if(id===B.AIR||id===B.BEDROCK||id===B.WATER||id===B.PORTAL||id===B.DOOR_TOP)return null;
- return id===B.GRASS?B.DIRT:id===B.STONE?B.COBBLE:id;
+ if(id===B.AIR||id===B.BEDROCK||id===B.WATER||id===B.PORTAL)return null;
+ return id===B.GRASS?B.DIRT:id===B.STONE?B.COBBLE:id===B.DOOR_TOP?B.DOOR:id;
 }
 export class SurvivalInventory{
  constructor(storage=null,world='Overworld'){
@@ -27,7 +27,7 @@ export class SurvivalInventory{
  has(id,n=1){return this.count(id)>=n}
  canCraft(recipe){return Boolean(recipe)&&Object.entries(recipe.needs).every(([id,n])=>this.has(Number(id),n))&&this.count(recipe.id)+recipe.count<=MAX_STACK}
  add(id,n=1){
-  if(!Number.isInteger(id)||!block(id).name||id===B.AIR||!Number.isSafeInteger(n)||n<1)return 0;
+  if(!Number.isInteger(id)||id<=B.AIR||id>=BLOCKS.length||!Number.isSafeInteger(n)||n<1)return 0;
   const amount=Math.min(n,MAX_STACK-this.count(id));if(amount<=0)return 0;
   this.items.set(id,this.count(id)+amount);this.save();return amount;
  }
