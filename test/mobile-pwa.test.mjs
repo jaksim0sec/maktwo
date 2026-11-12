@@ -52,7 +52,7 @@ test('mobile hologram cards remain inside the portrait view cone',()=>{
 });
 test('physical 0.8m voxels preserve integer chunk storage and world save coordinates',()=>{
  assert.equal(BLOCK_SIZE,.8);
- const p=new Player(0,25,0);assert.ok(Math.abs(toMeters(p.height)-1.9)<1e-9);
+ const p=new Player(0,25,0);assert.ok(p.height<1.88&&p.height>1.65);
  const storage=new Map(),adapter={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)};
  const world=new World({mode:'flat',storage:adapter,name:'Scale'});world.set(-5,30,20,9);world.save();
  const restored=new World({mode:'flat',storage:adapter,name:'Scale'});

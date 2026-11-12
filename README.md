@@ -1,3 +1,5 @@
+> v1.3.3: Fixed inventory card clicking using the current pointer pixel, separated touch look gestures from hologram hover, adjusted player height to fit through the existing door, included light sources throughout the local light volume, and reduced naturally spawned sheep to six with wider spacing. No save or voxel-grid changes.
+
 > v1.3.2: Mobile inventory keeps left-zone movement and right-zone camera input, selecting a card only on a right-zone tap release. Narrow mobile quickbars scroll without pushing the tool button offscreen.
 
 > v1.3.2: Replaced repetitive horizontal wood stripes with irregular vertical bark grain and knots, concentric wood-end rings and softer plank structure. Texture stays 32×32 and the GPU vertex layout is unchanged.
@@ -8,7 +10,7 @@
 
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
-# MakTwo · Endless Night v1.1.0
+# MakTwo · Endless Night v1.3.3
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -53,7 +55,7 @@ npm test
 
 ## Physical scale and performance
 
-- One voxel side is physically **0.8 m**, including the WebGL world/hologram projection. The logical grid, chunk IDs, generated terrain and saved edits remain **integer voxel coordinates**. The player's physical height remains ~1.9 m and eye height ~1.7 m; creature render meshes remain meter-sized.
+- One voxel side is physically **0.8 m**, including the WebGL world/hologram projection. The logical grid, chunk IDs, generated terrain and saved edits remain **integer voxel coordinates**. The player collision height is now 1.76 voxels (1.41 m) and eye height is 1.59 voxels (1.27 m), below the 1.88-voxel door mesh. Creature render meshes remain metric-sized.
 - Streaming loads 37 chunks in a rounded 3-chunk ring instead of 49 square-ring chunks, with a smaller 56-chunk residency target. No change to the existing 16×16×64 storage size or generation algorithm.
 - PC/multitouch gestures are handled as discrete taps versus holds at their actual screen coordinates. The game world can be manipulated without pointer lock; desktop right-drag rotates the camera.
 

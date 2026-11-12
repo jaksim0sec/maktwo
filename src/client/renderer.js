@@ -136,7 +136,7 @@ export class Renderer{
   const origin=[ox,0,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${ox}:${oz}`;
   if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
   const blocks=makeOccluderSnapshot(world,origin);
-  const sources=world.lights.near(player.x,player.y+player.eye,20,52).filter(l=>l.x>=ox&&l.x<ox+LIGHT_WIDTH&&l.z>=oz&&l.z<oz+LIGHT_DEPTH).map(l=>({...l,rgb:rgb(l.color)}));
+  const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:0,maxY:LIGHT_HEIGHT,limit:80}).map(l=>({...l,rgb:rgb(l.color)}));
   const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;
   if(this.lightWorker){this.lightWorker.postMessage({token,origin,blocks:blocks.buffer,sources},[blocks.buffer]);return}
   const result=buildLightVolume(blocks,sources,{origin});const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texSubImage3D(gl.TEXTURE_3D,0,0,0,0,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,gl.RGBA,gl.UNSIGNED_BYTE,result);

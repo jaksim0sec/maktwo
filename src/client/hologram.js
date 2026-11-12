@@ -115,7 +115,15 @@ export class Hologram{
   gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));this.count=vertices.length/6;
  }
  point(clientX,clientY,rect){this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
- aim(player,aspect){if(!this.opened)return null;const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
+ aim(player){if(!this.opened)return null;const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
+ // Pick synchronously using the same camera projection as the rendered cards.
+ // Never act on a hover result cached before the most recent pointer movement.
+ pickAt(player,clientX,clientY,rect,{center=false}={}){
+  if(!this.opened)return null;
+  if(center){this.pointer=null}
+  else this.point(clientX,clientY,rect);
+  this.facePlayer(player);return this.aim(player);
+ }
  click(){return this.hover?.id||null}
  drawAtlas(){const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
   this.cards.forEach((card,i)=>{const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;

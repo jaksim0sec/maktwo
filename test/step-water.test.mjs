@@ -19,8 +19,8 @@ function walkToBarrier(height,ceiling=false){
 test('world voxel is physically 0.8m while player keeps human proportions and saved chunk layout',()=>{
  const p=new Player(0,25,0);
  assert.equal(BLOCK_SIZE,.8);
- assert.ok(Math.abs(toMeters(p.height)-1.9)<1e-8);
- assert.ok(Math.abs(toMeters(p.eye)-1.7)<1e-8&&p.eye<p.height);
+ assert.ok(p.height<1.88&&p.height>1.65);
+ assert.ok(p.eye<p.height&&p.eye>1.45);
  assert.equal(new Chunk(0,0).data.length,16*16*64);
 });
 test('auto step climbs exactly one full block without jumping',()=>{

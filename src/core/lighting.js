@@ -31,6 +31,22 @@ export class LightIndex {
   if(entries)for(const posKey of entries)this.sources.delete(posKey);
   this.byChunk.delete(chunkKey);
  }
+ // Spatial query for every loaded light whose source lies within a light-volume.
+ // A distant newly placed torch must not disappear merely because 20 closer lights exist.
+ inBounds(minX,maxX,minZ,maxZ,{minY=0,maxY=64,limit=80}={}){
+  const chosen=[];
+  const firstX=Math.floor(minX/SIZE),lastX=Math.floor((maxX-1e-6)/SIZE);
+  const firstZ=Math.floor(minZ/SIZE),lastZ=Math.floor((maxZ-1e-6)/SIZE);
+  for(let cx=firstX;cx<=lastX;cx++)for(let cz=firstZ;cz<=lastZ;cz++){
+   const entries=this.byChunk.get(key(cx,cz));if(!entries)continue;
+   for(const pos of entries){const source=this.sources.get(pos);
+    if(source&&source.x>=minX&&source.x<maxX&&source.z>=minZ&&source.z<maxZ&&source.y>=minY&&source.y<maxY)chosen.push(source);
+   }
+  }
+  // Deterministic ordering avoids flickering picks in equally populated chunks.
+  chosen.sort((a,b)=>a.x-b.x||a.z-b.z||a.y-b.y);
+  return chosen.slice(0,limit);
+ }
  near(x,y,z,limit=8,range=32){
   const candidates=[],rangeSq=range*range;
   // Query only loaded chunks overlapping the local light radius.

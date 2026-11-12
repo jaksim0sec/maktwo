@@ -72,7 +72,7 @@ export class Input{
  }
  clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset()}
  setUiMode(open){const next=Boolean(open);if(this.uiMode===next)return;this.uiMode=next;if(next)this.clear()}
- setInventoryMode(open){this.inventoryMode=Boolean(open);this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.gestures.reset()}
+ setInventoryMode(open){const next=Boolean(open);if(this.inventoryMode===next)return;this.inventoryMode=next;this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.gestures.reset();this.dx=0;this.dy=0}
  toggleCameraMode(){
   if(document.pointerLockElement===this.canvas){document.exitPointerLock?.();return}
   try{const request=this.canvas.requestPointerLock?.();request?.catch?.(e=>console.warn('[MakTwo] Pointer lock unavailable',e))}catch(e){console.warn('[MakTwo] Pointer lock unavailable',e)}
