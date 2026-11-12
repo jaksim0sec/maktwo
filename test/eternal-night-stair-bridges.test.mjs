@@ -81,3 +81,24 @@ test('roof addition paths have guardrails outside their open portal and stair la
  if(!nearPortal)assert.ok(id===B.AIR||partById(id)?.family==='passage',
   'roof link does not place opaque walls in the crossing');
 });
+
+test('sloped skybridges voxelize the same quarter-step walkway geometry as building stairs',()=>{
+ const plan=createCityPlan(9999),world=new World({seed:9999,mode:'eternal-city-lab'});
+ const graded=plan.walkways.flatMap(l=>l.segments.filter(s=>(s.kind==='stairs'||s.kind==='ramp')&&s.length>7));
+ assert.ok(graded.length>100,'the city has many sloping connections');
+ let found=0,checked=0;
+ for(const s of graded.slice(0,90)){
+  for(const t of [.32,.53,.74]){
+   const x=s.from[0]+(s.to[0]-s.from[0])*t,z=s.from[2]+(s.to[2]-s.from[2])*t;
+   const surface=s.from[1]+(s.to[1]-s.from[1])*t;
+   const v=encodeCityStair(surface,0);
+   const id=world.get(Math.floor(x)+.5,v.base,Math.floor(z)+.5);
+   checked++;
+   if(partById(id)?.family!=='staircase')continue;
+   assert.equal(world.getShapeState(x,v.base,z).cityStair,true);
+   found++;
+  }
+  if(found>12)break;
+ }
+ assert.ok(found>=5,`sloping bridges need real treads, got ${found} of ${checked}`);
+});
