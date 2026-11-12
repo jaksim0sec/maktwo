@@ -1,5 +1,6 @@
 import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId} from './blocks.js';
 import {RECIPES} from './crafting.js';
+import {PART_ID_START} from './part-library.js';
 // One canonical registry for user-visible categories and world definitions.
 // Stable world names are storage keys: NEVER rename an existing entry.
 export const WORLD_PRESETS=Object.freeze([
@@ -14,7 +15,8 @@ const visible=BLOCKS.filter(({id})=>id!==B.AIR&&id!==B.BEDROCK&&id!==B.DOOR_TOP&
 export const isPlaceableItem=id=>placeables.has(id);
 export const CREATIVE_ITEMS=Object.freeze(visible);
 export const PALETTES=Object.freeze({
- blocks:{label:'건축재',items:visible.filter(id=>!isPlaceableItem(id))},
+ blocks:{label:'건축재',items:visible.filter(id=>id<PART_ID_START&&!isPlaceableItem(id))},
+ parts:{label:'건축 부품',items:visible.filter(id=>id>=PART_ID_START)},
  items:{label:'배치품',items:visible.filter(isPlaceableItem)},
  craft:{label:'제작',items:RECIPES.map(r=>r.id)},
 });

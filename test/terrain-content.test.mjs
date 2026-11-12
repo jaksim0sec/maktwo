@@ -13,7 +13,9 @@ test('legacy block IDs remain stable and only studio presets are visible',()=>{
  assert.deepEqual(WORLD_PRESETS.map(x=>x.name),['TextureGallery','PartsGallery']);
  assert.equal(B.DOOR,18);assert.equal(B.DOOR_TOP,19);
  assert.deepEqual([B.PATH,B.GLOW_MUSHROOM,B.FENCE],[20,21,22]);
- assert.deepEqual(PALETTE_KEYS,['blocks','items','craft']);
+ assert.deepEqual(PALETTE_KEYS,['blocks','parts','items','craft']);
+ assert.equal(PALETTES.parts.items.length,65);
+ assert.ok(!PALETTES.blocks.items.some(id=>PALETTES.parts.items.includes(id)));
  assert.ok(PALETTES.blocks.items.includes(B.PLANKS));
  assert.ok(PALETTES.items.items.includes(B.TORCH)&&!PALETTES.blocks.items.includes(B.TORCH));
  assert.equal(blockLabel(B.FENCE),'나무 울타리');

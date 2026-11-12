@@ -35,9 +35,9 @@ function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
 function cardGeometry(palette,items,compact=false,page=null){
  const headers=[
-  ['tab:blocks','건축재'],['tab:items','배치품'],['tab:craft','제작'],['hand','맨손'],['close','닫기'],
+  ['tab:blocks','건축재'],['tab:parts','부품'],['tab:items','배치품'],['tab:craft','제작'],['hand','맨손'],['close','닫기'],
  ];
- if(page?.total>1)headers.splice(3,0,['page:prev','‹'],['page:next',`${page.index+1}/${page.total} ›`]);
+ if(page?.total>1)headers.splice(4,0,['page:prev','‹'],['page:next',`${page.index+1}/${page.total} ›`]);
  const spacing=compact?.22:.35;
  const cards=headers.map(([id,name],i)=>({
   id,name,x:(i-(headers.length-1)/2)*spacing,y:compact?.54:.67,
