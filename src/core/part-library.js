@@ -159,9 +159,9 @@ const tiles=[86,87,88,89,90],stones=[91,92,93,94,95],concretes=[96,97,98,99,100]
 export function partGeometry(id){
  const p=partById(id);if(!p)return null;
  const v=p.variant,a=[];
- const put=(x,y,z,w,h,d,mat,alpha=false,solid=true)=>{
+ const put=(x,y,z,w,h,d,mat,alpha=false,solid=true,meta=null)=>{
   if(w<=0||h<=0||d<=0)throw Error('Invalid architectural shape');
-  a.push({x,y,z,w,h,d,material:mat,alpha,solid});
+  a.push({x,y,z,w,h,d,material:mat,alpha,solid,...meta});
  };
  const dark=metals[0],silver=metals[3],frame=v%2?metals[1]:dark;
  const edge=(height=.84,mat=dark)=>{
@@ -230,17 +230,45 @@ export function partGeometry(id){
   break;
  }
  case 'window':{
+  // A whole window per block: jamb, reveal, independent sash, glazing,
+  // weatherstrip, sill and small hinge/handle shapes. Depth never fills the cell.
   const f=[dark,metals[1],metals[0],silver,metals[1]][v];
-  for(const x of [.06,.87])put(x,.06,.43,.07,.88,.16,f);
-  for(const y of [.06,.87])put(.06,y,.43,.88,.07,.16,f);
-  const low=v===1?.43:.14,high=v===4?.53:.87;
-  if(v===1){put(.06,.1,.43,.88,.34,.16,f);}
-  if(v===4){put(.06,.54,.43,.88,.32,.16,f);}
-  put(.13,low,.50,.74,high-low,.035,tiles[2],true);
-  if(v===0){put(.49,.12,.42,.055,.76,.17,f);}
-  if(v===2)for(const x of [.35,.65])mullion(x,f);
-  if(v===3)put(.13,.62,.42,.74,.065,.17,f);
-  if(v===4){put(.13,.51,.42,.74,.055,.17,f);put(.18,.71,.39,.65,.025,.12,f);}
+  const frame=(x,y,w,h)=>put(x,y,.455,w,h,.082,f);
+  const glass=(x,y,w,h,z=.496)=>put(x,y,z,w,h,.022,tiles[2],true);
+  const trim=(x,y,w,h)=>put(x,y,.419,w,h,.027,metals[3]);
+  // Perimeter box with recessed thin sill and separate drainage rail.
+  frame(.072,.075,.064,.85);frame(.864,.075,.064,.85);
+  frame(.074,.075,.85,.065);frame(.074,.86,.85,.065);
+  put(.065,.036,.405,.872,.038,.19,v===3?stones[0]:metals[1]);
+  for(const x of [.10,.87])put(x,.89,.428,.029,.035,.13,metals[3]); // corner brackets
+  if(v===0){ // Horizontal sliding aluminum sash, two offset glass leaves
+   glass(.14,.15,.38,.65,.487);glass(.49,.15,.37,.65,.513);
+   frame(.49,.13,.052,.69);trim(.135,.13,.045,.69);trim(.82,.13,.045,.69);
+   put(.53,.43,.426,.052,.115,.045,metals[3]); // latch
+   put(.10,.13,.42,.80,.028,.06,dark);
+  }else if(v===1){ // High ventilation window above a solid opaque lower infill
+   put(.137,.14,.481,.727,.33,.062,concretes[2]);
+   glass(.14,.53,.72,.26);frame(.13,.48,.74,.056);
+   for(const y of [.60,.69,.78])put(.15,y,.424,.70,.022,.04,silver);
+   put(.79,.63,.42,.035,.082,.04,metals[3]);
+  }else if(v===2){ // Tripartite narrow steel casements
+   for(const [x,w] of [[.14,.19],[.38,.23],[.66,.20]])glass(x,.14,w,.70);
+   for(const x of [.346,.633]){frame(x,.12,.051,.75);trim(x+.014,.15,.019,.68);}
+   for(const x of [.28,.77])put(x,.49,.413,.023,.10,.035,silver);
+   put(.13,.13,.43,.73,.028,.05,dark);
+  }else if(v===3){ // Broad storefront transom with double glazing rails
+   glass(.14,.14,.72,.39,.493);glass(.14,.60,.72,.21,.493);
+   frame(.13,.54,.74,.061);trim(.13,.545,.74,.017);
+   for(const x of [.16,.84])put(x,.55,.413,.02,.045,.045,metals[3]);
+   put(.16,.1,.4,.68,.035,.05,stones[2]);
+  }else{ // Hopper window, upper fixed sheet and lower hinged vent leaf
+   glass(.14,.50,.72,.34,.504);
+   put(.13,.46,.433,.74,.051,.095,f);
+   glass(.165,.14,.67,.25,.48);
+   for(const x of [.21,.78])put(x,.385,.418,.055,.10,.062,metals[3]); // hinge pins
+   put(.46,.23,.39,.08,.10,.035,silver); // opening latch
+   put(.16,.13,.42,.70,.032,.07,metals[0]);
+  }
   break;
  }
  case 'partition':{
@@ -270,16 +298,45 @@ export function partGeometry(id){
   break;
  }
  case 'staircase':{
-  const mat=[concretes[0],stones[0],metals[2],floors[4],stones[4]][v];
-  put(.03,0,.03,.94,.16,.94,mat);
-  put(.03,.16,.48,.94,.27,.49,mat);
-  put(.03,.43,.75,.94,.25,.22,mat);
-  for(const x of [.06,.88]){put(x,.12,.10,.07,.60,.09,metals[0]);put(x,.12,.80,.07,.70,.09,metals[0]);}
-  put(.06,.71,.13,.07,.05,.72,metals[0]);put(.88,.71,.13,.07,.05,.72,metals[0]);
-  if(v===1){put(.03,.68,.78,.94,.055,.19,stones[2]);}
-  if(v===2)for(const z of [.30,.62])put(.10,.03,z,.79,.08,.06,metals[1]);
-  if(v===3)put(.04,.41,.48,.92,.045,.49,stones[2]);
-  if(v===4)put(.03,.13,.07,.94,.06,.10,stones[2]);
+  // A three-riser run with distinct treads, open/detailed risers, nosings and
+  // integrated sloped handrails. No independent fence block is needed.
+  const carcass=[concretes[0],stones[0],metals[1],floors[4],stones[4]][v];
+  const tread=[concretes[3],stones[0],metals[3],floors[4],stones[4]][v];
+  const railMat=v===2?metals[3]:v===3?metals[0]:metals[0];
+  const sections=[{z:0,d:.333,h:.25},{z:.333,d:.334,h:.49},{z:.667,d:.333,h:.74}];
+  for(let k=0;k<sections.length;k++){
+   const q=sections[k];
+   // Full-width structure meets its neighbor without an interior side.
+   if(v===2){ // Ribbed open steel stringers instead of a monolithic concrete block
+    for(const x of [.13,.79])put(x,.02,q.z+.018,.085,q.h-.04,q.d-.036,carcass,false,true,{structural:true});
+    put(.07,q.h-.07,q.z+.009,.86,.065,q.d-.018,tread,false,true,{structural:true});
+   }else{
+    put(0,0,q.z,1,q.h-.025,q.d,carcass,false,true,{structural:true});
+    put(0,q.h-.035,q.z,.999,.035,q.d,tread,false,true,{structural:true});
+   }
+   put(.035,q.h-.015,q.z+.012,.93,.025,.063,
+    v===0?concretes[2]:v===3?stones[2]:metals[3],false,true,{structural:true});
+   // Tread anti-slip strips and exposed riser joints.
+   if(v===1||v===4)for(const x of [.13,.26,.39,.52,.65,.78])
+    put(x,q.h+.001,q.z+.065,.038,.008,q.d-.11,stones[2]);
+   if(v===3)for(const x of [.16,.42,.68])put(x,q.h+.001,q.z+.055,.034,.009,q.d-.09,stones[2]);
+   if(v===2){for(const x of [.18,.44,.70])put(x,q.h+.001,q.z+.035,.065,.012,q.d-.08,metals[0]);}
+   for(const [side,x] of [['left',.035],['right',.91]]){
+    // Rail posts start at each tread top; the same model owns every post.
+    const z=q.z+.15,railY=.59+.31*z;
+    const postTop=Math.min(.95,railY),postBottom=q.h-.012;
+    if(postTop>postBottom)put(x,postBottom,z,.055,postTop-postBottom,.060,railMat,false,true,{railSide:side});
+    if(k===0||k===2)put(x-.016,postTop-.02,z-.02,.09,.038,.10,metals[3],false,true,{railSide:side});
+   }
+  }
+  for(const [side,x] of [['left',.036],['right',.908]]){
+   // Inclined, non-stepped top rail; shape uses a sheared prism in Y/Z.
+   put(x,.59,.055,.060,.052,.89,railMat,false,true,{railSide:side,slopeY:.31});
+   put(x,.41,.08,.035,.035,.83,railMat,false,true,{railSide:side,slopeY:.31});
+  }
+  if(v===0||v===1){ // Smooth stone fascia beneath the treads
+   for(const q of sections)put(.015,.018,q.z+.012,.021,q.h-.042,q.d-.024,carcass,false,true,{structural:true});
+  }
   break;
  }
  case 'balcony':{
@@ -292,18 +349,50 @@ export function partGeometry(id){
   break;
  }
  case 'ventilation':{
-  const mat=[metals[0],metals[1],metals[2],metals[4],metals[0]][v];
-  // Wall plate, duct barrel, rotor and grilles are independent physical parts.
-  put(.08,.12,.46,.84,.76,.10,mat);
+  // Ventilation units expose a dark recessed throat, a flanged housing,
+  // projecting fan cage or directional louvers. Curved rotors are emitted as
+  // decorative planar meshes from the same part registry (fanRotor variants).
+  const casing=[metals[0],metals[1],metals[2],metals[4],metals[0]][v];
+  const housing=(z,depth)=>{ // Rear bracket and four independent sides (open centre)
+   for(const y of [.17,.80])put(.135,y,z,.73,.061,depth,casing);
+   for(const x of [.135,.81])put(x,.17,z,.055,.70,depth,casing);
+  };
+  put(.105,.12,.68,.79,.78,.043,metals[0]); // dark interior throat
+  housing(.40,.28);
+  for(const x of [.145,.827])for(const y of [.21,.83])
+   put(x,y,.353,.030,.030,.045,metals[3]); // mount screws
   if(v===0||v===4){
-   put(.25,.24,.40,.50,.50,.10,metals[1]);
-   put(.44,.43,.30,.12,.12,.15,stones[2]);
-   for(const [dx,dy,w,h] of [[.20,.47,.26,.055],[.54,.47,.26,.055],[.47,.20,.055,.26],[.47,.54,.055,.26]])
-    put(dx,dy,.32,w,h,.07,metals[3]);
-   if(v===4)for(const x of [.12,.28,.67,.84])put(x,.12,.29,.035,.75,.05,metals[0]);
-  }else if(v===1){for(let y=.19;y<.79;y+=.115)put(.14,y,.37,.72,.048,.10,dark);}
-  else if(v===2){put(.19,.23,.24,.62,.52,.21,metals[1]);for(const x of [.25,.40,.55,.70])put(x,.30,.20,.035,.40,.05,dark);}
-  else{put(.2,.28,.18,.60,.44,.32,metals[1]);put(.15,.62,.18,.70,.12,.38,metals[4]);for(const x of [.28,.60])put(x,.34,.15,.09,.25,.09,metals[0]);}
+   housing(.29,.12);
+   // Radial grille approximated with thin circular-segment tangents.
+   for(const [x,y,w,h] of [[.50,.19,.035,.62],[.195,.49,.61,.031],
+    [.25,.27,.052,.47],[.69,.27,.05,.47]])
+    put(x,y,.295,w,h,.031,v===4?metals[1]:metals[3]);
+   put(.464,.464,.263,.076,.076,.080,metals[3]); // rotor hub
+   if(v===4){ // Reinforced guard bars and external support ears
+    for(const x of [.17,.30,.67,.81])put(x,.18,.247,.025,.65,.043,metals[0]);
+    put(.11,.46,.31,.78,.05,.08,metals[1]);
+    for(const x of [.07,.89])put(x,.22,.45,.042,.52,.18,metals[2]);
+   }
+  }else if(v===1){ // Gravity louvers angled in recessed slot
+   for(let k=0;k<6;k++){
+    const y=.235+k*.094;
+    put(.18,y,.33,.64,.026,.13,metals[3]);
+    put(.18,y+.020,.28,.64,.036,.04,casing);
+   }
+   put(.16,.22,.29,.038,.56,.07,metals[0]);
+   put(.80,.22,.29,.038,.56,.07,metals[0]);
+  }else if(v===2){ // Deep external boxed fan with weather hood and grate
+   housing(.22,.2);
+   put(.14,.76,.16,.72,.078,.48,metals[2]);
+   for(let x=.22;x<=.76;x+=.105)put(x,.24,.17,.033,.52,.042,metals[0]);
+   put(.10,.16,.24,.10,.11,.37,metals[1]);
+   put(.8,.16,.24,.10,.11,.37,metals[1]);
+  }else{ // Exposed industrial duct with bonnet and clamp bands
+   for(const x of [.15,.27,.66,.79])put(x,.23,.20,.047,.54,.43,metals[1]);
+   for(const y of [.26,.74])put(.18,y,.19,.63,.055,.46,metals[4]);
+   put(.21,.79,.15,.58,.082,.54,metals[2]);
+   for(const x of [.32,.60])put(x,.28,.14,.080,.40,.065,metals[3]);
+  }
   break;
  }
  case 'sign':{
