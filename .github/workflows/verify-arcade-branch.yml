@@ -4,10 +4,20 @@ on:
     branches:
       - fix/korean-arcade-spatial-logic-20261113
 jobs:
-  test:
+  candidate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cef8daea52ac3872d6e549821859abddf3f8a1d9
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
