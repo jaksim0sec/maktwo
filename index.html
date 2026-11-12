@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo | 끝나지 않는 밤</title>
- <link rel="stylesheet" href="./style.css?v=1.10.0">
+ <link rel="stylesheet" href="./style.css?v=1.11.0">
 </head>
 <body>
  <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
@@ -43,7 +43,7 @@
  <div id="build-controls">
   <div id="block-name" aria-live="polite"></div>
   <div id="hotbar-dock" aria-label="빠른 선택">
-   <button id="bag-btn" class="dock-action" aria-label="공간형 가방 열기" title="가방 · E" aria-expanded="false"><span class="dock-icon" aria-hidden="true">▤</span></button>
+   <button id="bag-btn" class="dock-action" aria-label="공간형 가방 열기" title="가방 · E" aria-expanded="false"><svg class="bag-glyph" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8.5h14l1 11H4l1-11Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/><path d="M8 14h8"/></svg></button>
    <div id="hotbar" aria-label="아이템 바로가기"></div>
   </div>
  </div>
@@ -63,6 +63,6 @@
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.10.0"></script>
+ <script type="module" src="./src/client/game.js?v=1.11.0"></script>
 </body>
 </html>

@@ -40,3 +40,11 @@ Reference ideas (not dependencies or copied source): FastNoiseLite's domain warp
 - **Region-based terrain caches**, optionally computed in a Worker for hydraulic erosion and river drainage.
 - **Prop/component registry**, for openable storage, gardening growth and furniture, with persistent state outside block IDs.
 - **Device tests**, especially mobile touch, WebGL shaders, PWA update lifecycle, and memory on low-end hardware.
+
+## Modular ruins v1
+
+- `EternalNight` is a separate `ruins`-mode world using a new storage key. Existing presets and voxel edits are retained.
+- `src/worldgen/buildings.js` uses deterministic plans per 32-cell region. A five-block-tall, stair-connected floor plan is generated first and stacked into shop, utility and room floors. Upper storeys can shift, roofs can collapse, lower floors can be buried and rubble appears around footprints.
+- Each chunk stamps overlapping building plans independently in global world coordinates. No persistent structure instances or extra renderer draw calls are required.
+- 22 architectural voxel IDs and 18 additional procedural material textures preserve the existing block IDs, mesh stride and WebGL texture array. Fluorescent fixtures use the existing light volume.
+- The generation version is saved per world; legacy worlds without a version remain v1. Mid-rise ruins fit the 64-high layout. True megastructures require vertical chunk sections and distant LOD.

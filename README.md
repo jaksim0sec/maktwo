@@ -1,3 +1,10 @@
+## v1.11: Eternal Night · modular ruined buildings
+
+- New `EternalNight` world opens by default. Existing `Overworld`, Flatlands and other saved worlds remain selectable from settings.
+- 22 architectural block types including stained plaster, aged shop fronts, shutters, tiled corridors, rusted panels and damaged fluorescent lamps. The renderer now has 40 procedural material layers.
+- Buildings are generated floor by floor from a seeded layout, then stacked with stair bays, partial burial, shifted upper floors, debris and collapse damage. Each neighboring chunk produces the same building sections.
+- World generation version is saved; previously saved worlds without this field stay on legacy v1 rather than silently changing geography.
+
 ## v1.10: 자연 지형 · 확장 재질
 
 - 신규 지형용 블록 ID 30~54 25종. 기존 블록 ID와 저장 파일 형식 유지.
