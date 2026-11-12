@@ -1,7 +1,7 @@
 import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.js';
 import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
-import {solidBlockOverlap,fenceBoxes} from './shapes.js';
+import {solidBlockOverlap,fenceBoxes,shapeBoxes} from './shapes.js';
 export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
@@ -82,6 +82,9 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
    const baseY=id===B.DOOR_TOP?y-1:y;
    const door=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
    if(door&&door.distance>=t-1e-5&&door.distance<=maxDistance)return{x,y,z,id,normal:door.normal,distance:door.distance};
+  }else if(shapeBoxes(id,x,y,z,world.getShapeState?.(x,y,z))){
+   let closest=null;for(const bounds of shapeBoxes(id,x,y,z,world.getShapeState?.(x,y,z))){const hit=intersectAabb(origin,direction,[bounds.x,bounds.y,bounds.z],[bounds.x+bounds.w,bounds.y+bounds.h,bounds.z+bounds.d]);if(hit&&hit.distance>=t-1e-5&&(!closest||hit.distance<closest.distance))closest=hit}
+   if(closest&&closest.distance<=maxDistance)return{x,y,z,id,normal:closest.normal,distance:closest.distance};
   }else if(id===B.FENCE){
    let closest=null;for(const bounds of fenceBoxes(x,y,z)){
     const hit=intersectAabb(origin,direction,[bounds.x,bounds.y,bounds.z],[bounds.x+bounds.w,bounds.y+bounds.h,bounds.z+bounds.d]);

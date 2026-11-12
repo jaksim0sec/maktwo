@@ -207,7 +207,7 @@ class Game{
   const miningMode=input.mine;
   const aim=input.aim||(this.input.locked?null:this.input.canvasCursor());
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
-  this.target=raycast(this.world,origin,ray,7.5,{hitWater:miningMode,hitDecor:miningMode});
+  this.target=raycast(this.world,origin,ray,7.5,{hitWater:!miningMode&&this.selected>=0,hitDecor:miningMode});
   if(input.use&&this.target&&this.target.id===B.WORKBENCH){
    this.setPanel('inventory');this.station={world:this.world,x:this.target.x,y:this.target.y,z:this.target.z};
    this.inventoryPalette='craft';this.updateHologram();this.status('작업대 · 발견한 제작법을 선택하세요');
@@ -225,7 +225,7 @@ class Game{
    if(this.interactTimer>0||!this.target)return;
    this.placeLatch=true;
    const id=this.paletteItems[this.selected];if(!this.inventory.has(id)){this.status(`${blockLabel(id)}이 부족해요 · 채굴하거나 제작하세요`);this.interactTimer=.25;return}
-   const t=this.target,x=t.x+t.normal.x,y=t.y+t.normal.y,z=t.z+t.normal.z;
+   const t=this.target,replaceWater=t.id===B.WATER,x=t.x+(replaceWater?0:t.normal.x),y=t.y+(replaceWater?0:t.normal.y),z=t.z+(replaceWater?0:t.normal.z);
    const old=this.world.get(x,y,z);
    if(block(old).replaceable){
     if(id===B.DOOR){
@@ -236,6 +236,7 @@ class Game{
      }else this.status('문은 위로 두 칸의 공간이 필요해요');
     }else{
      if(this.world.set(x,y,z,id)){
+      if([B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR].includes(id)){const facing=((Math.round(p.yaw/(Math.PI/2))%4)+4)%4;const upper=[B.STONE_SLAB,B.WOOD_SLAB].includes(id)&&t.normal.y===-1;this.world.setShapeState(x,y,z,{facing,upper})}
       if(collides(this.world,p.x,p.y,p.z,p.width,p.height))this.world.set(x,y,z,old);
       else{this.inventory.remove(id);this.refreshInventoryUI();this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5)}
      }
@@ -248,7 +249,7 @@ class Game{
   if(this.interactTimer<=0&&this.selected<0&&this.entities.attack(p,3.4)){
    this.interactTimer=.40;this.mining.reset();this.showMining(0);return;
   }
-  const target=this.target&&this.target.id!==B.BEDROCK?this.target:null;
+  const target=this.target&&this.target.id!==B.BEDROCK&&this.target.id!==B.WATER?this.target:null;
   const result=this.mining.update(target,true,dt);this.showMining(result.ratio);
   if(result.completed&&target){
    if(this.world.get(target.x,target.y,target.z)===target.id){

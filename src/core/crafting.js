@@ -18,6 +18,12 @@ export const RECIPES=Object.freeze([
  make('path',B.PATH,4,'bench',['CC'],{C:B.COBBLE},'돌길 ×4'),
  make('lantern',B.LANTERN,1,'bench',[' O ','OTO',' O '],{O:B.ORE,T:B.TORCH},'랜턴'),
  make('glass',B.GLASS,2,'bench',['SS','SS'],{S:B.SAND},'유리 ×2'),
+ make('stone_stairs',B.STONE_STAIRS,4,'bench',['C  ','CC ','CCC'],{C:B.COBBLE},'돌 계단 ×4'),
+ make('wood_stairs',B.WOOD_STAIRS,4,'bench',['P  ','PP ','PPP'],{P:B.PLANKS},'나무 계단 ×4'),
+ make('stone_slab',B.STONE_SLAB,6,'bench',['CCC'],{C:B.COBBLE},'돌 반블록 ×6'),
+ make('wood_slab',B.WOOD_SLAB,6,'bench',['PPP'],{P:B.PLANKS},'나무 반블록 ×6'),
+ make('chair',B.CHAIR,1,'bench',['P P','PPP','P P'],{P:B.PLANKS},'나무 의자'),
+ make('flower_pot',B.FLOWER_POT,2,'hand',['C C',' C '],{C:B.COBBLE},'꽃 화분 ×2'),
 ]);
 export const recipeByName=name=>RECIPES.find(r=>r.name===name)||null;
 export function recipeGrid(recipe){const grid=Array(9).fill(0);if(!recipe)return grid;

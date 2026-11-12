@@ -3,6 +3,7 @@ import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
+import {shapeBoxes,isStairs,isSlab} from '../core/shapes.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -17,7 +18,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','chair','flower-pot'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -79,16 +80,16 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
+  if(isStairs(id)||isSlab(id)||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.FENCE||id===B.WORKBENCH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
-  const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
-  const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
-  for(const verts of [v1,v2,[...v1].reverse(),[...v2].reverse()])quad(opaque,verts,color,1);
+  flowerMesh(opaque,wx,y,wz,world.seed);
+
  }
  return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
 }
@@ -162,4 +163,22 @@ export function gardenMesh(dest,id,x,y,z){
   }
   box(.375,1.04,.375,.25,.08,.25,'#a48a65');
  }
+}
+
+export function flowerMesh(dest,x,y,z,seed=0){
+ const n=hash(x,0,z,seed),h=.55+hash(x,1,z,seed)*.16;
+ const petal=n<.26?'#b97999':n<.52?'#d8a8b9':n<.78?'#e4c69b':'#ab99c5';
+ cube(dest,x+.47,y+.045,z+.47,.06,h-.08,.06,rgb('#628764'));
+ cube(dest,x+.33,y+.27,z+.46,.16,.045,.09,rgb('#72956e'));
+ cube(dest,x+.51,y+.33,z+.44,.16,.045,.09,rgb('#668a63'));
+ const cy=y+h;
+ for(const [dx,dz] of [[-.13,0],[.13,0],[0,-.13],[0,.13]])cube(dest,x+.44+dx,cy-.02,z+.44+dz,.12,.105,.12,rgb(petal));
+ cube(dest,x+.462,cy+.025,z+.462,.076,.08,.076,rgb('#d7b77e'));
+}
+export function shapeMesh(dest,id,x,y,z,state){
+ const boxes=shapeBoxes(id,x,y,z,state)||[],c=rgb(BLOCKS[id].color);
+ for(const b of boxes){const dx=b.x-x,dy=b.y-y,dz=b.z-z;
+  for(let f=0;f<FACES.length;f++){const face=FACES[f],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);quad(dest,verts,c,face.shade+4*materialFor(id,f))}
+ }
+ if(id===B.FLOWER_POT){cube(dest,x+.43,y+.33,z+.43,.14,.33,.14,rgb('#608360'));cube(dest,x+.36,y+.55,z+.36,.28,.12,.28,rgb('#cf95a7'));cube(dest,x+.41,y+.65,z+.41,.18,.08,.18,rgb('#e3c6a4'))}
 }

@@ -57,6 +57,7 @@ precision highp float;
 in vec2 uv;
 uniform float uHorizon;
 out vec4 frag;
+float starHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
  vec3 high=vec3(.018,.020,.025);
  vec3 horizon=vec3(.073,.073,.080);
@@ -65,7 +66,9 @@ void main(){
  vec3 color=mix(horizon,high,upper);
  float below=1.-smoothstep(uHorizon-.65,uHorizon+.02,uv.y);
  color=mix(color,low,below*.65);
- frag=vec4(color,1.);
+ vec2 cell=floor(uv*vec2(200.,115.));vec2 pos=fract(uv*vec2(200.,115.));
+ float stars=step(.992,starHash(cell))*(1.-smoothstep(.035,.22,length(pos-vec2(.5))))*smoothstep(uHorizon+.05,uHorizon+.38,uv.y);
+ color+=vec3(.21,.22,.23)*stars;frag=vec4(color,1.);
 }`;
 function shader(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 function program(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}

@@ -5,6 +5,8 @@ export class World{
  getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved)c.data[idx]=id;c.dirty=true;this.lights.loadChunk(c);this.lightRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
+ getShapeState(x,y,z){return this.blockStates.get(this.stateKey(x,y,z))||{facing:0,upper:false}}
+ setShapeState(x,y,z,state={}){const id=this.get(x,y,z,false);if(![B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR].includes(id))return false;this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%4+4)%4,upper:Boolean(state.upper)});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;return true}
  getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return this.blockStates.get(this.stateKey(x,yBase,z))||{facing:0,open:false}}
  setDoorState(x,y,z,{facing=0,open=false}={}){const baseY=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);if(this.get(x,baseY,z)!==B.DOOR)return false;this.blockStates.set(this.stateKey(x,baseY,z),{facing:((facing%4)+4)%4,open:!!open});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;this.events.emit('door-change',{x,y:baseY,z});return true}
  toggleDoor(x,y,z,occupants=[]){
