@@ -17,7 +17,7 @@ test('a generated stair tread encodes height in the existing style byte and leav
   assert.equal(decoded.rail,true);
   assert.ok(Math.abs(encoded.base+decoded.height-height)<=.125001);
  }
- const id=partById(156)?.family==='staircase'?156:156;
+ const id=156; // First independently placeable stair family block (unchanged ID)
  const creative=partPrisms(id,1,8,1,{facing:4});
  const generated=partPrisms(id,1,8,1,{facing:4,cityStair:true,treadHeight:.75,rail:false});
  assert.ok(creative.length>generated.length,'city tread is not three repeated risers and two full rails');

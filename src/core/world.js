@@ -28,12 +28,11 @@ export class World{
   const cityStair=Boolean(variant&CITY_STAIR_STYLE);
   const state={facing:variant&TURN_STYLE?variant&7:0,upper:false,
    variant:variant&TURN_STYLE?0:variant,
-   ...(cityStair?{cityStair:true,treadHeight:((variant&CITY_STAIR_LEVEL_MASK)>>3)+1&0xff,rail:Boolean(variant&64)}:{}),
+   ...(cityStair?{cityStair:true,treadHeight:(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4,rail:Boolean(variant&64)}:{}),
    ...this.blockStates.get(this.stateKey(x,y,z))};
-  if(cityStair){
-   if(partById(this.get(x,y,z,false))?.family==='passage'){
-    state.cityBridge=true;state.cityStair=false;state.bridgePost=Boolean(variant&8);
-   }else state.treadHeight=(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4;
+  if(cityStair&&partById(this.get(x,y,z,false))?.family==='passage'){
+   state.cityBridge=true;state.cityStair=false;state.bridgePost=Boolean(variant&8);
+   delete state.treadHeight;delete state.rail;
   }
   const id=this.get(x,y,z,false);
   if(partById(id)?.family==='staircase'){
