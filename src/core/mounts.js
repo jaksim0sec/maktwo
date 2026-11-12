@@ -27,17 +27,26 @@ export const MOUNT_PARTS = {
 };
 export const isWallItem = id => Object.hasOwn(MOUNT_PARTS,id);
 
+function rotatePair(u,v,facing){
+ switch(facing&3){
+  case 1:return [-v,u];
+  case 2:return [-u,-v];
+  case 3:return [v,-u];
+  default:return [u,v];
+ }
+}
 export function mountPoint(mount,u,v,d) {
+ if(mount.facing)[u,v]=rotatePair(u,v,mount.facing);
  return [mount.x+mount.nz*u+mount.nx*d,mount.y+v,mount.z-mount.nx*u+mount.nz*d];
 }
 
 export function mountCell(mount) {
  const cell=mountPoint(mount,0,0,.09).map(Math.floor);
  for (const [u,v,d,w,h,t] of MOUNT_PARTS[mount.id]) {
-  for (const left of [u,u+w]) for (const depth of [d,d+t]) {
-   const p=mountPoint(mount,left,v,depth);
+  for (const left of [u,u+w]) for (const height of [v,v+h]) for (const depth of [d,d+t]) {
+   const p=mountPoint(mount,left,height,depth);
    if (p[0]<cell[0]||p[0]>cell[0]+1||p[2]<cell[2]||p[2]>cell[2]+1||
-       p[1]<cell[1]||p[1]+h>cell[1]+1) return null;
+       p[1]<cell[1]||p[1]>cell[1]+1) return null;
   }
  }
  return cell;
@@ -47,6 +56,10 @@ export function hitMount(mount,origin,direction,intersect) {
  const {nx,nz}=mount, dx=origin.x-mount.x, dz=origin.z-mount.z;
  const pos={x:nz*dx-nx*dz,y:origin.y-mount.y,z:nx*dx+nz*dz};
  const dir={x:nz*direction.x-nx*direction.z,y:direction.y,z:nx*direction.x+nz*direction.z};
+ if(mount.facing){
+  [pos.x,pos.y]=rotatePair(pos.x,pos.y,-mount.facing);
+  [dir.x,dir.y]=rotatePair(dir.x,dir.y,-mount.facing);
+ }
  let closest=null;
  for (const [u,v,d,w,h,t] of MOUNT_PARTS[mount.id]) {
   const hit=intersect(pos,dir,[u,v,d],[u+w,v+h,d+t]);

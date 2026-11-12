@@ -3,7 +3,7 @@ import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
-import {shapeBoxes,isStairs,isSlab} from '../core/shapes.js';
+import {shapeBoxes,isStairs,isSlab,rotateCellXZ} from '../core/shapes.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 
@@ -33,6 +33,18 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
  const adjacent=new Map(neighbors.map(([dx,dz,data,forms])=>[`${dx},${dz}`,{data,forms}]));
  const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,forms=chunk.forms;
+ // Store top-face UV turns in the existing material field. Only chunks with
+ // rotated cubes need this array, and only the horizontal masks use it.
+ let cubeTurns;
+ for(const [pos,state] of states){
+  if(!state.facing)continue;
+  const [wx,y,wz]=pos.split(',').map(Number),x=wx-ox,z=wz-oz;
+  if(x<0||x>=SIZE||z<0||z>=SIZE||y<0||y>=HEIGHT)continue;
+  const idx=(y*SIZE+z)*SIZE+x;
+  if(CROSS[chunk.data[idx]]||forms?.[idx])continue;
+  cubeTurns??=new Uint8Array(chunk.data.length);
+  cubeTurns[idx]=state.facing&3;
+ }
  for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
   const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
@@ -62,7 +74,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     }
     const transparent=TRANSPARENT[id];
     mask[i]=(!otherForm&&OPAQUE[other])||(id===other&&(transparent||CUTOUT[id]))||(!transparent&&other===B.GLASS)
-      ?0:id|(id===B.WATER&&n!==1?y<<8:0);
+      ?0:id|(id===B.WATER&&n!==1?y<<8:0)|(n===1?(cubeTurns?.[idx]||0)<<14:0);
    }
    for(let j=0;j<nv;j++)for(let k=0;k<nu;){
     const idx=j*nu+k,mat=mask[idx];if(!mat){k++;continue}
@@ -80,7 +92,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
     const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],visualSeed)*.06;
-    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex));
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex)+256*(mat>>>14));
     k+=width;
    }
   }
@@ -107,14 +119,19 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
    continue;
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
-  const wx=ox+x,wz=oz+z,color=COLORS[id];
-  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,stateAt(wx,y,wz));continue}
-  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,stateAt(wx,y,wz));continue}
- if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
-  if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
-  if(id===B.FENCE||id===B.WORKBENCH){gardenMesh(opaque,id,wx,y,wz);continue}
-  if(id!==B.FLOWER&&BLOCKS[id].render!=='cross'){fixture(opaque,id,wx,y,wz);continue}
-  flowerMesh(opaque,wx,y,wz,visualSeed,id);
+  const wx=ox+x,wz=oz+z,state=states.size?stateAt(wx,y,wz):undefined;
+  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state);continue}
+  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state);continue}
+  const start=opaque.length;
+  if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.FENCE||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);
+  else if(id!==B.FLOWER&&BLOCKS[id].render!=='cross')fixture(opaque,id,wx,y,wz);
+  else flowerMesh(opaque,wx,y,wz,visualSeed,id);
+  if(state?.facing){
+   for(let i=start;i<opaque.length;i+=7){
+    const [rx,rz]=rotateCellXZ(opaque[i]-wx,opaque[i+2]-wz,state.facing);
+    opaque[i]=wx+rx;opaque[i+2]=wz+rz;
+   }
+  }
 
  }
  for(const mount of chunk.mounts?.values()||[]){
@@ -239,7 +256,7 @@ export function shapeMesh(dest,id,x,y,z,state){
   const paint=glass?rgb('#25343b'):c,mat=glass?materialFor(B.DIRTY_GLASS,0):materialFor(id,0);
   for(let fi=0;fi<FACES.length;fi++){
    const face=FACES[fi],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);
-   quad(dest,verts,paint,face.shade+4*(glass?mat:materialFor(id,fi)));
+   quad(dest,verts,paint,face.shade+4*(glass?mat:materialFor(id,fi))+(fi===2||fi===3?256*((state?.facing||0)&3):0));
   }
  }
  if(id===B.FLOWER_POT){

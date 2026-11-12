@@ -9,11 +9,11 @@ const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
 uniform mat4 uVP;uniform vec3 uCamera;uniform float uTime;
-out vec3 vColor;out float vFog;out vec3 vPos;out float vEmission;flat out int vMaterial;
-void main(){gl_Position=uVP*vec4(aPos*${BLOCK_SIZE.toFixed(2)},1.);vPos=aPos;vEmission=aShade<0.?1.:0.;vMaterial=aShade<0.?0:int(floor(aShade*.25));vColor=aColor*(aShade<0.?abs(aShade):(aShade-4.*float(vMaterial)));float d=length(aPos*${BLOCK_SIZE.toFixed(2)}-uCamera);vFog=clamp((d-24.)/62.,0.,1.);}`;
+out vec3 vColor;out float vFog;out vec3 vPos;out float vEmission;flat out int vMaterial;flat out int vTurns;
+void main(){gl_Position=uVP*vec4(aPos*${BLOCK_SIZE.toFixed(2)},1.);vPos=aPos;vEmission=aShade<0.?1.:0.;int packedMat=aShade<0.?0:int(floor(aShade*.25));vTurns=packedMat>>6;vMaterial=packedMat&63;vColor=aColor*(aShade<0.?abs(aShade):(aShade-4.*float(packedMat)));float d=length(aPos*${BLOCK_SIZE.toFixed(2)}-uCamera);vFog=clamp((d-24.)/62.,0.,1.);}`;
 const FRAG=`#version 300 es
 precision highp float;
-in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;flat in int vMaterial;
+in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;flat in int vMaterial;flat in int vTurns;
 uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;
@@ -38,6 +38,9 @@ void main(){
  vec3 tinted=vColor;
  if(vMaterial>0){
   vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vPos.xz:(axis.x>axis.z?vPos.zy:vPos.xy);
+  if(vTurns==1)uv=vec2(-uv.y,uv.x);
+  else if(vTurns==2)uv=-uv;
+  else if(vTurns==3)uv=vec2(uv.y,-uv.x);
   tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
  }
  // Ambient retains the material color; lamp light adds a restrained amber tint.

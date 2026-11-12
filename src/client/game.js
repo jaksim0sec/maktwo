@@ -6,12 +6,12 @@ import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../
 import {screenRay,canvasPoint} from './picking.js';
 import {FORMS,supportsForms,formCode} from '../core/construction.js';
 import {isWallItem} from '../core/mounts.js';
-import {solidBlockOverlap,isSlab,isStairs} from '../core/shapes.js';
+import {solidBlockOverlap,isSlab,isStairs,rotatePanel} from '../core/shapes.js';
 const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.rotation=0;this.manualFacing=null;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualFacing=null;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  bindWorld(){
   this.stopMountEvents?.();
@@ -47,23 +47,23 @@ class Game{
   if(!shape||!rotate)return;
   shape.hidden=!supportsForms(id);
   shape.textContent=FORMS[this.form];
-  const custom=this.rotatesForm(id);
-  rotate.hidden=!custom&&!this.rotatesBlock(id);
-  const facing=custom?this.rotation:this.manualFacing;
-  rotate.textContent=facing===null?'회전 · 자동':`회전 · ${facing*90}°`;
+  rotate.hidden=id==null;
+  const auto=id===B.DOOR||isStairs(id);
+  const facing=this.placementFacing(id);
+  rotate.textContent=auto&&this.manualFacing===null?'회전 · 자동':`회전 · ${facing*90}°`;
  }
- rotatesForm(id){return supportsForms(id)&&this.form>=3}
- rotatesBlock(id){return id===B.DOOR||isStairs(id)}
- placementFacing(){return this.manualFacing??(Math.round(this.player.yaw/(Math.PI/2))&3)}
+ placementFacing(id){
+  if(this.manualFacing!==null)return this.manualFacing;
+  return id===B.DOOR||isStairs(id)?Math.round(this.player.yaw/(Math.PI/2))&3:0;
+ }
  changeForm(){
   if(!supportsForms(this.paletteItems[this.selected]))return;
   this.form=(this.form+1)%FORMS.length;this.updateFormControls();
  }
  rotateForm(){
   const id=this.paletteItems[this.selected];
-  if(this.rotatesForm(id))this.rotation=(this.rotation+1)&3;
-  else if(this.rotatesBlock(id))this.manualFacing=(this.placementFacing()+1)&3;
-  else return;
+  if(id==null)return;
+  this.manualFacing=(this.placementFacing(id)+1)&3;
   this.updateFormControls();
  }
  get paletteItems(){return this.inventory.quickSlots}
@@ -319,7 +319,7 @@ class Game{
    const t=this.target;
    if(t.mounted)return;
    if(isWallItem(id)&&t.anchor&&Math.abs(t.normal.y)<1e-6&&Math.hypot(t.normal.x,t.normal.z)>.5){
-    if(this.world.placeMount(id,t)){this.inventory.remove(id);this.refreshInventoryUI()}
+    if(this.world.placeMount(id,t,this.placementFacing(id))){this.inventory.remove(id);this.refreshInventoryUI()}
     else this.status('이 면에 배치할 공간이 없어요');
     this.interactTimer=.20;return;
    }
@@ -330,17 +330,18 @@ class Game{
    const old=this.world.get(x,y,z);
    if(block(old).replaceable){
     if(id===B.DOOR){
-     const facing=this.placementFacing(),upperOld=this.world.get(x,y+1,z);
+     const facing=this.placementFacing(id),upperOld=this.world.get(x,y+1,z);
      if(this.world.placeDoor(x,y,z,facing,[p,...this.entities.entities])){
       if(collides(this.world,p.x,p.y,p.z,p.width,p.height)){this.world.removeDoor(x,y,z);if(old!==B.AIR)this.world.set(x,y,z,old);if(upperOld!==B.AIR)this.world.set(x,y+1,z,upperOld)}
       else{this.inventory.remove(id);this.refreshInventoryUI();this.status('나무 문 설치 · 클릭해서 열고 닫기')};
      }else this.status('문은 위로 두 칸의 공간이 필요해요');
     }else{
-     const form=supportsForms(id)?formCode(this.form,this.rotation):0;
-     const facing=this.placementFacing();
+     const facing=this.placementFacing(id);
+     const form=supportsForms(id)?formCode(this.form,facing):0;
+     const placedId=rotatePanel(id,facing);
      const state={facing,upper:isSlab(id)&&n.y===-1};
-     if(!solidBlockOverlap({getShapeState:()=>state},x,y,z,id,p,1e-5,form)&&this.world.set(x,y,z,id,{form})){
-      if(isStairs(id)||isSlab(id))this.world.setShapeState(x,y,z,state);
+     if(!solidBlockOverlap({getShapeState:()=>state},x,y,z,placedId,p,1e-5,form)&&this.world.set(x,y,z,placedId,{form})){
+      if((facing&&!form)||state.upper)this.world.setShapeState(x,y,z,state);
       this.inventory.remove(id);this.refreshInventoryUI();
       this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5);
      }

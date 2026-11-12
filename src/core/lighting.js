@@ -1,6 +1,7 @@
 // World-owned emissive block index. No renderer dependency and no per-frame chunk scans.
 import {SIZE} from './chunk.js';
 import {block} from './blocks.js';
+import {mountPoint} from './mounts.js';
 import {key} from '../util/math.js';
 
 const positionKey=(x,y,z)=>`${x},${y},${z}`;
@@ -35,7 +36,8 @@ export class LightIndex {
   const light=mount&&block(mount.id).light;
   if(light){
    entries.add(posKey);
-   this.sources.set(posKey,{...light,id:mount.id,x:mount.x+mount.nx*.15,y:mount.y+.15,z:mount.z+mount.nz*.15});
+   const [x,y,z]=mountPoint(mount,0,.15,.15);
+   this.sources.set(posKey,{...light,id:mount.id,x,y,z});
   }
  }
  unloadChunk(chunkKey){

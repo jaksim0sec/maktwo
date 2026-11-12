@@ -12,7 +12,7 @@ export class World{
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
  getShapeState(x,y,z){return this.blockStates.get(this.stateKey(x,y,z))||{facing:0,upper:false}}
- setShapeState(x,y,z,state={}){const id=this.get(x,y,z,false);if(![B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CONCRETE_STAIRS,B.CONCRETE_SLAB,B.CHAIR].includes(id))return false;this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%4+4)%4,upper:Boolean(state.upper)});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;return true}
+ setShapeState(x,y,z,state={}){const id=this.get(x,y,z,false);if(id===B.AIR||isDoor(id))return false;this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%4+4)%4,upper:Boolean(state.upper)});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;return true}
  getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return this.blockStates.get(this.stateKey(x,yBase,z))||{facing:0,open:false}}
  setDoorState(x,y,z,{facing=0,open=false}={}){const baseY=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);if(this.get(x,baseY,z)!==B.DOOR)return false;this.blockStates.set(this.stateKey(x,baseY,z),{facing:((facing%4)+4)%4,open:!!open});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;this.events.emit('door-change',{x,y:baseY,z});return true}
  toggleDoor(x,y,z,occupants=[]){
@@ -42,13 +42,13 @@ export class World{
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
   return c?.forms?.[Chunk.index(x-cx*SIZE,y,z-cz*SIZE)]||0;
  }
- placeMount(id,target){
+ placeMount(id,target,facing=0){
   if(!isWallItem(id)||!target.anchor||!target.normal||Math.abs(target.normal.y)>1e-6)return false;
   const {x,y,z}=target.anchor,{x:nx,z:nz}=target.normal;
   if(Math.abs(Math.hypot(nx,nz)-1)>1e-6)return false;
   const support=this.get(target.x,target.y,target.z);
   if(!block(support).solid||support!==target.id)return false;
-  const mount={id,x,y,z,nx,nz,sx:target.x,sy:target.y,sz:target.z};
+  const mount={id,x,y,z,nx,nz,facing:facing&3,sx:target.x,sy:target.y,sz:target.z};
   const cell=mountCell(mount);
   if(!cell)return false;
   const [bx,by,bz]=cell;

@@ -89,7 +89,7 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
     const baseY=id===B.DOOR_TOP?y-1:y;
     hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
    }else{
-    const state=isStairs(id)||isSlab(id)?world.getShapeState?.(x,y,z):undefined;
+    const state=isStairs(id)||isSlab(id)||id===B.CHAIR?world.getShapeState?.(x,y,z):undefined;
     const boxes=id===B.FENCE?fenceBoxes(x,y,z):shapeBoxes(id,x,y,z,state);
     if(boxes){
      for(const {x:bx,y:by,z:bz,w,h,d} of boxes){

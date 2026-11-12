@@ -65,3 +65,22 @@ test('creative resources and recipes do not alter survival inventory, and flight
  assert.ok(player.y>25&&player.y+player.height<=27+1e-4);
  player.update(world,1/60,{crouch:true});assert.ok(player.vy<0);
 });
+
+test('rotated construction keeps cube texture turns, chair collision and mounted sign picking after reload',()=>{
+ const records=new Map(),storage={getItem:k=>records.get(k),setItem:(k,v)=>records.set(k,v)};
+ let world=new World({mode:'flat',storage});
+ world.set(2,25,2,B.CHAIR);
+ world.setShapeState(2,25,2,{facing:1});
+ world.set(4,25,2,B.PLANKS);
+ world.setShapeState(4,25,2,{facing:1});
+ const wall=raycast(world,{x:6,y:25.5,z:2.5},{x:-1,y:0,z:0});
+ assert.equal(world.placeMount(B.SHOP_SIGN,wall,1),true);
+ world.save();
+ world=new World({mode:'flat',storage});
+ assert.equal(collides(world,2.8,25.7,2.5,.05,.1),true);
+ assert.equal(collides(world,2.5,25.7,2.8,.05,.1),false);
+ assert.equal(raycast(world,{x:6,y:25.77,z:2.5},{x:-1,y:0,z:0}).id,B.SHOP_SIGN);
+ assert.equal(raycast(world,{x:6,y:25.5,z:2.77},{x:-1,y:0,z:0}).id,B.PLANKS);
+ const {opaque}=meshChunk(world,world.getChunk(0,0));
+ assert.ok(opaque.some((value,i)=>i%7===6&&value===297&&opaque[i-5]===26));
+});
