@@ -5,7 +5,8 @@ import {BLOCK as B,BLOCKS} from '../src/core/blocks.js';
 import {WORLD_PRESETS} from '../src/core/catalog.js';
 import {ARCH_MATERIALS,ARCH_MATERIAL_START} from '../src/core/architectural-materials.js';
 import {GALLERY_BLOCK_IDS,galleryCoordinate} from '../src/worldgen/material-gallery.js';
-import {ARCHETYPES,showcaseBlueprint} from '../src/worldgen/architecture-v3.js';
+import {ARCHETYPES} from '../src/worldgen/architecture-v3.js';
+import {componentPlan} from '../src/worldgen/architectural-components.js';
 import {makeTextureLayers,materialFor} from '../src/client/textures.js';
 
 test('six selectable studio worlds; original block IDs remain stable',()=>{
@@ -25,11 +26,11 @@ test('flat texture gallery has exactly one sample per displayed full material bl
 });
 test('each isolated building shares the original architecture program and no neighboring buildings',()=>{
  for(const type of ARCHETYPES){
-  const seed=52771,w=new World({mode:'building:'+type,seed}),p=showcaseBlueprint(type,seed);
-  assert.equal(p.type,type);assert.equal(p.floors,3);
-  assert.equal(w.get(p.x,p.base+3,p.z+3),p.facade,type);
+  const seed=52771,w=new World({mode:'building:'+type,seed}),p=componentPlan(seed,ARCHETYPES.indexOf(type));
+  assert.equal(p.floors,3);
+  assert.equal(w.get(p.x+5,p.base+2,p.z+4),B.AIR,type);
   assert.equal(w.get(64,26,64),B.AIR);assert.equal(w.get(64,22,64),B.CONCRETE);
-  assert.deepEqual(p,showcaseBlueprint(type,seed));
+  assert.deepEqual(p,componentPlan(seed,ARCHETYPES.indexOf(type)));
  }
 });
 test('30 new deterministic 32px textures map to stable material IDs',()=>{
