@@ -1,5 +1,5 @@
 import {SIZE, HEIGHT} from '../core/chunk.js';
-import {BLOCK as B, BLOCKS, block} from '../core/blocks.js?v=0.8.0';
+import {BLOCK as B, BLOCKS, block} from '../core/blocks.js?v=0.9.0';
 import {hash} from '../util/math.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.

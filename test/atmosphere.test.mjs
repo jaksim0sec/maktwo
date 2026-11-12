@@ -29,7 +29,8 @@ test('hologram inventory renders in WebGL instead of a separate DOM overlay',()=
  assert.match(game,/e.code==='KeyE'\|\|e.code==='KeyI'/);
  assert.match(game,/this\.input\.setUiMode\(this\.uiOpen\)/);
  assert.match(game,/this\.hologram\.open\(this\.player\)/);
- assert.match(hologram,/gl\.drawArrays\(gl\.TRIANGLES,0,6\)/);
+ assert.match(hologram,/gl\.drawArrays\(gl\.TRIANGLES,0,this\.count\)/);
+ assert.match(hologram,/gl\.enable\(gl\.DEPTH_TEST\)/);
  const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
  for(const [,id] of game.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has(id),`missing DOM element #${id}`);
 });

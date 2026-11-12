@@ -1,4 +1,4 @@
-# MakTwo · Endless Night v0.7.0
+# MakTwo · Endless Night v0.9.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -24,8 +24,10 @@ npm test
 | Space | Jump |
 | Shift | Crouch / descend while flying |
 | Ctrl | Sprint |
-| Left click | Break block (including placed water) / attack mob |
-| Right click or R | Place a block against the face you are looking at |
+| Left click with empty hand | **Hold** to mine (block-dependent break times); attack nearby mob |
+| Left click with an equipped block | Place **one** block per press |
+| Right click | Hold to mine even while equipped |
+| Q / tap the same hotbar slot | Unequip, return to empty hands |
 | 1..0 or scroll | Select from the current hotbar |
 | L or the light button | Switch between the original building hotbar and three light fixtures |
 | Light palette 1 / 2 / 3 | Torch / Lantern / Campfire |
@@ -34,7 +36,7 @@ npm test
 | Shift+G | Spawn a zombie for debugging |
 | B | Make a small block explosion at target |
 | P | Save edited blocks |
-| E or I | Open a real world-space WebGL hologram without releasing pointer lock. Aim the holo-reticle and left-click an item; E closes it |
+| E or I | Open separate **world-anchored 3D inventory tiles**. Keep looking with the mouse and aim at a tile to select; E closes it. World geometry can occlude tiles |
 | M | Open/close HTML settings (separate from the in-world hologram) |
 | Settings → 주변 물 정리 | Clear only player-edited water within 24 blocks and save automatically |
 | H | Open/close help |
@@ -136,3 +138,10 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - Press **E / I**: the bag is now a **real 3D quad rendered by WebGL in the world**, not HTML with CSS perspective. Its position and orientation are defined from player/world coordinates. Mouse is kept captured, moving the reticle inside the panel. Click a tile to equip and close, click the on-panel tabs to switch category, or press **L**; press **E** to close. No Escape loop.
 - Settings and help remain accessible HTML overlays on **M / H**. Existing saved blocks, generation, mesh worker and physics behavior are unchanged.
 - Tests include opaque-wall light blocking, doorway propagation, overlapping lamp compression, volume snapshots, and hologram hit tests. **Actual browser WebGL rendering remains unverified in the automated environment** and should be checked on-device.
+
+## v0.9.0: World-anchored inventory and hold-to-break
+
+- Replaces the large camera-facing menu surface with small, separated cards in the **actual world coordinates**, anchored when opened. The regular camera turns during selection, and **scene depth testing** allows opaque terrain to occlude the tiles. Individual cards use one shared small atlas and one batched draw call. This is not a fullscreen HTML/CSS modal, though the settings and help overlays remain ordinary HTML.
+- Clicking with a selected item now **places one block per mouse press**. Press Q, select the same item again, or choose **맨손** in the spatial bag to unequip; empty-hand left-click then **mines while held**. Right-click can mine while an item is equipped. R no longer places blocks.
+- Every block defines `breakTime` in seconds independently from blast resistance. Mining is cancellable, starts over on a different target, and shows a small progress meter. Bedrock remains unbreakable.
+- Save data, registered block IDs, existing terrain generation and meshing algorithms are not changed. Runtime WebGL2 appearance still requires real-device validation.

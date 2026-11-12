@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {view,perspective} from '../src/client/renderer.js';
 import {World} from '../src/core/world.js';
-
 const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
 test('camera basis stays orthonormal across yaw and pitch',()=>{
  for(const yaw of [0,.4,1.7,-2.2])for(const pitch of [0,.2,.8,-1.3]){

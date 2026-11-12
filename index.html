@@ -5,7 +5,7 @@
  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
  <meta name="theme-color" content="#272c30">
  <title>MakTwo · The Endless Night</title>
- <link rel="stylesheet" href="./style.css?v=0.7.0">
+ <link rel="stylesheet" href="./style.css?v=0.9.0">
 </head>
 <body>
  <canvas id="screen" aria-label="복셀 월드"></canvas>
@@ -21,15 +21,15 @@
   <button id="help-btn">조작법 · H</button>
   <span>시드 <b id="seed"></b></span>
  </aside>
- <div id="crosshair"><i></i><i></i></div><div id="target"></div>
+ <div id="crosshair"><i></i><i></i></div><div id="mine-progress" aria-hidden="true"><span></span></div><div id="target"></div>
  <div id="toast"></div>
  <div id="health"></div><div id="flight"></div>
- <div id="control-hint" aria-live="polite">좌클릭 파괴 · 우클릭 / R 설치 · 1–0 블록 선택 · L 조명 · E 가방 · M 설정</div>
+ <div id="control-hint" aria-live="polite">맨손 좌클릭 길게 채굴 · 아이템 선택 후 좌클릭 설치 · Q 맨손 · E 공간 가방</div>
  <div id="block-name"></div><div id="hotbar-dock"><button id="bag-btn" aria-label="건축 가방 열기" title="가방 · E" aria-expanded="false">가방 <span class="bag-shortcut">E</span></button><button id="palette-toggle" aria-label="건축 및 조명 도구 전환" title="조명 전환 · L">✦ 조명</button><div id="hotbar"></div></div>
- <div id="mobile"><div class="move-hint">이동</div><div class="touchbuttons"><button data-action="mine">파괴</button><button data-action="place">설치</button><button data-action="jump">점프</button><button data-action="crouch">하강</button></div></div>
+ <div id="mobile"><div class="move-hint">이동</div><div class="touchbuttons"><button data-action="mine">채굴</button><button data-action="place">설치</button><button data-action="jump">점프</button><button data-action="crouch">하강</button></div></div>
  <div id="help" class="overlay hidden"><div class="help-card"><h2>조작법</h2><div class="help-grid">
-  <b>이동</b><span>W A S D</span><b>시점</b><span>화면 클릭 후 마우스</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>왼쪽 클릭</span><b>블록 설치</b><span>오른쪽 클릭 또는 R</span><b>블록 선택</b><span>1–0 / 스크롤</span><b>조명 도구</b><span>L / 아래 ✦ 조명 버튼</span><b>비행</b><span>F</span><b>양 생성</b><span>G</span><b>좀비 테스트</b><span>Shift+G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>물 복구</b><span>M 설정 → 주변 물 정리</span><b>UI 조작</b><span>E 가방 (게임 속 홀로그램) / M 설정</span><b>게임으로 복귀</b><span>E 또는 홀로그램에서 닫기</span><b>마우스 해제</b><span>Esc / E</span></div><button id="close-help">닫기</button></div></div>
+  <b>이동</b><span>W A S D</span><b>시점</b><span>화면 클릭 후 마우스</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>맨손에서 좌클릭 누르기</span><b>블록 설치</b><span>아이템 장착 후 좌클릭</span><b>블록 선택</b><span>1–0 / 스크롤 · Q 맨손</span><b>조명 도구</b><span>L / 아래 ✦ 조명 버튼</span><b>비행</b><span>F</span><b>양 생성</b><span>G</span><b>좀비 테스트</b><span>Shift+G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>물 복구</b><span>M 설정 → 주변 물 정리</span><b>UI 조작</b><span>E 실제 월드의 공간형 가방 / M 설정</span><b>게임으로 복귀</b><span>E 또는 홀로그램에서 닫기</span><b>마우스 해제</b><span>Esc / M 설정</span></div><button id="close-help">닫기</button></div></div>
  <div id="fatal" hidden></div>
- <script type="module" src="./src/client/game.js?v=0.8.0"></script>
+ <script type="module" src="./src/client/game.js?v=0.9.0"></script>
 </body>
 </html>

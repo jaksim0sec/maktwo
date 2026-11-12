@@ -27,6 +27,12 @@ button,select{font:inherit;color:inherit}button{cursor:pointer}#screen{display:b
 /* In-world inventory is a WebGL quad; only its existing bag shortcut uses DOM. */
 #bag-btn{height:45px;min-width:69px;padding:0 10px;background:#282b31e6;border:1px solid #fff4;border-radius:9px;font-size:11px;color:#f4eee7}
 .bag-shortcut{margin-left:5px;padding:1px 4px;border-radius:4px;background:#ffffff20;font-size:10px}
-body.holo-open #crosshair,body.holo-open #target,body.holo-open #hotbar-dock,body.holo-open #block-name,body.holo-open #health,body.holo-open #flight{opacity:0;pointer-events:none}
+body.holo-open #target,body.holo-open #hotbar-dock,body.holo-open #block-name,body.holo-open #health,body.holo-open #flight{opacity:0;pointer-events:none}
 body.holo-open #control-hint{bottom:10px;background:#141a1dcc}
 @media(max-width:660px){#bag-btn{height:39px;min-width:49px;padding:0 6px;font-size:10px}.bag-shortcut{display:none}}
+
+/* A compact charge meter next to the reticle. It never blocks pointer input. */
+#mine-progress{position:fixed;left:50%;top:calc(50% + 27px);transform:translateX(-50%);width:65px;height:4px;border-radius:7px;background:#15181acb;opacity:0;transition:opacity .11s;pointer-events:none;overflow:hidden}
+#mine-progress.active{opacity:1}
+#mine-progress span{display:block;height:100%;width:var(--progress,0%);background:#e4c7a4;border-radius:7px}
+body.holo-open #mine-progress{opacity:0}

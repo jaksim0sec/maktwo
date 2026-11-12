@@ -1,6 +1,6 @@
 // World-owned emissive block index. No renderer dependency and no per-frame chunk scans.
 import {SIZE} from './chunk.js';
-import {block} from './blocks.js?v=0.8.0';
+import {block} from './blocks.js?v=0.9.0';
 import {key} from '../util/math.js';
 
 const positionKey=(x,y,z)=>`${x},${y},${z}`;

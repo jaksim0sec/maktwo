@@ -14,7 +14,7 @@ function emit(target,type,props={}){
  return e;
 }
 
-test('construction input supports R as an alternative to trackpad right click and suspends actions in UI mode',()=>{
+test('primary mouse is use, secondary mouse is sustained mining, R is unused, UI suppresses actions',()=>{
  const oldDoc=globalThis.document,oldWin=globalThis.window;
  const doc=new EventTarget(),win=new EventTarget(),canvas=new EventTarget();
  Object.assign(doc,{pointerLockElement:null});
@@ -23,7 +23,7 @@ test('construction input supports R as an alternative to trackpad right click an
  try{
   const input=new Input(canvas);
   emit(doc,'keydown',{code:'KeyR'});
-  assert.equal(input.read().place,true);
+  assert.equal(input.read().place,false);
   emit(doc,'keydown',{code:'KeyW'});
   assert.equal(input.read().forward,true);
   input.setUiMode(true);
@@ -35,9 +35,12 @@ test('construction input supports R as an alternative to trackpad right click an
   emit(canvas,'mousedown',{button:2});
   assert.equal(input.locked,true);
   emit(canvas,'mousedown',{button:2});
-  assert.equal(input.read().place,true);
+  assert.equal(input.read().mine,true);
+  emit(canvas,'mousedown',{button:0});
+  assert.equal(input.read().use,true);
   doc.pointerLockElement=null;emit(doc,'pointerlockchange');
-  assert.equal(input.read().place,false,'unlocked pointer must release held mouse state');
+  assert.equal(input.read().mine,false,'unlocked pointer must release mining state');
+  assert.equal(input.read().use,false,'unlocked pointer must release placement state');
  }finally{globalThis.document=oldDoc;globalThis.window=oldWin}
 });
 
@@ -68,7 +71,7 @@ test('UI documents explain placement and expose a one-click resume path',()=>{
  const controller=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
  assert.match(page,/id="resume"/);
  assert.match(page,/id="control-hint"/);
- assert.match(page,/우클릭 \/ R 설치/);
+ assert.match(page,/아이템 장착 후 좌클릭/);
  assert.match(controller,/e\.code==='KeyE'/);
  assert.match(controller,/this\.requestGameFocus\(\)/);
 });
