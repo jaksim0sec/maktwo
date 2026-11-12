@@ -7,6 +7,6 @@ export function applyCameraLook(player,dx,dy,sensitivity=.0023){
 export function cameraEyeY(player){return player.y+player.eye+(player.visualStepOffset||0)}
 export function dampStepOffset(offset,dt){
  if(!Number.isFinite(offset))return 0;
- const next=offset*Math.exp(-10*Math.max(0,Math.min(.1,dt)));
+ const next=offset*Math.exp(-4.8*Math.max(0,Math.min(.1,dt)));
  return Math.abs(next)<.001?0:next;
 }

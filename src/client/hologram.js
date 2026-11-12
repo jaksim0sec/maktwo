@@ -23,9 +23,9 @@ void main(){vec4 c=texture(uAtlas,vUV);if(c.a<.015)discard;
  if(vCard==uHovered){c.rgb=mix(c.rgb,vec3(.90,.76,.54),.21);c.a=min(1.,c.a*1.1);}
  else if(vCard==uSelected){c.rgb=mix(c.rgb,vec3(.83,.75,.62),.10);}
  outColor=vec4(c.rgb,c.a*uOpacity);}`;
-const ATLAS_W=1024,ATLAS_H=1024,CELL_W=192,CELL_H=230;
+const ATLAS_W=1024,ATLAS_H=1024,CELL_W=196,CELL_H=235;
 // World-rendered spatial panel attached to the viewer. No fixed object remains inside a house.
-export const PANEL_DISTANCE=1.95, PANEL_SCALE=.86;
+export const PANEL_DISTANCE=1.58, PANEL_SCALE=1.12;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const add=(a,b,k)=>a.map((v,i)=>v+b[i]*k);
@@ -77,13 +77,18 @@ export function faceAnchor(anchor,viewer){
 }
 // The frame follows the head while open; actual card vertices still live in the WebGL scene.
 // Use camera-up to keep its plane perpendicular to the current view rather than lying flat.
-export function followAnchor(anchor,player){
+export function followAnchor(anchor,player,dt=Infinity){
  if(!anchor)return false;
  const yaw=player.yaw,pitch=player.pitch,sy=Math.sin(yaw),cy=Math.cos(yaw),sp=Math.sin(pitch),cp=Math.cos(pitch);
  const forward=[-sy*cp,sp,-cy*cp],right=[cy,0,-sy],up=[sy*sp,cp,cy*sp];
  const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
  const center=add(add(eye,forward,PANEL_DISTANCE),up,-.12);
- anchor.center=center;anchor.forward=forward;anchor.right=right;anchor.up=up;
+ const t=Number.isFinite(dt)?1-Math.exp(-7.5*Math.max(0,Math.min(dt,.12))):1;
+ for(let i=0;i<3;i++)anchor.center[i]+=(center[i]-anchor.center[i])*t;
+ const f=anchor.forward.map((v,i)=>v+(forward[i]-v)*t);
+ const len=Math.hypot(...f)||1;anchor.forward=f.map(v=>v/len);
+ const horizontal=Math.hypot(anchor.forward[0],anchor.forward[2]);
+ if(horizontal>.0001){anchor.right=[-anchor.forward[2]/horizontal,0,anchor.forward[0]/horizontal];anchor.up=[-anchor.forward[1]*anchor.forward[0]/horizontal,horizontal,-anchor.forward[1]*anchor.forward[2]/horizontal]}else{anchor.right=right;anchor.up=up}
  return true;
 }
 export function spatialHit(anchor,cards,camera,ray){
@@ -118,7 +123,7 @@ export class Hologram{
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
  open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
- followPlayer(player){if(this.opened&&followAnchor(this.anchor,player))this.buildGeometry()}
+ followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null}
  setInventory(palette,items,selected,station='hand'){this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
@@ -140,15 +145,15 @@ export class Hologram{
   if(!this.opened)return null;
   if(center){this.pointer=null}
   else this.point(clientX,clientY,rect);
-  this.followPlayer(player);return this.aim(player);
+  return this.aim(player);
  }
  click(){return this.hover?.id||null}
  drawAtlas(){const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
   this.cards.forEach((card,i)=>{const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;
    const isHeader=!card.id.startsWith('item:'),active=isHeader?(card.id===`tab:${this.palette}`||card.id==='hand'&&this.selected===-1):Number(card.id.slice(5))===this.selected;
-   const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,'rgba(54,60,65,.81)');grad.addColorStop(1,'rgba(29,34,38,.89)');
-   rounded(ctx,x+5,y+8,w-10,h-16,22,grad,active?'rgba(235,200,155,.76)':'rgba(235,235,232,.25)');
-   if(isHeader){ctx.font=font(29,true);ctx.fillStyle=active?'#f8dfb7':'#e6e7e3';ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9);ctx.textAlign='left';return}
+   const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,'rgba(60,52,44,.86)');grad.addColorStop(1,'rgba(24,29,30,.93)');
+   rounded(ctx,x+5,y+8,w-10,h-16,16,grad,active?'rgba(232,191,137,.82)':'rgba(205,199,181,.17)');
+   if(isHeader){ctx.font=font(34,true);ctx.fillStyle=active?'#f8dfb7':'#e6e7e3';ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9);ctx.textAlign='left';return}
    if(this.palette==='craft'&&card.recipe){
     const cells=recipeGrid(card.recipe);const startX=x+w/2-43,startY=y+25,step=29;
     for(let c=0;c<9;c++){
@@ -157,7 +162,7 @@ export class Hologram{
      if(cells[c])drawItemIcon(ctx,cells[c],xx+2,yy+2,23);
     }
    }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
-   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
+   ctx.textAlign='center';ctx.font=font(34,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+166,177);ctx.font=font(22);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;

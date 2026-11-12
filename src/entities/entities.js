@@ -9,10 +9,10 @@ export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this
   const wantsCrouch=Boolean(input.crouch)&&!this.fly;
   this.crouching=wantsCrouch||(!this.fly&&collides(w,this.x,this.y,this.z,this.width,this.standingHeight));
   this.height=this.crouching?this.crouchedHeight:this.standingHeight;
-  this.eye+=((this.crouching?this.crouchedEye:this.standingEye)-this.eye)*Math.min(1,dt*13);
+  this.eye+=((this.crouching?this.crouchedEye:this.standingEye)-this.eye)*(1-Math.exp(-Math.min(dt,.08)*8.5));
   // Never let the camera enter a ceiling while the capsule is crouched.
-  this.eye=Math.min(this.eye,this.height-.11);
-  const speed=toVoxels(this.fly?10:this.crouching?3:input.sprint?8:5),forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;
+  if(collides(w,this.x,this.y+this.eye-.12,this.z,this.width,.12))this.eye=Math.min(this.eye,this.height-.08);
+  const speed=toVoxels(this.fly?8:this.crouching?2.7:input.sprint?7:5),forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
  if(this.fly){this.y+=(Number(input.jump)-Number(input.crouch))*speed*dt;this.vy=0}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
  direction(){return{x:-Math.sin(this.yaw)*Math.cos(this.pitch),y:Math.sin(this.pitch),z:-Math.cos(this.yaw)*Math.cos(this.pitch)}}}

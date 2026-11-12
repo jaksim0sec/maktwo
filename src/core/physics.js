@@ -44,7 +44,9 @@ export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clam
  const sub=Math.max(1,Math.ceil(Math.hypot(e.vx,e.vy,e.vz)*dt/.18));const step=dt/sub;e.grounded=false;
  for(let n=0;n<sub;n++){
   for(const [axis,vel] of [['x','vx'],['z','vz']]){const old=e[axis];e[axis]+=e[vel]*step;if(collides(world,e.x,e.y,e.z,w,h)){// Step up a low obstacle when walking.
-   if(!e.fly&&wasGrounded&&e.vy<=1&&!doorCollision(world,e.x,e.y,e.z,w,h)&&climbStep(world,e,w,h))continue;e[axis]=old;e[vel]=0}}
+   if(!e.fly&&wasGrounded&&e.vy<=1&&!e.crouching&&!doorCollision(world,e.x,e.y,e.z,w,h)&&climbStep(world,e,w,h))continue;e[axis]=old;e[vel]=0}
+   if(e.crouching&&wasGrounded&&!e.fly&&!collides(world,e.x,e.y-.12,e.z,w,h)){e[axis]=old;e[vel]=0}
+  }
   const oldY=e.y;e.y+=e.vy*step;
   if(collides(world,e.x,e.y,e.z,w,h)){
    // Revert the *swept* vertical movement. Never search upward with a while-loop:
