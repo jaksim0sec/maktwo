@@ -3,11 +3,13 @@ import {integratedTerrain} from './integrated.js';
 import {stampArchitectureV3} from './architecture-v3.js';
 import {stampMaterialGallery} from './material-gallery.js';
 import {stampPartGallery} from './part-gallery.js';
+import {CITY_MODE,CITY_BASE_Y,stampCityChunk} from './eternal-night-game.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17, GENERATION_VERSION=5;
 export const BIOMES={plains:{tree:.012},forest:{tree:.075},desert:{tree:0},mountains:{tree:.008},marsh:{tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
 const isStudioMode=mode=>mode==='materials'||mode==='parts';
 function terrainAt(x,z,seed,mode){
+ if(mode===CITY_MODE)return {height:CITY_BASE_Y-1,biome:'plains'};
  if(mode==='flat'||isStudioMode(mode))return {height:22,biome:'plains'};
  const profile=integratedTerrain(x,z,seed);
  if(mode==='islands'){
@@ -21,6 +23,7 @@ export const surfaceAt=(x,z,seed,mode='normal')=>terrainAt(x,z,seed,mode).height
 // Stable world-coordinate passes: features can cross chunk boundaries without load-order dependence.
 const MAX_TREE_CHANCE=Math.max(...Object.values(BIOMES).map(biome=>biome.tree));
 export function generateChunk(chunk,seed,mode='normal'){
+ if(mode===CITY_MODE)return stampCityChunk(chunk,seed);
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE, profiles=new Array(SIZE*SIZE);
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const wx=ox+x,wz=oz+z,profile=terrainAt(wx,wz,seed,mode);

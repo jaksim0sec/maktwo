@@ -1,5 +1,6 @@
 import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {CITY_MODE,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {stairConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
@@ -187,6 +188,15 @@ export class World{
 
  stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.lights.unloadChunk(k);this.lightRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  spawn(){
+  if(this.mode===CITY_MODE){
+   let fallback;
+   for(const pos of citySpawnCandidates(this.seed)){
+    fallback??=pos;
+    const {x,y,z}=pos;
+    if(this.get(x,y-1,z)===B.FLOOR_TILE&&this.get(x,y,z)===B.AIR&&this.get(x,y+1,z)===B.AIR)return pos;
+   }
+   if(fallback)return fallback;
+  }
   if(this.mode==='materials')return {x:18.5,y:25,z:38.5};
    if(this.mode==='parts')return partGallerySpawn(0);
   if(this.mode.startsWith('building:'))return {x:9.5,y:25,z:-2.5};

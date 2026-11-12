@@ -6,6 +6,7 @@ import {PART_ID_START} from './part-library.js';
 export const WORLD_PRESETS=Object.freeze([
  {name:'TextureGallery',seed:9999,mode:'materials',label:'텍스처 전시장'},
  {name:'PartsGallery',seed:9999,mode:'parts',label:'건축 부품 전시장'},
+ {name:'EternalNightCityLab',seed:9999,mode:'eternal-city-lab',label:'영원한 밤 · 도시 실험'},
 ]);
 const placeables=new Set([
  ...LIGHTBAR,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.FLOWER_POT,

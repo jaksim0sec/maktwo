@@ -9,8 +9,8 @@ import {PARTS,PART_FAMILIES} from '../src/core/part-library.js';
 import {partPosition,partGallerySpawn} from '../src/worldgen/part-gallery.js';
 import {makeTextureLayers,materialFor} from '../src/client/textures.js';
 
-test('only the independent material and part galleries are visible; old IDs remain stable',()=>{
- assert.deepEqual(WORLD_PRESETS.map(p=>p.mode),['materials','parts']);
+test('independent galleries and the city lab have separate presets; old IDs remain stable',()=>{
+ assert.deepEqual(WORLD_PRESETS.map(p=>p.mode),['materials','parts','eternal-city-lab']);
  assert.equal(B.CONCRETE,55);assert.equal(B.CEILING_FINISH,85);
  assert.equal(BLOCKS.length,ARCH_MATERIAL_START+ARCH_MATERIALS.length+PARTS.length);
  assert.equal(PART_FAMILIES.length,13);assert.equal(PARTS.length,65);
