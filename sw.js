@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.1.0';
+const CACHE_NAME='maktwo-shell-v1.1.1';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
@@ -35,9 +35,11 @@ self.addEventListener('fetch',event=>{
    try{const response=await fetch(request);if(response.ok)await cache.put(new URL('./index.html',self.registration.scope),response.clone());return response;}
    catch{return await cache.match(new URL('./index.html',self.registration.scope))||Response.error();}
   }
-  const cached=await cache.match(request,{ignoreSearch:true});
-  if(cached)return cached;
-  try{const response=await fetch(request);if(response.ok)await cache.put(request,response.clone());return response;}
-  catch{return Response.error();}
+  // Network-first for source files prevents cached modules from different
+  // versions from being combined into an invisible or frozen WebGL scene.
+  // The app-shell cache remains the offline fallback.
+  try{const response=await fetch(request);if(response.ok){await cache.put(request,response.clone());return response;}
+      return await cache.match(request,{ignoreSearch:true})||response;}
+  catch{return await cache.match(request,{ignoreSearch:true})||Response.error();}
  })());
 });

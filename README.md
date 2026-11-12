@@ -1,3 +1,5 @@
+> v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
+
 # MakTwo · Endless Night v1.1.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.

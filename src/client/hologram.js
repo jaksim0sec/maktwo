@@ -15,11 +15,12 @@ in vec2 vUV;flat in int vCard;
 uniform sampler2D uAtlas;
 uniform int uHovered;
 uniform int uSelected;
+uniform float uOpacity;
 out vec4 outColor;
 void main(){vec4 c=texture(uAtlas,vUV);if(c.a<.015)discard;
  if(vCard==uHovered){c.rgb=mix(c.rgb,vec3(.90,.76,.54),.21);c.a=min(1.,c.a*1.1);}
  else if(vCard==uSelected){c.rgb=mix(c.rgb,vec3(.83,.75,.62),.10);}
- outColor=c;}`;
+ outColor=vec4(c.rgb,c.a*uOpacity);}`;
 const ATLAS_W=1024,ATLAS_H=768,CELL_W=192,CELL_H=230;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
@@ -94,7 +95,7 @@ function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSou
 export class Hologram{
  constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
-  this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected')};
+  this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,15*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
@@ -114,7 +115,7 @@ export class Hologram{
   gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));this.count=vertices.length/6;
  }
  point(clientX,clientY,rect){this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
- aim(player,aspect){if(!this.opened)return null;const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):player.direction();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
+ aim(player,aspect){if(!this.opened)return null;const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
  click(){return this.hover?.id||null}
  drawAtlas(){const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
   this.cards.forEach((card,i)=>{const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;
@@ -133,8 +134,11 @@ export class Hologram{
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
   gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.selected<0?2:this.selected+4);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
-  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
-  gl.drawArrays(gl.TRIANGLES,0,this.count);
-  gl.depthMask(true);gl.enable(gl.CULL_FACE);gl.disable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
+  // A subdued silhouette stays visible when nearby terrain would otherwise
+  // hide every card. The actual in-world surfaces still obey the depth buffer.
+  gl.depthFunc(gl.GREATER);gl.uniform1f(this.u.opacity,.32);gl.drawArrays(gl.TRIANGLES,0,this.count);
+  gl.depthFunc(gl.LEQUAL);gl.uniform1f(this.u.opacity,1);gl.drawArrays(gl.TRIANGLES,0,this.count);
+  gl.depthFunc(gl.LESS);gl.depthMask(true);gl.enable(gl.CULL_FACE);gl.disable(gl.BLEND);
  }
 }
