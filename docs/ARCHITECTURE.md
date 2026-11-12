@@ -48,3 +48,10 @@ Reference ideas (not dependencies or copied source): FastNoiseLite's domain warp
 - Each chunk stamps overlapping building plans independently in global world coordinates. No persistent structure instances or extra renderer draw calls are required.
 - 22 architectural voxel IDs and 18 additional procedural material textures preserve the existing block IDs, mesh stride and WebGL texture array. Fluorescent fixtures use the existing light volume.
 - The generation version is saved per world; legacy worlds without a version remain v1. Mid-rise ruins fit the 64-high layout. True megastructures require vertical chunk sections and distant LOD.
+
+## Architecture v2 / height-graded sky
+
+- `EternalNightR2` is an opt-in new world key (generation version 4). It is the default launch world; old `EternalNight` version-3 saves remain selectable and render with the v1 generator.
+- V2 architecture uses stable x/z positions for the common 2-block-wide stair core; a side landing path connects storeys. Solid concrete frames, recessed half panels, thin partitions, window meshes and concrete stair collision all match the partial box renderer.
+- Exterior walls no longer receive a bright ceiling tile on every storey boundary. A central circulation corridor links side rooms and service landings; façade bays use windows, piers, sills and variable shutters.
+- Sky clarity is a pure smoothstep driven by world voxel altitude starting at Y=210 and reaching full clear daylight at Y=470; high-altitude stars fade away. The current 64-high chunk layout still prevents ordinary survival players reaching those elevations. An eventual vertical section refactor is required before high sky is directly explorable.

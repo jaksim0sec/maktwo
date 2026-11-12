@@ -1,3 +1,9 @@
+## v1.12 · Architectural ruins / clear-sky altitude
+
+- Default world `EternalNightR2` uses modular, navigable interior floors with genuine concrete stairs, partial-depth walls, window frames and multiple room connections.
+- Old `EternalNight` remains selectable and unchanged. New geometry blocks append IDs 77–82 without renumbering prior saves.
+- The cloudless sky shader now transitions from permanently dark at low altitude to eerily bright, clear blue between Y=210 and Y=470. Current 64-high terrain means high-altitude access is a separate future milestone.
+
 ## v1.11: Eternal Night · modular ruined buildings
 
 - New `EternalNight` world opens by default. Existing `Overworld`, Flatlands and other saved worlds remain selectable from settings.

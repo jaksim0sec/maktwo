@@ -2,6 +2,7 @@ import {SIZE,HEIGHT} from '../core/chunk.js';
 import {highlandAt,highlandBiome} from './landforms.js';
 import {integratedTerrain} from './integrated.js';
 import {stampRuins} from './buildings.js';
+import {stampArchitectureV2} from './architecture-v2.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17;
 export const BIOMES={plains:{base:22,relief:7,tree:.012},forest:{base:24,relief:9,tree:.075},desert:{base:20,relief:8,tree:0},mountains:{base:30,relief:23,tree:.008},marsh:{base:18,relief:4,tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
@@ -78,7 +79,10 @@ export function generateChunk(chunk,seed,mode='normal',version=1){
    }else if(top===B.GRASS&&roll>.975)chunk.set(x,h+1,z,B.FLOWER);
   }
  }
- if(mode==='ruins')stampRuins(chunk,seed);
+ if(mode==='ruins'){
+  if(version>=4)stampArchitectureV2(chunk,seed);
+  else stampRuins(chunk,seed);
+ }
  chunk.dirty=true;return chunk;
 }
 export const GENERATORS={normal:'Integrated ridges, canyons, marsh and biomes',flat:'Flat builder world',islands:'Scattered ocean islands',highlands:'Warped ridges, winding canyons and mountains',ruins:'Procedural stacked abandoned buildings'};

@@ -4,6 +4,7 @@ import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
 import {cameraEyeY,dampStepOffset} from './camera.js';
 import {makeTextureLayers} from './textures.js';
+import {skyClarityAt} from './atmosphere.js';
 const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
@@ -57,6 +58,7 @@ const SKY_FRAG=`#version 300 es
 precision highp float;
 in vec2 uv;
 uniform float uHorizon;
+uniform float uClarity;
 out vec4 frag;
 float starHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
@@ -69,7 +71,13 @@ void main(){
  color=mix(color,low,below*.65);
  vec2 cell=floor(uv*vec2(200.,115.));vec2 pos=fract(uv*vec2(200.,115.));
  float stars=step(.992,starHash(cell))*(1.-smoothstep(.035,.22,length(pos-vec2(.5))))*smoothstep(uHorizon+.05,uHorizon+.38,uv.y);
- color+=vec3(.21,.22,.23)*stars;frag=vec4(color,1.);
+ vec3 clearTop=vec3(.24,.47,.78);
+ vec3 clearHorizon=vec3(.70,.84,.95);
+ float clearGradient=smoothstep(uHorizon-.20,uHorizon+.62,uv.y);
+ vec3 highAltitude=mix(clearHorizon,clearTop,clearGradient);
+ color=mix(color,highAltitude,uClarity);
+ color+=vec3(.21,.22,.23)*stars*(1.-uClarity);
+ frag=vec4(color,1.);
 }`;
 function shader(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 function program(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
@@ -78,7 +86,7 @@ export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);retur
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_NEAREST);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
@@ -190,10 +198,12 @@ export class Renderer{
   return new Float32Array(arr)
  }
  frame(world,player,entities,effects,dt=1/60){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*(this.hologram?.opened?Math.max(this.renderScale,.96):this.renderScale),width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
-  const fog=[.067,.067,.075];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const clarity=skyClarityAt(cameraEyeY(player));
+  const fog=[.067+.53*clarity,.067+.70*clarity,.075+.83*clarity];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   gl.uniform1f(this.skyHorizon,Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32)));
+  gl.uniform1f(this.skyClarity,clarity);
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
   const camY=toMeters(cameraEyeY(player)),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,toMeters(player.x),camY,toMeters(player.z)));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,toMeters(player.x),camY,toMeters(player.z));gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.35);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
