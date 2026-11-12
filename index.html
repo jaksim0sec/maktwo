@@ -5,7 +5,7 @@
  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
  <meta name="theme-color" content="#272c30">
  <title>MakTwo · The Endless Night</title>
- <link rel="stylesheet" href="./style.css?v=0.6.0">
+ <link rel="stylesheet" href="./style.css?v=0.7.0">
 </head>
 <body>
  <canvas id="screen" aria-label="복셀 월드"></canvas>
@@ -21,20 +21,6 @@
   <button id="help-btn">조작법 · H</button>
   <span>시드 <b id="seed"></b></span>
  </aside>
- <section id="spatial-layer" class="hidden" aria-hidden="true" aria-label="건축 가방">
-  <div class="spatial-dim" aria-hidden="true"></div>
-  <div class="spatial-stage">
-   <div class="spatial-board" role="dialog" aria-modal="false" aria-labelledby="inventory-title">
-    <div class="spatial-top"><span class="spatial-eyebrow">MAKTWO <span class="spatial-dot"></span> NIGHTFALL COLLECTION</span><button id="inventory-close" class="spatial-close" aria-label="가방 닫기">×</button></div>
-    <div class="spatial-heading"><div><div class="spatial-kicker">밤의 가방</div><h2 id="inventory-title">무엇을 놓아볼까</h2><p>필요한 물건을 골라 따뜻한 공간을 만들어 보세요</p></div><div class="spatial-moon" aria-hidden="true"></div></div>
-    <div class="spatial-content">
-     <div class="spatial-catalog"><div class="spatial-tabs" role="tablist" aria-label="가방 분류"><button type="button" data-inventory-tab="blocks" role="tab">건축</button><button type="button" data-inventory-tab="lights" role="tab">조명</button></div><div id="inventory-list" class="inventory-grid" aria-label="사용 가능한 물건"></div></div>
-     <aside class="spatial-preview"><div class="preview-caption">선택한 물건</div><div id="preview-specimen" class="preview-specimen"></div><div id="preview-name" class="preview-title">Grass</div><p id="preview-note">원하는 것을 골라주세요</p><div class="preview-tip">선택하면 바로 건축 모드로 돌아갑니다</div></aside>
-    </div>
-    <div class="spatial-bottom"><span>E · 가방 닫기</span><button id="inventory-resume">계속 가꾸기 <span aria-hidden="true">↗</span></button></div>
-   </div>
-  </div>
- </section>
  <div id="crosshair"><i></i><i></i></div><div id="target"></div>
  <div id="toast"></div>
  <div id="health"></div><div id="flight"></div>
@@ -42,8 +28,8 @@
  <div id="block-name"></div><div id="hotbar-dock"><button id="bag-btn" aria-label="건축 가방 열기" title="가방 · E" aria-expanded="false">가방 <span class="bag-shortcut">E</span></button><button id="palette-toggle" aria-label="건축 및 조명 도구 전환" title="조명 전환 · L">✦ 조명</button><div id="hotbar"></div></div>
  <div id="mobile"><div class="move-hint">이동</div><div class="touchbuttons"><button data-action="mine">파괴</button><button data-action="place">설치</button><button data-action="jump">점프</button><button data-action="crouch">하강</button></div></div>
  <div id="help" class="overlay hidden"><div class="help-card"><h2>조작법</h2><div class="help-grid">
-  <b>이동</b><span>W A S D</span><b>시점</b><span>화면 클릭 후 마우스</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>왼쪽 클릭</span><b>블록 설치</b><span>오른쪽 클릭 또는 R</span><b>블록 선택</b><span>1–0 / 스크롤</span><b>조명 도구</b><span>L / 아래 ✦ 조명 버튼</span><b>비행</b><span>F</span><b>양 생성</b><span>G</span><b>좀비 테스트</b><span>Shift+G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>물 복구</b><span>M 설정 → 주변 물 정리</span><b>UI 조작</b><span>E 가방 / M 설정 · 클릭으로 조작</span><b>게임으로 복귀</b><span>E 또는 가방 닫기</span><b>마우스 해제</b><span>Esc / E</span></div><button id="close-help">닫기</button></div></div>
+  <b>이동</b><span>W A S D</span><b>시점</b><span>화면 클릭 후 마우스</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>왼쪽 클릭</span><b>블록 설치</b><span>오른쪽 클릭 또는 R</span><b>블록 선택</b><span>1–0 / 스크롤</span><b>조명 도구</b><span>L / 아래 ✦ 조명 버튼</span><b>비행</b><span>F</span><b>양 생성</b><span>G</span><b>좀비 테스트</b><span>Shift+G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>물 복구</b><span>M 설정 → 주변 물 정리</span><b>UI 조작</b><span>E 가방 (게임 속 홀로그램) / M 설정</span><b>게임으로 복귀</b><span>E 또는 홀로그램에서 닫기</span><b>마우스 해제</b><span>Esc / E</span></div><button id="close-help">닫기</button></div></div>
  <div id="fatal" hidden></div>
- <script type="module" src="./src/client/game.js?v=0.6.0"></script>
+ <script type="module" src="./src/client/game.js?v=0.7.0"></script>
 </body>
 </html>

@@ -17,17 +17,19 @@ test('night uses a horizon gradient and a bounded, soft light falloff',()=>{
  assert.match(source,/const SKY_FRAG=/);
  assert.match(source,/smoothstep\(uHorizon/);
  assert.match(source,/gl\.drawArrays\(gl\.TRIANGLES,0,3\)/);
- assert.match(source,/falloff\*falloff\*\(1\.5-\.5\*falloff\)/);
+ assert.match(source,/uLightVolume/);
+ assert.match(source,/texelFetch\(uLightVolume/);
  assert.match(source,/uniform1f\(this\.u\.brightness,\.35\)/);
  assert.doesNotMatch(source,/const fog=\[\.046,\.056,\.085\]/);
 });
-test('spatial bag provides a no-escape item selection path',()=>{
- const html=read('index.html'),game=read('src/client/game.js'),css=read('style.css');
- for(const id of ['screen','bag-btn','spatial-layer','inventory-list','inventory-resume','inventory-close','preview-name'])assert.match(html,new RegExp(`id="${id}"`));
- assert.match(game,/e\.code==='KeyE'\|\|e\.code==='KeyI'/);
- assert.match(game,/this\.requestGameFocus\(\)/);
+test('hologram inventory renders in WebGL instead of a separate DOM overlay',()=>{
+ const html=read('index.html'),game=read('src/client/game.js'),hologram=read('src/client/hologram.js');
+ for(const id of ['screen','bag-btn','hotbar','toolbar'])assert.match(html,new RegExp(`id="${id}"`));
+ assert.doesNotMatch(html,/id="spatial-layer"/);
+ assert.match(game,/e.code==='KeyE'\|\|e.code==='KeyI'/);
  assert.match(game,/this\.input\.setUiMode\(this\.uiOpen\)/);
- assert.match(css,/perspective:1450px/);
+ assert.match(game,/this\.hologram\.open\(this\.player\)/);
+ assert.match(hologram,/gl\.drawArrays\(gl\.TRIANGLES,0,6\)/);
  const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
  for(const [,id] of game.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has(id),`missing DOM element #${id}`);
 });

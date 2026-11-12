@@ -24,46 +24,9 @@ button,select{font:inherit;color:inherit}button{cursor:pointer}#screen{display:b
 @media(max-width:650px){#hud{padding:11px}#hud .stats{font-size:9px}#hotbar-dock{bottom:7px;gap:3px}#hotbar{gap:2px;padding:4px}#palette-toggle{min-width:42px;padding:0 5px;height:39px;font-size:10px}.slot{width:min(8.0vw,39px);height:39px}.voxel{width:17px;height:17px}#health{bottom:57px;left:10px}#flight{bottom:57px;right:10px}#block-name{bottom:57px}#target{display:none}#control-hint{display:none}}
 @media(pointer:coarse){#mobile{display:block}.move-hint{position:fixed;bottom:95px;left:23px;width:95px;height:95px;border:1px solid #fff5;border-radius:50%;display:grid;place-items:center;color:#fffa;font-size:11px;pointer-events:none}.touchbuttons{position:fixed;bottom:92px;right:10px;display:grid;grid-template-columns:repeat(2,58px);gap:5px}.touchbuttons button{height:51px;border:1px solid #fff4;background:#20262bc9;border-radius:9px;font-size:11px;touch-action:none}#toolbar{top:49px}}
 
-/* In-game spatial inventory: CSS 3D depth over the live scene, no extra 3D draw calls or backdrop-filter passes. */
+/* In-world inventory is a WebGL quad; only its existing bag shortcut uses DOM. */
 #bag-btn{height:45px;min-width:69px;padding:0 10px;background:#282b31e6;border:1px solid #fff4;border-radius:9px;font-size:11px;color:#f4eee7}
 .bag-shortcut{margin-left:5px;padding:1px 4px;border-radius:4px;background:#ffffff20;font-size:10px}
-#spatial-layer{position:fixed;inset:0;z-index:15;pointer-events:none;display:flex;align-items:center;justify-content:center;isolation:isolate}
-#spatial-layer.hidden{display:none}
-.spatial-dim{position:absolute;inset:0;background:linear-gradient(90deg,#080a13b0,#1316224d 55%,#080a13a0);pointer-events:none}
-.spatial-stage{position:relative;width:min(92vw,840px);max-height:calc(100dvh - 30px);perspective:1450px;pointer-events:none}
-.spatial-board{pointer-events:auto;overflow:hidden;max-height:calc(100dvh - 30px);display:flex;flex-direction:column;border:1px solid #faf8f03b;border-radius:25px;background:linear-gradient(125deg,#353942f7 0%,#282d37f8 65%,#242730fc);color:#f5f2ec;box-shadow:3px 20px 75px #0009,inset 0 1px #fff4;transform:rotateY(-6deg) rotateX(2deg) translateZ(4px);transform-style:preserve-3d;animation:spatial-arrive .24s cubic-bezier(.2,.8,.2,1) both}
-@keyframes spatial-arrive{from{opacity:0;transform:translateY(15px) rotateY(-9deg) rotateX(4deg) scale(.965)}to{opacity:1;transform:rotateY(-6deg) rotateX(2deg) translateZ(4px)}}
-.spatial-top{display:flex;align-items:center;justify-content:space-between;padding:16px 23px 6px}
-.spatial-eyebrow,.preview-caption{font-size:9px;letter-spacing:1.5px;font-weight:650;color:#c4c2bf;text-transform:uppercase}
-.spatial-dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:#e5b68e;vertical-align:middle;margin:0 7px}
-.spatial-close{border:1px solid #ffffff35;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;background:#fff1;font-size:20px;line-height:1;color:#f8f5ef}
-.spatial-heading{display:flex;justify-content:space-between;gap:14px;padding:13px 28px 22px}
-.spatial-kicker{font-size:12px;color:#e7b890;letter-spacing:.4px;margin-bottom:5px}
-.spatial-heading h2{font-size:clamp(23px,3vw,31px);letter-spacing:-.8px;font-weight:620;margin:0}
-.spatial-heading p{font-size:11px;color:#c7c7ca;margin:7px 0 0;line-height:1.5}
-.spatial-moon{flex:none;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#e6dbc3,#a99880 82%);box-shadow:0 0 25px #d3ad7755,0 0 55px #f0bd7e22;opacity:.87;position:relative}
-.spatial-moon:after{content:'';position:absolute;width:50px;height:54px;border-radius:50%;background:#2d3039;left:24px;top:-12px}
-.spatial-content{display:grid;grid-template-columns:minmax(0,1fr) 195px;gap:16px;min-height:0;padding:0 23px 17px}
-.spatial-catalog{background:#171b24a8;border:1px solid #fff2;border-radius:17px;padding:13px;min-height:0;overflow:auto}
-.spatial-tabs{display:flex;gap:7px;margin-bottom:14px}
-.spatial-tabs button{border:1px solid transparent;padding:8px 15px;background:transparent;color:#b9bdc5;border-radius:8px;font-size:12px;font-weight:600}
-.spatial-tabs button.active{background:#f0e4d2;color:#302c2a}
-.inventory-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-.inventory-item{border:1px solid #ffffff1b;border-radius:12px;min-height:82px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:#f0f0f008;color:#e7e5e3;transition:background .1s,border-color .1s,transform .1s}
-.inventory-item:hover,.inventory-item:focus-visible{border-color:#e6c8a296;background:#fff2;transform:translateY(-2px);outline:none}
-.inventory-item.is-selected{border-color:#e9c9a0ab;background:#e1c7a01a}
-.inventory-specimen{height:27px;width:27px;background:var(--tile);border-radius:3px;transform:rotate(-9deg) skewY(2deg);box-shadow:inset 5px 3px #fff3,inset -6px -5px #0004,2px 4px 7px #0005}
-.inventory-label{font-size:10px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.spatial-preview{display:flex;flex-direction:column;align-items:center;text-align:center;border:1px solid #ffffff24;border-radius:17px;padding:19px 15px;background:linear-gradient(155deg,#5b505054,#35343d66)}
-.spatial-preview .preview-caption{align-self:flex-start;letter-spacing:.6px;color:#d9c8bb}
-.preview-specimen{width:76px;height:76px;margin:25px auto 17px;background:var(--tile,#8eaa83);transform:rotate(-10deg) skewY(4deg);box-shadow:inset 13px 10px #ffffff2d,inset -16px -12px #0004,11px 18px 22px #0006;border-radius:4px}
-.preview-title{font-size:17px;font-weight:650;letter-spacing:-.3px}
-.spatial-preview p{font-size:11px;color:#d6d1cb;line-height:1.55;margin:7px 0 0}
-.preview-tip{font-size:10px;line-height:1.5;color:#c0b5ad;margin-top:auto;padding-top:20px}
-.spatial-bottom{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 25px 18px;border-top:1px solid #fff2}
-.spatial-bottom>span{font-size:10px;color:#bbb9b8}
-#inventory-resume{background:#e8e2d8;border:0;color:#272831;padding:10px 16px;border-radius:11px;font-weight:650;font-size:12px}
-#inventory-resume span{margin-left:7px}
-body.ui-open #crosshair{opacity:.22}
-@media(max-width:660px){#bag-btn{height:39px;min-width:49px;padding:0 6px;font-size:10px}.bag-shortcut{display:none}.spatial-stage{width:min(96vw,520px);max-height:calc(100dvh - 26px)}.spatial-board{transform:none;border-radius:21px;max-height:calc(100dvh - 26px);animation:none}.spatial-heading{padding:12px 17px 17px}.spatial-heading h2{font-size:22px}.spatial-top{padding:12px 17px 0}.spatial-moon{width:42px;height:42px}.spatial-moon:after{width:40px;height:43px;left:18px;top:-10px}.spatial-content{grid-template-columns:1fr;gap:8px;padding:0 13px 10px}.spatial-preview{display:none}.spatial-catalog{padding:10px}.inventory-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.inventory-item{min-height:73px}.spatial-bottom{padding:11px 17px 14px}}
-@media(prefers-reduced-motion:reduce){.spatial-board{animation:none}.inventory-item{transition:none}}
+body.holo-open #crosshair,body.holo-open #target,body.holo-open #hotbar-dock,body.holo-open #block-name,body.holo-open #health,body.holo-open #flight{opacity:0;pointer-events:none}
+body.holo-open #control-hint{bottom:10px;background:#141a1dcc}
+@media(max-width:660px){#bag-btn{height:39px;min-width:49px;padding:0 6px;font-size:10px}.bag-shortcut{display:none}}

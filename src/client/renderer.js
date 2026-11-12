@@ -1,4 +1,5 @@
 import {meshChunk,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
+import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
 const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
@@ -9,23 +10,22 @@ const FRAG=`#version 300 es
 precision highp float;
 in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;
 uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;
-uniform vec4 uLightPos[8];uniform vec3 uLightColor[8];uniform int uLightCount;
+uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;
 out vec4 frag;
 void main(){
- vec3 light=vec3(.65,.72,.93)*uBrightness;
- for(int i=0;i<8;i++){
-  if(i>=uLightCount)break;
-  vec3 delta=vPos-uLightPos[i].xyz;
-  float r2=dot(delta,delta)/(uLightPos[i].w*uLightPos[i].w);
-  // Warm local illumination: restrained inner glow and a softly fading edge.
-  // Squared distance avoids a per-light sqrt in this fragment shader.
-  float falloff=max(0.,1.-r2);
-  float strength=falloff*falloff*(1.5-.5*falloff);
-  float flicker=1.+.012*sin(uTime*3.7+float(i)*4.2);
-  light+=uLightColor[i]*strength*flicker;
- }
- vec3 c=vEmission>.5?min(vColor,vec3(1.)):vColor*min(light,vec3(1.38));
+ // The lighting volume contains ONLY reachable open-air cells. A wall cannot
+ // illuminate its far side. Sample the air just outside the fragment's face.
+ vec3 normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
+ ivec3 cell=ivec3(floor(vPos+normal*.045-uLightOrigin));
+ bool inside=all(greaterThanEqual(cell,ivec3(0)))&&all(lessThan(cell,ivec3(uLightSize)));
+ vec3 emission=inside?texelFetch(uLightVolume,cell,0).rgb:vec3(0.);
+ vec3 ambient=vec3(.65,.72,.93)*uBrightness;
+ // Desaturate strongly lit albedo, otherwise grass turns fluorescent lime green.
+ float gray=dot(vColor,vec3(.24,.68,.08));
+ vec3 warmReflectance=mix(vColor,vec3(gray),.74);
+ vec3 c=vEmission>.5?min(vColor,vec3(1.)):vColor*ambient+warmReflectance*emission*1.38;
+ c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);
 }`;
@@ -55,20 +55,33 @@ function program(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.V
 function matMultiply(a,b){const o=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++)for(let k=0;k<4;k++)o[j*4+i]+=a[k*4+i]*b[j*4+k];return o}
 export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)/(near-far),-1,0,0,2*far*near/(near-far),0])}
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
+function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightPos:gl.getUniformLocation(this.program,'uLightPos[0]'),lightColor:gl.getUniformLocation(this.program,'uLightColor[0]'),lightCount:gl.getUniformLocation(this.program,'uLightCount')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.lightPositions=new Float32Array(8*4);this.lightColors=new Float32Array(8*3);this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,1.2);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.lightTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);this.lightOrigin=[0,0,0];this.lightAppliedKey='';this.lightRequestedKey='';this.lightBusy=false;this.lightSerial=0;this.lightWorker=null;this.lightLastRequest=0;this.hologram=null;this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,1.2);
  try{if(typeof Worker==='function'){
   this.worker=new Worker(new URL('./mesh.worker.js',import.meta.url),{type:'module'});
   this.worker.onmessage=({data})=>{const task=this.inflight.get(data.key);if(!task||task.token!==data.token)return;this.inflight.delete(data.key);if(data.error){console.error('Mesher worker:',data.error);task.chunk.dirty=true;this.disableWorker();return}this.completed.push({task,data})};
   this.worker.onerror=(event)=>{console.warn('Worker unavailable, using fallback mesher',event.message);this.disableWorker()};
  }}catch(error){console.warn('Worker unavailable',error)}
+ try{if(typeof Worker==='function'){
+  this.lightWorker=new Worker(new URL('./light.worker.js',import.meta.url),{type:'module'});
+  this.lightWorker.onmessage=({data})=>{
+   if(data.token!==this.lightSerial)return;
+   this.lightBusy=false;
+   if(data.error){console.warn('Light worker error',data.error);this.lightWorker.terminate();this.lightWorker=null;return}
+   const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
+   gl.texSubImage3D(gl.TEXTURE_3D,0,0,0,0,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(data.output));
+   this.lightOrigin=data.origin;this.lightAppliedKey=this.lightRequestedKey;
+  };
+  this.lightWorker.onerror=(error)=>{console.warn('Light Worker unavailable',error.message);this.lightWorker.terminate();this.lightWorker=null;this.lightBusy=false};
+ }}catch(error){console.warn('Light Worker unavailable',error)}
  gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.039,.040,.046,1)}
  upload(data){const gl=this.gl,vao=gl.createVertexArray(),vbo=gl.createBuffer();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,28,24);gl.bindVertexArray(null);return{vao,vbo,count:data.length/7}}
  replace(old,data){if(old)this.dispose(old);return this.upload(data)}
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
- resetWorld(world){for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++}
+ resetWorld(world){for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;glClearLight(this.gl,this.lightTexture)}
  queueMesh(world,key,chunk){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
@@ -104,6 +117,17 @@ export class Renderer{
   }
   if(best)this.queueMesh(world,best[0],best[1]);
  }
+ updateLightVolume(world,player){
+  const ox=Math.floor(player.x/16)*16-32,oz=Math.floor(player.z/16)*16-32;
+  const origin=[ox,0,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${ox}:${oz}`;
+  if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
+  const blocks=makeOccluderSnapshot(world,origin);
+  const sources=world.lights.near(player.x,player.y+player.eye,20,52).filter(l=>l.x>=ox&&l.x<ox+LIGHT_WIDTH&&l.z>=oz&&l.z<oz+LIGHT_DEPTH).map(l=>({...l,rgb:rgb(l.color)}));
+  const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;
+  if(this.lightWorker){this.lightWorker.postMessage({token,origin,blocks:blocks.buffer,sources},[blocks.buffer]);return}
+  const result=buildLightVolume(blocks,sources,{origin});const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texSubImage3D(gl.TEXTURE_3D,0,0,0,0,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,gl.RGBA,gl.UNSIGNED_BYTE,result);
+  this.lightOrigin=origin;this.lightAppliedKey=requestKey;this.lightBusy=false;
+ }
  observeFrame(ms){
   // Lower 3D render resolution when GPU is consistently overwhelmed.
   this.frameAverage=this.frameAverage*.965+Math.min(100,ms)*.035;
@@ -125,20 +149,14 @@ export class Renderer{
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
   const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.35);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
-  // GPU cost is bounded: only the eight nearest loaded light sources per frame.
-  const nearby=world.lights.near(player.x,camY,player.z,8,40);
-  this.lightPositions.fill(0);this.lightColors.fill(0);
-  for(let i=0;i<nearby.length;i++){
-   const l=nearby[i],base=i*4,c=i*3;
-   this.lightPositions.set([l.x,l.y,l.z,l.radius],base);
-   const color=rgb(l.color);
-   this.lightColors.set(color.map(v=>v*l.intensity),c);
-  }
-  gl.uniform1i(this.u.lightCount,nearby.length);
-  gl.uniform4fv(this.u.lightPos,this.lightPositions);
-  gl.uniform3fv(this.u.lightColor,this.lightColors);
+  this.updateLightVolume(world,player);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
+  gl.uniform1i(this.u.lightVolume,0);
+  gl.uniform3fv(this.u.lightOrigin,this.lightOrigin);
+  gl.uniform3f(this.u.lightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
   const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=88;const visible=[];for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m)}this.lastDrawnChunks=visible.length;for(const m of visible)this.drawMesh(m.opaque);
   const data=this.dynamicData(entities,effects,performance.now()*.001);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
+  this.hologram?.render(vp,performance.now()*.001);
  }
 }
