@@ -45,14 +45,22 @@ export function shapeBoxes(id,x,y,z,state={}){
  // AABBs are used for physics, selection and the worker-built mesh.
  if(id===B.THIN_WALL_NS)return [{x,y,z:z+.34,w:1,h:1,d:.32}];
  if(id===B.THIN_WALL_EW)return [{x:x+.34,y,z,w:.32,h:1,d:1}];
- if(id===B.WINDOW_NS)return [
-  {x:x+.12,y:y+.12,z:z+.47,w:.76,h:.76,d:.06},
-  {x,y,z:z+.39,w:.14,h:1,d:.22},{x:x+.86,y,z:z+.39,w:.14,h:1,d:.22},
-  {x,y:y+.86,z:z+.39,w:1,h:.14,d:.22},{x,y,z:z+.39,w:1,h:.14,d:.22}];
- if(id===B.WINDOW_EW)return [
-  {x:x+.47,y:y+.12,z:z+.12,w:.06,h:.76,d:.76},
-  {x:x+.39,y,z,w:.22,h:1,d:.14},{x:x+.39,y,z:z+.86,w:.22,h:1,d:.14},
-  {x:x+.39,y:y+.86,z,w:.22,h:.14,d:1},{x:x+.39,y,z,w:.22,h:.14,d:1}];
+ if(id===B.WINDOW_NS||id===B.WINDOW_EW){
+  const variant=Math.max(0,Math.min(5,state.variant||0));
+  const left=variant===2?.30:.12,right=variant===2?.70:.88;
+  const low=variant===5?.43:.12,high=variant===5?.84:.88;
+  const parts=[
+   {x:x+left,y:y+low,z:z+.47,w:right-left,h:high-low,d:.06},
+   {x,y,z:z+.39,w:left+.02,h:1,d:.22},
+   {x:x+right-.02,y,z:z+.39,w:1-right+.02,h:1,d:.22},
+   {x,y:y+.86,z:z+.39,w:1,h:.14,d:.22},
+   {x,y,z:z+.39,w:1,h:.14,d:.22},
+  ];
+  if(variant===3)for(const offset of [.35,.65])parts.push({x:x+offset,y:y+.12,z:z+.40,w:.05,h:.76,d:.2});
+  if(variant===4)parts.push({x:x+.12,y:y+.54,z:z+.40,w:.76,h:.06,d:.2});
+  if(variant===5)parts.push({x:x+.12,y:y+.41,z:z+.40,w:.76,h:.055,d:.2});
+  return id===B.WINDOW_EW?rotateBoxes(parts,x,z,1):parts;
+ }
  if(id===B.CHAIR){
   return rotateBoxes([{x:x+.13,y:y+.39,z:z+.13,w:.74,h:.17,d:.74},{x:x+.13,y:y+.55,z:z+.73,w:.74,h:.42,d:.14},...[.16,.69].flatMap(dx=>[.16,.69].map(dz=>({x:x+dx,y,z:z+dz,w:.15,h:.41,d:.15})))],x,z,facing);
  }

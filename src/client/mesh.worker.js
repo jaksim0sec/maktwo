@@ -7,8 +7,9 @@ self.onmessage=({data:job})=>{
   const chunk=new Chunk(job.cx,job.cz);
   chunk.data=new Uint8Array(job.data);
   if(job.forms)chunk.forms=new Uint8Array(job.forms);
+  if(job.styles)chunk.styles=new Uint8Array(job.styles);
   chunk.mounts=job.mounts;
-  const neighbors=job.neighbors.map(([dx,dz,buffer,forms])=>[dx,dz,new Uint8Array(buffer),forms&&new Uint8Array(forms)]);
+  const neighbors=job.neighbors.map(([dx,dz,buffer,forms,styles])=>[dx,dz,new Uint8Array(buffer),forms&&new Uint8Array(forms),styles&&new Uint8Array(styles)]);
   const states=new Map(job.doorStates||[]);
   const mesh=meshChunkData(chunk,{neighbors,states,visualSeed:job.seed});
   self.postMessage({key:job.key,revision:job.revision,token:job.token,opaque:mesh.opaque,transparent:mesh.transparent},[mesh.opaque.buffer,mesh.transparent.buffer]);

@@ -5,15 +5,19 @@ import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
  constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved)c.data[idx]=id;const forms=this.forms.get(k);
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
  c.dirty=true;this.lights.loadChunk(c);this.lightRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
- getShapeState(x,y,z){return this.blockStates.get(this.stateKey(x,y,z))||{facing:0,upper:false}}
+ getShapeState(x,y,z){
+  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
+  const y0=Math.floor(y),variant=y0>=0&&y0<HEIGHT?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
+  return {facing:0,upper:false,variant,...this.blockStates.get(this.stateKey(x,y,z))};
+ }
  setShapeState(x,y,z,state={}){const id=this.get(x,y,z,false);if(id===B.AIR||isDoor(id))return false;this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%4+4)%4,upper:Boolean(state.upper),...(state.panelTurn!==undefined?{panelTurn:state.panelTurn&3}:{})});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;return true}
- getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return this.blockStates.get(this.stateKey(x,yBase,z))||{facing:0,open:false}}
+ getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return {...this.getShapeState(x,yBase,z),open:false,...this.blockStates.get(this.stateKey(x,yBase,z))}}
  setDoorState(x,y,z,{facing=0,open=false}={}){const baseY=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);if(this.get(x,baseY,z)!==B.DOOR)return false;this.blockStates.set(this.stateKey(x,baseY,z),{facing:((facing%4)+4)%4,open:!!open});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;this.events.emit('door-change',{x,y:baseY,z});return true}
  toggleDoor(x,y,z,occupants=[]){
   const bx=Math.floor(x),bz=Math.floor(z),baseY=this.get(x,y,z)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);
@@ -91,7 +95,7 @@ export class World{
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz),k=key(cx,cz);
   const lx=x-cx*SIZE,lz=z-cz*SIZE,idx=Chunk.index(lx,y,lz),oldId=c.data[idx],oldForm=c.forms?.[idx]||0;
   if(oldId===id&&oldForm===form)return false;
-  c.set(lx,y,lz,id);
+  c.set(lx,y,lz,id);if(c.styles)c.styles[idx]=0;
   if(oldForm!==form){
    if(!c.forms)c.forms=new Uint8Array(c.data.length);
    c.forms[idx]=form;

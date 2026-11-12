@@ -30,7 +30,7 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 // Six directional masks; every rectangular run of the same block becomes ONE quad.
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
 export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}={}){
- const adjacent=new Map(neighbors.map(([dx,dz,data,forms])=>[`${dx},${dz}`,{data,forms}]));
+ const adjacent=new Map(neighbors.map(([dx,dz,data,forms,styles])=>[`${dx},${dz}`,{data,forms,styles}]));
  const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,forms=chunk.forms;
  // Store top-face UV turns in the existing material field. Only chunks with
@@ -92,7 +92,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
     const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],visualSeed)*.06;
-    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex)+256*(mat>>>14));
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex)+512*(mat>>>14));
     k+=width;
    }
   }
@@ -119,11 +119,19 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
    continue;
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
-  const wx=ox+x,wz=oz+z,state=states.size?stateAt(wx,y,wz):undefined;
-  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state);continue}
+  const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
+  const variant=chunk.styles?.[idx]||0,state=variant?{variant,...authored}:authored;
+  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state,transparent);continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state);continue}
   const start=opaque.length;
-  if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.FENCE||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);
+  if(id===B.FENCE&&variant===7){
+   metalRailing(opaque,wx,y,wz,(nextY)=>{
+    const rz=z+1,dz=rz>=SIZE?1:0,other=dz?adjacent.get('0,1'):chunk;
+    if(!other?.data||!other?.styles||nextY<0||nextY>=HEIGHT)return false;
+    const k=(nextY*SIZE+(rz%SIZE))*SIZE+x;
+    return other.data[k]===B.FENCE&&other.styles[k]===7;
+   });
+  }else if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.FENCE||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);
   else if(id!==B.FLOWER&&BLOCKS[id].render!=='cross')fixture(opaque,id,wx,y,wz);
   else flowerMesh(opaque,wx,y,wz,visualSeed,id);
   if(state?.facing){
@@ -189,7 +197,8 @@ export function fixture(dest,id,x,y,z){
 // Rendering it separately avoids breaking greedy face merging or chunk storage.
 export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
  const b=doorBounds(x,z,state?.facing||0,Boolean(state?.open));
- const color=rgb('#af9372');
+ const colors=['#af9372','#957e66','#737b80','#a3b3b9','#6f655c','#80868b'];
+ const color=rgb(colors[Math.max(0,Math.min(5,state?.variant||0))]);
  for(let f=0;f<FACES.length;f++){
   const face=FACES[f];const verts=face.corners.map(([a,c,d])=>[b.x+a*b.w,y+.04+c*DOOR_HEIGHT,b.z+d*b.d]);
   quad(dest,verts,color,face.shade+4*materialFor(18,f));
@@ -199,6 +208,27 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
  cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb('#cdbd8f'));
 }
 
+// A stair flight sets style 7 on side posts; render connected rising handrails.
+export function metalRailing(dest,x,y,z,hasNeighbor){
+ const steel=rgb('#41484b');
+ cube(dest,x+.43,y,z+.43,.14,1.03,.14,steel);
+ cube(dest,x+.39,y+1.03,z+.39,.22,.07,.22,steel);
+ for(const nextY of [y,y+1,y-1]){
+  if(!hasNeighbor(nextY))continue;
+  for(const h of [.52,.88]){
+   const a=y+h,b=nextY+h,t=.065;
+   // Four-sided sloped beam between adjacent upright posts.
+   const p=[[x+.47,a,z+.50],[x+.47,a+.09,z+.50],[x+.47,b+.09,z+1.5],[x+.47,b,z+1.5]];
+   quad(dest,p,steel,.8);
+   quad(dest,[...p].reverse().map(q=>[q[0]+t,q[1],q[2]]),steel,.82);
+   for(let i=0;i<4;i++){
+    const j=(i+1)%4;
+    quad(dest,[p[i],p[j],[p[j][0]+t,p[j][1],p[j][2]],[p[i][0]+t,p[i][1],p[i][2]]],steel,.86);
+   }
+  }
+  break;
+ }
+}
 export function gardenMesh(dest,id,x,y,z){
  const box=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
  if(id===B.WORKBENCH){
@@ -247,16 +277,16 @@ export function flowerMesh(dest,x,y,z,seed=0,id=B.FLOWER){
  cube(dest,x+.462,cy+.025,z+.462,.076,.08,.076,rgb('#d7b77e'));
 }
 // Partial voxel shapes keep the authored block material and physical AABBs aligned.
-export function shapeMesh(dest,id,x,y,z,state){
+export function shapeMesh(dest,id,x,y,z,state,glassDest=dest){
  const diagonal=isPanel(id)?diagonalPanel(id,state):null;
  if(diagonal){
   for(let index=0;index<diagonal.length;index++){
    const glass=(id===B.WINDOW_NS||id===B.WINDOW_EW)&&index===0;
-   const paint=glass?rgb('#25343b'):COLORS[id];
+   const paint=glass?rgb('#a9bdc5'):COLORS[id],out=glass?glassDest:dest;
    for(const face of diagonal[index].faces){
     const shade=FACES[face.material].shade+4*materialFor(glass?B.DIRTY_GLASS:id,face.material);
     const points=face.points.map(([a,b,c])=>[x+a,y+b,z+c]);
-    for(let i=1;i<points.length-1;i++)for(const j of [0,i,i+1])dest.push(...points[j],...paint,shade);
+    for(let i=1;i<points.length-1;i++)for(const j of [0,i,i+1])out.push(...points[j],...paint,shade);
    }
   }
   return;
@@ -266,10 +296,10 @@ export function shapeMesh(dest,id,x,y,z,state){
  for(let index=0;index<boxes.length;index++){
   const b=boxes[index],dx=b.x-x,dy=b.y-y,dz=b.z-z;
   const glass=(id===B.WINDOW_NS||id===B.WINDOW_EW)&&index===0;
-  const paint=glass?rgb('#25343b'):c,mat=glass?materialFor(B.DIRTY_GLASS,0):materialFor(id,0);
+  const paint=glass?rgb('#a9bdc5'):c,mat=glass?materialFor(B.DIRTY_GLASS,0):materialFor(id,0),out=glass?glassDest:dest;
   for(let fi=0;fi<FACES.length;fi++){
    const face=FACES[fi],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);
-   quad(dest,verts,paint,face.shade+4*(glass?mat:materialFor(id,fi))+(fi===2||fi===3?256*((state?.facing||0)&3):0));
+   quad(out,verts,paint,face.shade+4*(glass?mat:materialFor(id,fi))+(fi===2||fi===3?512*((state?.facing||0)&3):0));
   }
  }
  if(id===B.FLOWER_POT){
