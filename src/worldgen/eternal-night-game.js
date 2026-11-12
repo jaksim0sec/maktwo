@@ -239,9 +239,18 @@ function stampAnnex(part,x,z,put,empty) {
 function stampWalkway(link,part,x,z,put,empty) {
   if(!inside(part.outline,x,z))return;
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
-  const level=Math.round(part.y??segmentY(part,x,z));
-  const style=link.architecture??'open';
-  if(empty(level-1))put(level-1,style==='hung'?B.METAL_PANEL:B.FLOOR_TILE);
+  const surface=part.y??segmentY(part,x,z);
+  const level=Math.round(surface),style=link.architecture??'open';
+  if(part.kind==='deck'){
+    if(empty(level-1))put(level-1,style==='hung'?B.METAL_PANEL:B.FLOOR_TILE);
+  }else{
+    // Graded bridge sections also receive ONE real tread rather than a
+    // staircase made from full-height tiled cubes with 1 m vertical jumps.
+    const vx=part.to[0]-part.from[0],vz=part.to[2]-part.from[2];
+    const profile=encodeCityStair(surface,outwardTurn(vx,vz));
+    if(empty(profile.base))put(profile.base,cityPart('staircase',2),
+      profile.facing,false,CITY_STAIR_STYLE|(profile.quarter<<3));
+  }
   if(!part.from)return;
   const dx=(part.to[0]-part.from[0])/part.length,dz=(part.to[2]-part.from[2])/part.length;
   const sx=x-part.from[0],sz=z-part.from[2],along=sx*dx+sz*dz,lateral=sz*dx-sx*dz;
@@ -262,15 +271,16 @@ function stampWalkway(link,part,x,z,put,empty) {
     const roofY=level+(style==='hung'?4:3);
     if(empty(roofY)&&(style!=='hung'||edge||bay===0))put(roofY,style==='enclosed'?B.CEILING_TILE:B.CONCRETE_BEAM);
   }
-  if(edge&&!storefront&&empty(level)) {
+  const guardY=part.kind==='deck'?level:Math.ceil(surface);
+  if(edge&&!storefront&&empty(guardY)) {
     if(style==='enclosed'){
       const face=enclosedPassageBay(bay);
-      put(level,cityPart('wall',1),turn,true);
-      if(empty(level+1))put(level+1,cityPart(face.window?'window':'wall',face.window?3:1),turn,true);
-      if(empty(level+2))put(level+2,cityPart(face.vent?'ventilation':'wall',1),turn,true);
+      put(guardY,cityPart('wall',1),turn,true);
+      if(empty(guardY+1))put(guardY+1,cityPart(face.window?'window':'wall',face.window?3:1),turn,true);
+      if(empty(guardY+2))put(guardY+2,cityPart(face.vent?'ventilation':'wall',1),turn,true);
     } else {
       // A continuous guardrail replaces three posts per independent module.
-      put(level,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(mod(Math.floor(along),3)===0?8:0));
+      put(guardY,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(mod(Math.floor(along),3)===0?8:0));
       if(bay===0&&(style==='arcade'||style==='hung')){
         for(let y=level+1;y<level+(style==='hung'?4:3);y++)if(empty(y))put(y,cityPart('column',3),turn,true);
       }
