@@ -22,15 +22,12 @@ export class GestureState {
   const f=this.fingers.get(id);if(!f)return;
   const dist=Math.hypot(x-f.startX,y-f.startY);
   if(f.side==='right'){
-   if(f.holding){if(dist>HOLD_CANCEL_DRIFT_PX)f.holdCancelled=true;}
-   else if(!f.holdCancelled){
-    if(dist>=LOOK_START_PX)f.lookActive=true;
-    if(f.lookActive){
-     // CSS px, not device px; keep look sensitivity comparable on phones and tablets.
-     const gain=clamp(1750/f.viewportWidth,2.8,5.6);
-     this.lookX+=clamp(x-f.x,-48,48)*gain;
-     this.lookY+=clamp(y-f.y,-48,48)*gain;
-    }
+   if(f.holding&&dist>HOLD_CANCEL_DRIFT_PX){f.holding=false;f.holdCancelled=true;f.lookActive=true;}
+   if(!f.holding&&!f.holdCancelled&&dist>=LOOK_START_PX)f.lookActive=true;
+   if(f.lookActive){
+    const gain=clamp(1750/f.viewportWidth,2.8,5.6);
+    this.lookX+=clamp(x-f.x,-48,48)*gain;
+    this.lookY+=clamp(y-f.y,-48,48)*gain;
    }
   }
   if(dist>TAP_DRIFT_PX)f.dragged=true;

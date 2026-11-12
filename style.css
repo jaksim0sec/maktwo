@@ -35,3 +35,6 @@ body.holo-open #inventory-close{display:block}
 #underwater-filter{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;background:linear-gradient(160deg,#14578985,#0c344a70);transition:opacity .24s ease}
 body.submerged #underwater-filter{opacity:1;backdrop-filter:blur(1.15px);-webkit-backdrop-filter:blur(1.15px)}
 @media(pointer:coarse){.touchbuttons{gap:10px;bottom:calc(105px + env(safe-area-inset-bottom))}.touchbuttons button{width:55px;height:55px;border-radius:16px;background:#1c252980;border:1px solid #ffffff25;font-size:26px;color:#f3eadb;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}}
+
+/* Scene-first HUD: controls and block names are available in settings, not persistent overlays. */
+#control-hint,#block-name,#target,#flight{display:none!important}

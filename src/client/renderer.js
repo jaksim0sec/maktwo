@@ -1,3 +1,4 @@
+import {block as itemBlock} from '../core/blocks.js';
 import {meshChunk,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
@@ -170,6 +171,11 @@ export class Renderer{
  dynamicData(entities,effects,time){
   const arr=[];
   for(const e of entities){
+   if(e.type==='drop'){
+    const color=rgb(itemBlock(e.itemId).color),size=.23,phase=Math.sin(time*2+e.id)*.07;
+    cube(arr,e.x-size/2,e.y+phase,e.z-size/2,size,size,size,color,.92);
+    continue;
+   }
    const walk=Math.sin(time*7+e.id)*.12,zombie=e.type==='zombie';
    const c=zombie?rgb('#728c72'):rgb('#d9d5cb'),head=zombie?rgb('#8aa089'):rgb('#c7b9a7');
    // Creature size is measured in meters, independent of the 0.8m voxel.

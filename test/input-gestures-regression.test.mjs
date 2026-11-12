@@ -20,13 +20,13 @@ test('look gesture does not edit or mine and retains right-hand role after cross
  assert.equal(s.miningPoint(700),null);
  s.up(6,140,150,730);assert.equal(s.consumeTaps(),0);
 });
-test('hold stays anchored through a small wobble; large drift cancels permanently',()=>{
+test('hold stays anchored through a small wobble; large drift transitions to camera drag',()=>{
  const s=new GestureState();s.down(2,300,400,180,1000,360);
  assert.equal(s.miningPoint(1000+HOLD_MS-1),null);
  assert.deepEqual(s.miningPoint(1000+HOLD_MS),{x:300,y:400});
  s.move(2,314,403);assert.deepEqual(s.miningPoint(1500),{x:300,y:400});
  assert.deepEqual(s.consumeLook(),[0,0]);
- s.move(2,335,410);assert.equal(s.miningPoint(1600),null);
+ s.move(2,335,410);assert.equal(s.miningPoint(1600),null);assert.ok(s.consumeLook()[0]>0);
  s.move(2,301,400);assert.equal(s.miningPoint(1700),null);
  s.up(2,300,400,1800);assert.equal(s.consumeTaps(),0);
 });

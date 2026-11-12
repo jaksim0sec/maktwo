@@ -1,5 +1,6 @@
 import {block,BLOCK as B} from '../core/blocks.js';
 import {makeTextureLayers,materialFor} from './textures.js';
+import {shapeBoxes} from '../core/shapes.js';
 
 // Render tiny isometric item portraits from the same procedural material layers
 // as world blocks. No separate texture pack, network requests, or GPU draws.
@@ -27,9 +28,21 @@ function face(ctx,id,faceIndex,points,shade){
  ctx.drawImage(tile,left,top,Math.max(...xs)-left+1,Math.max(...ys)-top+1);
  ctx.restore();
 }
+// The icon and world mesh share the same AABB geometry.
+export function drawShapeIcon(ctx,id){
+ const boxes=shapeBoxes(id,0,0,0,{facing:0,upper:false});if(!boxes)return false;
+ const pr=(x,y,z)=>[32+(x-z)*22,43-y*29+(x+z)*7];
+ for(const b of [...boxes].sort((a,b)=>(a.x+a.z+a.y*.3)-(b.x+b.z+b.y*.3))){
+  const x=b.x,z=b.z,y=b.y,X=x+b.w,Z=z+b.d,Y=y+b.h;
+  face(ctx,id,1,[pr(x,y,Z),pr(X,y,Z),pr(X,Y,Z),pr(x,Y,Z)],.82);
+  face(ctx,id,0,[pr(X,y,z),pr(X,y,Z),pr(X,Y,Z),pr(X,Y,z)],.72);
+  face(ctx,id,2,[pr(x,Y,z),pr(X,Y,z),pr(X,Y,Z),pr(x,Y,Z)],1);
+ }return true;
+}
 export function drawItemIcon(ctx,id,x,y,size=64){
  ctx.save();ctx.translate(x,y);ctx.scale(size/64,size/64);
- if(id===B.TORCH||id===B.LANTERN||id===B.CAMPFIRE||id===B.GLOW_MUSHROOM){
+ if(drawShapeIcon(ctx,id)){}
+ else if(id===B.TORCH||id===B.LANTERN||id===B.CAMPFIRE||id===B.GLOW_MUSHROOM){
   if(id===B.CAMPFIRE){poly(ctx,[[10,46],[31,33],[55,46],[34,58]],'#70523d');poly(ctx,[[15,47],[19,39],[43,47],[39,55]],'#af815b')}
   else if(id===B.LANTERN){poly(ctx,[[19,19],[45,19],[48,49],[16,49]],'#a17948');poly(ctx,[[22,24],[42,24],[43,44],[21,44]],'#ffd38b');poly(ctx,[[18,15],[46,15],[43,21],[21,21]],'#d8b274');}
   else if(id===B.GLOW_MUSHROOM){poly(ctx,[[29,31],[37,31],[37,57],[28,57]],'#d1bc93');poly(ctx,[[11,31],[23,20],[40,17],[54,30],[48,39],[16,39]],'#e7a877');}

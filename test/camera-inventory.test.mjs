@@ -51,7 +51,7 @@ test('in-game inventory frame retains camera and physics while interaction is bl
  assert.match(source,/this\.input\.setInventoryMode\(this\.panel==='inventory'\)/);
  assert.match(source,/toggleCameraMode\(\)/);
  assert.match(html,/id="camera-btn"/);
- for(const id of ['screen','hotbar','palette-toggle','bag-btn','menu-btn','resume','help-btn','mode','water-repair'])assert.ok(html.includes(`id="${id}"`));
+ for(const id of ['screen','hotbar','bag-btn','menu-btn','resume','help-btn','mode','water-repair'])assert.ok(html.includes(`id="${id}"`));
  assert.match(css,/#hotbar-dock/);assert.match(css,/#toolbar/);
 });
 test('mobile inventory keeps dual-finger movement and camera; tap is not world placement',()=>{

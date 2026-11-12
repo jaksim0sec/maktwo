@@ -45,7 +45,7 @@ export class SurvivalInventory{
   const amount=Math.min(n,MAX_STACK-this.count(id));if(amount<=0)return 0;
   this.items.set(id,this.count(id)+amount);this.seen.add(id);this.save();return amount;
  }
- remove(id,n=1){if(!Number.isSafeInteger(n)||n<1||!this.has(id,n))return false;const left=this.count(id)-n;if(left)this.items.set(id,left);else this.items.delete(id);this.save();return true}
+ remove(id,n=1){if(!Number.isSafeInteger(n)||n<1||!this.has(id,n))return false;const left=this.count(id)-n;if(left)this.items.set(id,left);else{this.items.delete(id);this.quickSlots=this.quickSlots.map(slot=>slot===id?null:slot)}this.save();return true}
  craft(recipe,station='hand'){if(!this.canCraft(recipe,station))return false;
   // Apply all ingredients and the output as a single ledger mutation.
   for(const [id,n] of Object.entries(recipe.needs)){
@@ -59,8 +59,9 @@ export class SurvivalInventory{
  load(){let data=null;try{const raw=this.storage?.getItem(this.key);if(raw!==null&&raw!==undefined)data=JSON.parse(raw)}catch{}
   if((data?.version===1||data?.version===2)&&Array.isArray(data.items)){
    for(const [id,n] of data.items){if(Number.isInteger(id)&&id>0&&id<BLOCKS.length&&Number.isInteger(n)&&n>0)this.items.set(id,Math.min(n,MAX_STACK))}
-   if(data.version===2){for(const id of data.seen||[])if(Number.isInteger(id)&&id>0&&id<BLOCKS.length)this.seen.add(id);if(Array.isArray(data.quickSlots)&&data.quickSlots.length===HOTBAR_SIZE)this.quickSlots=data.quickSlots.map(id=>id===null?null:(Number.isInteger(id)&&id>0&&id<BLOCKS.length?id:null));}
+   if(data.version===2){for(const id of data.seen||[])if(Number.isInteger(id)&&id>0&&id<BLOCKS.length)this.seen.add(id);if(Array.isArray(data.quickSlots)&&data.quickSlots.length===HOTBAR_SIZE)this.quickSlots=data.quickSlots.map(id=>id===null?null:(Number.isInteger(id)&&id>0&&id<BLOCKS.length&&this.count(id)>0?id:null));}
   }else for(const [id,n] of Object.entries(STARTER_SUPPLIES))this.items.set(Number(id),n);
+  this.quickSlots=this.quickSlots.map(id=>id!==null&&this.count(id)>0?id:null);
   for(const id of this.items.keys())this.seen.add(id);
  }
 }

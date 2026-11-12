@@ -1,4 +1,4 @@
-import {moveBody,collides,inWater} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
+import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels} from '../core/scale.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
@@ -23,14 +23,26 @@ export class Mob extends Entity{constructor(type,x,y,z){super(type,x,y,z);this.w
  this.vx=dx*speed;this.vz=dz*speed;this.heading=Math.atan2(-dx,-dz);if((this.grounded||this.water)&&!this.fly){const aheadX=this.x+dx*.6,aheadZ=this.z+dz*.6;if(collides(world,aheadX,this.y,aheadZ,this.width,this.height)&&!collides(world,aheadX,this.y+1,aheadZ,this.width,this.height))this.vy=7}
  super.tick(world,dt);if(this.y<0)this.dead=true;
  }}
+export class ItemDrop{
+ constructor(itemId,x,y,z,count=1){this.id=NEXT++;this.type='drop';this.itemId=itemId;this.count=count;this.x=x;this.y=y;this.z=z;this.age=0;this.dead=false}
+}
 export class EntityManager{
  constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0}
+ spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
- tick(dt,player){
+ tick(dt,player,inventory=null){
   // Wildlife is sparse and long-lived enough to make a quiet village feel settled.
   // Manual/test animals do not count against the natural population limit.
   const LIMIT=6,SPAWN_INTERVAL=16,MIN_SEPARATION=10,MAX_RANGE=60;
-  this.entities=this.entities.filter(e=>!e.dead&&e.age<(e.natural?180:240)&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
+  for(const e of this.entities)if(e.type==='drop'){
+   e.age+=dt;
+   if(inventory&&e.age>.22&&Math.abs(e.y-player.y)<2&&dist2(e,player)<2.15*2.15){
+    const obtained=inventory.add(e.itemId,e.count);e.count-=obtained;
+    if(obtained){inventory.assignQuickSlot(e.itemId);this.collected=true}
+    if(!e.count)e.dead=true;
+   }
+  }
+  this.entities=this.entities.filter(e=>!e.dead&&(e.type==='drop'?e.age<180:e.age<(e.natural?180:240))&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
   this.spawnTimer-=dt;
   if(this.spawnTimer<=0){
    this.spawnTimer=SPAWN_INTERVAL;
@@ -41,8 +53,16 @@ export class EntityManager{
     if(clear){for(let y=55;y>1;y--){if(this.world.get(x,y-1,z)!==0&&this.world.get(x,y,z)===0&&this.world.get(x,y+1,z)===0){this.spawn('sheep',x+.5,y,z+.5,{natural:true});break}}}
    }
   }
-  for(const e of this.entities)if(Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
+  for(const e of this.entities)if(e.type!=='drop'&&Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
  }
 
- attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}
+ hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity){
+  let choice=null,best=Math.min(maxDistance,blockDistance+1e-4);
+  for(const e of this.entities){if(e.dead||e.type==='drop')continue;
+   const r=e.width*.5,hit=intersectAabb(origin,direction,[e.x-r,e.y,e.z-r],[e.x+r,e.y+e.height,e.z+r]);
+   if(hit&&hit.distance>=0&&hit.distance<best){best=hit.distance;choice=e}
+  }
+  return choice;
+ }
+ attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){if(e.type==='drop')continue;const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}
 }

@@ -11,7 +11,7 @@ test('follow-camera spatial inventory does not remain buried in world geometry',
 });
 test('PWA installs one complete versioned asset set and never mixes revisioned source files',()=>{
  const sw=file('sw.js');
- assert.match(sw,/maktwo-shell-v1\.9\.0-stage2/);
+ assert.match(sw,/maktwo-shell-v1\.9\.1/);
  assert.match(sw,/cache\.addAll/);
  assert.match(sw,/cache:'reload'/);
  assert.match(sw,/await cache\.match\(url\)/);

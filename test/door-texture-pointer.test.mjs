@@ -71,7 +71,7 @@ test('hotbar labels localized without modifying stable block IDs',()=>{
 test('offline service worker includes new ray picker, door and texture modules',()=>{
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
  for(const p of ['src/client/picking.js','src/client/textures.js','src/core/door.js'])assert.ok(sw.includes(p));
- assert.match(sw,/maktwo-shell-v1\.9\.0-stage2/);
+ assert.match(sw,/maktwo-shell-v1\.9\.1/);
 });
 
 test('raycast only hits the physical door panel, not its empty cell',()=>{
