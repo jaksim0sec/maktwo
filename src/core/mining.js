@@ -3,9 +3,9 @@ import {block,BLOCK} from './blocks.js';
 export class MiningProgress{
  constructor(){this.key=null;this.seconds=0;this.ratio=0}
  reset(){this.key=null;this.seconds=0;this.ratio=0}
- update(target,holding,dt){
+ update(target,holding,dt,overrideSeconds){
   if(!holding||!target||target.id===BLOCK.AIR){this.reset();return {ratio:0,completed:false}}
-  const duration=block(target.id).breakTime;
+  const duration=overrideSeconds??block(target.id).breakTime;
   if(!Number.isFinite(duration)){this.reset();return {ratio:0,completed:false}}
   const key=`${target.x},${target.y},${target.z}:${target.id}`;
   if(this.key!==key){this.key=key;this.seconds=0}

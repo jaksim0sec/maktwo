@@ -362,7 +362,7 @@ class Game{
   if(!miningMode){this.mining.reset();this.showMining(0);return}
 
   const target=this.target&&this.target.id!==B.BEDROCK&&this.target.id!==B.WATER?this.target:null;
-  const result=p.creative&&target?{ratio:1,completed:this.interactTimer===0}:this.mining.update(target,true,dt);this.showMining(result.ratio);
+  const result=this.mining.update(target,true,dt,p.creative?.5:undefined);this.showMining(result.ratio);
   if(result.completed&&target){
    if(target.mounted||this.world.get(target.x,target.y,target.z)===target.id){
     const {x,y,z,id}=target;
