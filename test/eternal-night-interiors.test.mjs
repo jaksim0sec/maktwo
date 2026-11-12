@@ -17,6 +17,7 @@ test('corridor makes a contrasting tiled central walkway and thinner reddish per
 test('functional ceiling tile grid sits below the structural floor, with regular embedded lighting',()=>{
  assert.equal(hasDropCeiling(publicFloor,shape),true);
  assert.equal(hasDropCeiling({...publicFloor,top:12},shape),false,'small shop headroom protected');
+ assert.equal(hasDropCeiling({...publicFloor,program:'workshops'},shape),false,'industrial hall retains exposed structural ceiling');
  assert.equal(hasDropCeiling(publicFloor,{...shape,corridor:null,room:null}),false);
  assert.equal(ceilingFixture(publicFloor,hall,1.5,6.5,0),B.FLUORESCENT);
  assert.equal(ceilingFixture(publicFloor,hall,1.5,5.5,0),B.CEILING_FINISH);

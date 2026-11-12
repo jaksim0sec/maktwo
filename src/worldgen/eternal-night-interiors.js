@@ -23,7 +23,7 @@ export function floorFinish(f,shape,x,z,base) {
  * Callers check structural holes, staircase/landing geometry and exits.
  */
 export function hasDropCeiling(f,shape) {
- return Boolean(f.top-f.y>=6&&shape?.edge===-1
+ return Boolean(f.program!=='workshops'&&f.top-f.y>=6&&shape?.edge===-1
   &&(shape.corridor||(
    shape.room&&['market','court','exchange','shops'].includes(f.program)
   )));
