@@ -89,6 +89,21 @@ test('a player can walk from the test spawn through the doorway onto the main wa
   assert.ok(Math.abs(player.y-y)<.05&&player.grounded,'the deck supported the player');
 });
 
+test('airborne shop doors keep a clear walking aisle from the bridge',()=>{
+  const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
+  const bays=createCityPlan(world.seed).links.filter(l=>l.typology==='annex')
+    .map(l=>l.landings.find(p=>p.kind==='annex-bay'&&p.heading%2===0)).filter(Boolean).slice(0,10);
+  assert.equal(bays.length,10);
+  for(const bay of bays) {
+    const [a,b]=[bay.a,bay.b],nx=-Math.sign(b[2]-a[2])*bay.side,nz=Math.sign(b[0]-a[0])*bay.side;
+    const x=Math.floor((a[0]+b[0])/2-nx*2.65)+.5,z=Math.floor((a[2]+b[2])/2-nz*2.65)+.5,y=Math.round(bay.y);
+    const player=new Player(x,y,z);
+    player.yaw=Math.atan2(-nx,-nz);
+    for(let i=0;i<24;i++)player.update(world,1/60,{forward:true});
+    assert.ok(player.grounded&&Math.abs(player.y-y)<.1&&(player.x-x)*nx+(player.z-z)*nz>1.7);
+  }
+});
+
 test('switchback stairs reach low, middle and upper landings at every generated storey pitch',()=>{
   const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
   const plan=createCityPlan(world.seed);

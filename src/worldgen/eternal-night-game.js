@@ -186,7 +186,7 @@ function stampAnnex(part,x,z,put,empty) {
     for(let k=0;k<3;k++)if(empty(y+k))put(y+k,cityPart(k===1?'window':'wall',k===1?3:1),turn,true);
   } else if(outer<-.8&&along>length*.22&&along<length*.8&&empty(y+2)) {
     put(y+2,cityPart('sign',1),turn,true);
-  } else if(outer>.2&&empty(y))put(y,cityPart('interior',0),turn);
+  } else if(outer>.2&&(along<1.2||along>length-1.2)&&empty(y))put(y,cityPart('interior',0),turn);
 }
 
 function stampWalkway(link,part,x,z,put,empty) {
