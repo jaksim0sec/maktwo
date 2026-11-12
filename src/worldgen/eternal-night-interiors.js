@@ -35,7 +35,7 @@ export function ceilingFixture(f,corridor,x,z,buildingId) {
  const center=alongX?(corridor.z0+corridor.z1)/2:(corridor.x0+corridor.x1)/2;
  const minor=alongX?z:x,major=Math.floor(alongX?x:z);
  const phase=((major+buildingId)%6+6)%6;
- return Math.abs(minor-center)<.61&&phase===0?B.FLUORESCENT:B.CEILING_FINISH;
+ return Math.floor(minor)===Math.floor(center)&&phase===0?B.FLUORESCENT:B.CEILING_FINISH;
 }
 
 export function interiorWallFinish(f,base) {

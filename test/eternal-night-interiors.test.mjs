@@ -19,8 +19,9 @@ test('functional ceiling tile grid sits below the structural floor, with regular
  assert.equal(hasDropCeiling({...publicFloor,top:12},shape),false,'small shop headroom protected');
  assert.equal(hasDropCeiling({...publicFloor,program:'workshops'},shape),false,'industrial hall retains exposed structural ceiling');
  assert.equal(hasDropCeiling(publicFloor,{...shape,corridor:null,room:null}),false);
- assert.equal(ceilingFixture(publicFloor,hall,1.5,6.5,0),B.FLUORESCENT);
- assert.equal(ceilingFixture(publicFloor,hall,1.5,5.5,0),B.CEILING_FINISH);
+ assert.equal(ceilingFixture(publicFloor,hall,2.5,6.5,0),B.FLUORESCENT);
+ assert.equal(ceilingFixture(publicFloor,hall,2.5,5.5,0),B.CEILING_FINISH);
+ assert.equal(ceilingFixture(publicFloor,hall,1.5,6.5,0),B.CEILING_FINISH,'single centred luminaire row');
  assert.equal(ceilingFixture(publicFloor,hall,.5,6.5,0),B.CEILING_FINISH,'edge of hall stays ceiling tile');
  assert.equal(interiorWallFinish(publicFloor,B.CRACKED_CONCRETE),B.ARCH_CONCRETE_PEBBLE_PAINT);
 });
