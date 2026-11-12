@@ -54,6 +54,13 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
       const max=program==='court'?min+3:program==='market'?min+2:min+1;
       const lotSizes=[[max,min+1],[min+1,max],[min+1,min],[min,min+1],[min,min],[1,1]];
       if(alongX===(random(22)>.18))for(const p of lotSizes)p.reverse();
+      // Give small individual shops priority directly along the public alley.
+      const laneSide=CARDINAL.some(([dx,dz])=>{
+        const nx=x+dx,nz=z+dz;
+        return nx>=0&&nx<size&&nz>=0&&nz<size&&lanes[nz*size+nx]===1;
+      });
+      if(nearSpine&&laneSide&&(program==='market'||program==='shops')&&random(25)<.72)
+        lotSizes.unshift(lotSizes.pop());
       let found;
       for(const [w,d] of lotSizes) {
         if(used+w*d>budget+2||w===1&&step<5.2)continue;
@@ -71,8 +78,9 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
       }
       if(!found)continue;
       const {a,b,w,d}=found,small=w===1&&d===1;
-      const gap=small?Math.min(1.1,step*.16):Math.min(2.15,step*.23);
-      const inset=salt=>gap+(small?random(salt)*Math.min(.7,Math.max(0,(step-4.2-gap*2)/2)):0);
+      // Narrow lots share party-wall edges; larger ones have small service alleys.
+      const gap=small?0:nearSpine?.50:.85;
+      const inset=()=>gap;
       const v=make({x0:left+a*step+inset(61),z0:top+b*step+inset(62),x1:left+(a+w)*step-inset(63),z1:top+(b+d)*step-inset(64)},
         small?0:TYPES[program],section,null,layout.floorY,local);
       v.program=small?'shops':program;

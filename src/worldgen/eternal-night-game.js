@@ -62,10 +62,11 @@ function inspectShape(f,x,z) {
     if(d<dist){edge=i;dist=d;}
   }
   const room=f.rooms.find(r=>containsRect(r,x,z));
-  const door=f.rooms.find(({door})=>lineDistance(x,z,door.a,door.b)<.70)?.door;
+  const doorRoom=f.rooms.find(({door})=>lineDistance(x,z,door.a,door.b)<.70);
+  const door=doorRoom?.door;
   const partition=!door&&f.partitions.find(({a,b})=>lineDistance(x,z,a,b)<.56);
   const corridor=f.corridors.find(r=>containsRect(r,x,z));
-  return {edge,room,door,partition,corridor};
+  return {edge,room,door,doorKind:doorRoom?.kind,partition,corridor};
 }
 
 function furnishRoom(room,x,z,kit,seed) {
@@ -119,7 +120,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
       continue;
     }
     lastShape=shape;
-    const {edge,corridor,room,door,partition}=shape;
+    const {edge,corridor,room,door,doorKind,partition}=shape;
     const hole=f.holes.some(h=>containsRect(h,x,z));
     if(!hole)put(floor-1,kit.floor);
     // An exposed underside still needs a slab even where the next storey steps back.
@@ -168,7 +169,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
         for(let y=floor+2;y<ceiling;y++)put(y,kit.roomWall);
         const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
         const atDoor=midX===xi&&midZ===zi;
-        if(atDoor&&room?.kind!=='shop') {
+        if(atDoor&&doorKind!=='shop') {
           put(floor,B.DOOR,turn>>1);
           put(floor+1,B.DOOR_TOP);
         }
