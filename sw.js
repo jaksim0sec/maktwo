@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.3.3';
+const CACHE_NAME='maktwo-shell-v1.3.4';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
@@ -12,34 +12,43 @@ const APP_FILES=[
  './src/core/scale.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/worldgen/generators.js'
 ];
+// Install a complete and versioned app snapshot. NEVER mutate it at runtime.
+// A slow connection cannot partially overwrite code in a previously working build.
+const CANONICAL_ASSETS=new Set(APP_FILES.map(p=>new URL(p,self.registration.scope).pathname));
+const ENTRY=new URL('./index.html',self.registration.scope).href;
+const canonicalURL=request=>{
+ const url=new URL(request.url);
+ // Cache only this app's explicit files, not every GET request to the origin.
+ if(!CANONICAL_ASSETS.has(url.pathname))return null;
+ url.search='';url.hash='';return url.href;
+};
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
   const cache=await caches.open(CACHE_NAME);
-  await cache.addAll(APP_FILES.map(p=>new URL(p,self.registration.scope).href));
+  // Bypass HTTP caches. A single failure rejects the new worker, keeping the
+  // previous (complete) offline build intact.
+  await cache.addAll(APP_FILES.map(p=>new Request(new URL(p,self.registration.scope),{cache:'reload'})));
   await self.skipWaiting();
  })());
 });
 self.addEventListener('activate',event=>{
  event.waitUntil((async()=>{
-  const names=await caches.keys();
-  await Promise.all(names.filter(name=>name.startsWith('maktwo-shell-')&&name!==CACHE_NAME).map(name=>caches.delete(name)));
+  const keys=await caches.keys();
+  await Promise.all(keys.filter(name=>name.startsWith('maktwo-shell-')&&name!==CACHE_NAME).map(name=>caches.delete(name)));
   await self.clients.claim();
  })());
 });
 self.addEventListener('fetch',event=>{
  const request=event.request;
  if(request.method!=='GET'||new URL(request.url).origin!==self.location.origin)return;
+ const url=canonicalURL(request);
+ if(!url)return;
  event.respondWith((async()=>{
   const cache=await caches.open(CACHE_NAME);
-  if(request.mode==='navigate'){
-   try{const response=await fetch(request);if(response.ok)await cache.put(new URL('./index.html',self.registration.scope),response.clone());return response;}
-   catch{return await cache.match(new URL('./index.html',self.registration.scope))||Response.error();}
-  }
-  // Network-first for source files prevents cached modules from different
-  // versions from being combined into an invisible or frozen WebGL scene.
-  // The app-shell cache remains the offline fallback.
-  try{const response=await fetch(request);if(response.ok){await cache.put(request,response.clone());return response;}
-      return await cache.match(request,{ignoreSearch:true})||response;}
-  catch{return await cache.match(request,{ignoreSearch:true})||Response.error();}
+  const response=await cache.match(url);
+  if(response)return response;
+  // The worker only becomes active after every listed asset was cached.
+  // Unexpected navigation can still fall through safely when online.
+  try{return await fetch(request)}catch{return request.mode==='navigate'?(await cache.match(ENTRY)||Response.error()):Response.error()}
  })());
 });

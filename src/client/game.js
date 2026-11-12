@@ -165,7 +165,8 @@ class Game{
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
   this.target=raycast(this.world,origin,ray,7.5,{hitWater:miningMode,hitDecor:miningMode});
   if(input.use&&this.target&&(this.target.id===B.DOOR||this.target.id===B.DOOR_TOP)){
-   if(this.world.toggleDoor(this.target.x,this.target.y,this.target.z))this.status(this.world.getDoorState(this.target.x,this.target.y,this.target.z).open?'문을 열었어요':'문을 닫았어요');
+   if(this.world.toggleDoor(this.target.x,this.target.y,this.target.z,[p,...this.entities.entities]))this.status(this.world.getDoorState(this.target.x,this.target.y,this.target.z).open?'문을 열었어요':'문을 닫았어요');
+   else this.status('문 앞에 공간이 부족해요');
    this.interactTimer=.18;this.mining.reset();this.showMining(0);return;
   }
   const placing=(this.selected>=0&&input.use);

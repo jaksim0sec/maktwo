@@ -9,5 +9,6 @@ export function registerPWA(){
   if(wasControlled&&!reloaded&&!window.__maktwoReloading){reloaded=true;window.__maktwoReloading=true;window.location.reload()}
  });
  navigator.serviceWorker.register(url.href,{scope:new URL('../../',import.meta.url).pathname,updateViaCache:'none'})
+  .then(registration=>registration.update().catch(error=>console.warn('[MakTwo] SW update check failed:',error)))
   .catch(error=>console.warn('[MakTwo] Offline service worker unavailable:',error));
 }

@@ -9,15 +9,15 @@ test('world-space inventory remains visible as a faint occluded silhouette',()=>
  assert.match(s,/gl\.uniform1f\(this\.u\.opacity,\.32\)/);
  assert.match(s,/gl\.depthFunc\(gl\.LESS\)/);
 });
-test('PWA loads fresh online modules and falls back to cache offline',()=>{
+test('PWA installs one complete versioned asset set and never mixes revisioned source files',()=>{
  const sw=file('sw.js');
- assert.match(sw,/maktwo-shell-v1\.3\.3/);
- const pos=sw.indexOf('  // Network-first for source files');
- assert.ok(pos>=0);
- const network=sw.indexOf('await fetch\(request\)',pos); // literal index check in next assertion
- assert.match(sw.slice(pos),/await fetch\(request\)/);
- assert.match(sw.slice(pos),/cache\.match\(request,\{ignoreSearch:true\}\)/);
- assert.match(file('index.html'),/controllerchange/);
+ assert.match(sw,/maktwo-shell-v1\.3\.4/);
+ assert.match(sw,/cache\.addAll/);
+ assert.match(sw,/cache:'reload'/);
+ assert.match(sw,/await cache\.match\(url\)/);
+ assert.doesNotMatch(sw,/ignoreSearch:true|cache\.put\(request/);
+ assert.match(sw,/CANONICAL_ASSETS/);
+ assert.match(file('src/client/pwa.js'),/registration\.update\(\)/);
 });
 test('render frame failures show a visible diagnostic instead of silently freezing',()=>{
  const game=file('src/client/game.js');

@@ -1,4 +1,4 @@
-> v1.3.3: Fixed inventory card clicking using the current pointer pixel, separated touch look gestures from hologram hover, adjusted player height to fit through the existing door, included light sources throughout the local light volume, and reduced naturally spawned sheep to six with wider spacing. No save or voxel-grid changes.
+> v1.3.4: Fixed inventory card clicking using the current pointer pixel, separated touch look gestures from hologram hover, adjusted player height to fit through the existing door, included light sources throughout the local light volume, and reduced naturally spawned sheep to six with wider spacing. No save or voxel-grid changes.
 
 > v1.3.2: Mobile inventory keeps left-zone movement and right-zone camera input, selecting a card only on a right-zone tap release. Narrow mobile quickbars scroll without pushing the tool button offscreen.
 
@@ -10,7 +10,7 @@
 
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
-# MakTwo · Endless Night v1.3.3
+# MakTwo · Endless Night v1.3.4
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 

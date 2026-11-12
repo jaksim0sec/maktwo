@@ -90,7 +90,7 @@ test('offline worker activates and serves cached navigation, modules, and icons 
  const listeners={},data=new Map(),scope='https://example.test/maktwo/';
  const normalized=u=>typeof u==='string'?u:u.href||u.url;
  const cache={
-  async addAll(urls){for(const u of urls)data.set(normalized(u),new Response(`fixture:${u}`,{status:200}));},
+  async addAll(urls){for(const u of urls)data.set(normalized(u),new Response(`fixture:${normalized(u)}`,{status:200}));},
   async match(request,{ignoreSearch=false}={}){
    const url=normalized(request);
    if(!ignoreSearch)return data.get(url);
@@ -104,7 +104,7 @@ test('offline worker activates and serves cached navigation, modules, and icons 
   async delete(name){return keys.delete(name)}
  };
  const self={registration:{scope},location:{origin:'https://example.test'},clients:{claim:async()=>{}},skipWaiting:async()=>{},addEventListener:(name,listener)=>listeners[name]=listener};
- runInNewContext(source('sw.js'),{self,caches:cachesMock,URL,Response,fetch:async()=>{throw Error('Network offline')}});
+ runInNewContext(source('sw.js'),{self,caches:cachesMock,URL,Response,Request,fetch:async()=>{throw Error('Network offline')}});
  const run=(name,event)=>new Promise((resolve,reject)=>{
   listeners[name]({...event,waitUntil:p=>p.then(resolve,reject),respondWith:p=>p.then(resolve,reject)});
  });
@@ -112,7 +112,7 @@ test('offline worker activates and serves cached navigation, modules, and icons 
  await run('activate',{});
  const navigation=await run('fetch',{request:{url:scope,method:'GET',mode:'navigate'}});
  assert.equal(navigation.status,200);
- assert.match(await navigation.text(),/index\.html/);
+ assert.match(await navigation.text(),/example\.test\/maktwo\//);
  const module=await run('fetch',{request:{url:scope+'src/client/game.js?v=1.2.0',method:'GET',mode:'cors'}});
  assert.equal(module.status,200);
  assert.match(await module.text(),/src\/client\/game\.js/);

@@ -1,6 +1,6 @@
 import {block,BLOCK as B} from './blocks.js?v=1.1.0';import {clamp} from '../util/math.js';
 import {toVoxels} from './scale.js';
-import {doorBounds,isDoor,DOOR_HEIGHT} from './door.js';
+import {doorBounds,doorIntersectsBody,isDoor,DOOR_HEIGHT} from './door.js';
 export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
@@ -14,8 +14,8 @@ export function collides(world,x,y,z,width=.6,height=1.8){const e=1e-5;
  for(let bx=Math.floor(x-width/2+e);bx<=Math.floor(x+width/2-e);bx++)for(let by=Math.floor(y+e);by<=Math.floor(y+height-e);by++)for(let bz=Math.floor(z-width/2+e);bz<=Math.floor(z+width/2-e);bz++){
   const id=world.get(bx,by,bz);if(!block(id).solid)continue;
   if(isDoor(id)){
-   const state=world.getDoorState?.(bx,by,bz)||{facing:0,open:false};const door=doorBounds(bx,bz,state.facing,state.open);
-   if(x+width/2-e<=door.x||x-width/2+e>=door.x+door.w||z+width/2-e<=door.z||z-width/2+e>=door.z+door.d)continue;
+   const baseY=id===B.DOOR_TOP?by-1:by;
+   if(!doorIntersectsBody(bx,baseY,bz,world.getDoorState?.(bx,by,bz),{x,y,z,width,height},e))continue;
   }
   return true;
  }
@@ -27,7 +27,12 @@ export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clam
  for(let n=0;n<sub;n++){
   for(const [axis,vel] of [['x','vx'],['z','vz']]){const old=e[axis];e[axis]+=e[vel]*step;if(collides(world,e.x,e.y,e.z,w,h)){// Step up a low obstacle when walking.
    if(!e.fly&&wasGrounded&&e.vy<=1&&climbStep(world,e,w,h))continue;e[axis]=old;e[vel]=0}}
-  e.y+=e.vy*step;if(collides(world,e.x,e.y,e.z,w,h)){if(e.vy<0){e.grounded=true;e.y=Math.floor(e.y)+1+1e-3;while(collides(world,e.x,e.y,e.z,w,h))e.y+=1}else{e.y=Math.floor(e.y+h)-h-1e-3;while(collides(world,e.x,e.y,e.z,w,h))e.y-=.05}e.vy=0}
+  const oldY=e.y;e.y+=e.vy*step;
+  if(collides(world,e.x,e.y,e.z,w,h)){
+   // Revert the *swept* vertical movement. Never search upward with a while-loop:
+   // a door closing nearby could otherwise launch the character multiple metres.
+   if(e.vy<=0)e.grounded=true;e.y=oldY;e.vy=0;
+  }
  }
  if(!e.fly&&!e.grounded&&!collides(world,e.x,e.y-.06,e.z,w,h)){}else if(!e.fly&&e.vy===0)e.grounded=true;
  if(e.y<-10){e.x=0;e.y=45;e.z=0;e.vy=0}
