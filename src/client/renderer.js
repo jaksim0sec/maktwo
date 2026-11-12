@@ -18,10 +18,10 @@ void main(){
   if(i>=uLightCount)break;
   vec3 delta=vPos-uLightPos[i].xyz;
   float r2=dot(delta,delta)/(uLightPos[i].w*uLightPos[i].w);
-  // Wider penumbra with a soft zero-slope edge instead of a bright hotspot.
+  // Warm local illumination: restrained inner glow and a softly fading edge.
   // Squared distance avoids a per-light sqrt in this fragment shader.
   float falloff=max(0.,1.-r2);
-  float strength=falloff*falloff*(2.-falloff);
+  float strength=falloff*falloff*(1.5-.5*falloff);
   float flicker=1.+.012*sin(uTime*3.7+float(i)*4.2);
   light+=uLightColor[i]*strength*flicker;
  }
