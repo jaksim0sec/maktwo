@@ -60,7 +60,7 @@ test('landscape installed PWA and readable portrait fallback, with atomic offlin
  assert.equal(manifest.orientation,'landscape-primary');assert.match(css,/@media\(pointer:coarse\) and \(orientation:portrait\)/);
  assert.match(read('index.html'),/id="rotate-screen"/);assert.match(pwa,/screen\.orientation\.lock\('landscape'\)/);
  for(const name of ['src/core/inventory.js','src/client/item-icons.js'])assert.ok(sw.includes(name),name);
- assert.match(sw,/maktwo-shell-v1\.10\.0/);
+ assert.match(sw,/maktwo-shell-v\d+\.\d+\.\d+/);
 });
 test('scene stays unobstructed and warm light shader is restrained',()=>{
  const css=read('style.css'),shader=read('src/client/renderer.js');

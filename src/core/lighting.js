@@ -17,6 +17,7 @@ export class LightIndex {
    this.sources.set(posKey,{x:x+.5,y:y+light.offsetY,z:z+.5,id,...light});
   }
   this.byChunk.set(chunkKey,entries);
+  for(const [idx,mount] of chunk.mounts||[])this.updateMount(chunk.cx,chunk.cz,idx,mount);
  }
  update(x,y,z,id){
   const chunkKey=key(Math.floor(x/SIZE),Math.floor(z/SIZE));
@@ -25,6 +26,17 @@ export class LightIndex {
   const posKey=positionKey(x,y,z);entries.delete(posKey);this.sources.delete(posKey);
   const light=block(id).light;
   if(light){entries.add(posKey);this.sources.set(posKey,{x:x+.5,y:y+light.offsetY,z:z+.5,id,...light})}
+ }
+ updateMount(cx,cz,idx,mount){
+  const k=key(cx,cz),posKey=`mount:${k}:${idx}`;
+  const entries=this.byChunk.get(k);
+  if(!entries)return;
+  entries.delete(posKey);this.sources.delete(posKey);
+  const light=mount&&block(mount.id).light;
+  if(light){
+   entries.add(posKey);
+   this.sources.set(posKey,{...light,id:mount.id,x:mount.x+mount.nx*.15,y:mount.y+.15,z:mount.z+mount.nz*.15});
+  }
  }
  unloadChunk(chunkKey){
   const entries=this.byChunk.get(chunkKey);

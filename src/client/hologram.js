@@ -33,18 +33,16 @@ const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
-function cardGeometry(palette,items,compact=false){
- const cards=[
-  {id:'tab:blocks',name:'건축',x:-1.02,y:.67,w:.41,h:.25,depth:-.02},
-  {id:'tab:lights',name:'조명',x:-.56,y:.67,w:.41,h:.25,depth:-.035},
-  {id:'tab:garden',name:'정원',x:-.11,y:.67,w:.37,h:.25,depth:-.035},
-  {id:'tab:craft',name:'제작',x:.32,y:.67,w:.37,h:.25,depth:-.035},
-  {id:'hand',name:'맨손',x:.75,y:.67,w:.41,h:.25,depth:-.035},
-  {id:'close',name:'닫기',x:1.18,y:.67,w:.41,h:.25,depth:-.02},
+function cardGeometry(palette,items,compact=false,page=null){
+ const headers=[
+  ['tab:blocks','건축재'],['tab:items','배치품'],['tab:craft','제작'],['hand','맨손'],['close','닫기'],
  ];
- if(compact){
-  cards.forEach((card,i)=>{card.x=[-.62,-.36,-.10,.16,.42,.68][i];card.w=.25;card.y=.54});
- }
+ if(page?.total>1)headers.splice(3,0,['page:prev','‹'],['page:next',`${page.index+1}/${page.total} ›`]);
+ const spacing=compact?.22:.35;
+ const cards=headers.map(([id,name],i)=>({
+  id,name,x:(i-(headers.length-1)/2)*spacing,y:compact?.54:.67,
+  w:spacing-.025,h:.25,depth:-.035,
+ }));
  for(let i=0;i<items.length;i++){
   const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
   const x=compact?(col-1)*.40:(col-2)*.52,y=(compact?.06:.15)-row*(compact?.49:.53);
@@ -126,7 +124,7 @@ export class Hologram{
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null}
- setInventory(palette,items,selected,station='hand'){this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
+ setInventory(palette,items,selected,station='hand',page=null){this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact,page);this.dirty=true;this.buildGeometry()}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
    const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;
@@ -162,12 +160,12 @@ export class Hologram{
      if(cells[c])drawItemIcon(ctx,cells[c],xx+2,yy+2,23);
     }
    }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
-   ctx.textAlign='center';ctx.font=font(34,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+166,177);ctx.font=font(22);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
+   ctx.textAlign='center';ctx.font=font(34,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+166,177);ctx.font=font(22);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):(card.count===Infinity?'무제한':`보유 ${card.count||0}`),x+w/2,y+184);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
-  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.selected<0?2:this.selected+6);
+  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.cards.findIndex(card=>card.id===(this.selected<0?'hand':`item:${this.selected}`)));
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
   // Spatial head-attached UI is not world geometry: keep full 3D perspective

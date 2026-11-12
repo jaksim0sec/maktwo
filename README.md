@@ -4,7 +4,7 @@ The `EternalNightR3` preset generates original floor plans using five spatial ty
 
 ## v1.12 · Architectural ruins / clear-sky altitude
 
-- Default world `EternalNightR2` uses modular, navigable interior floors with genuine concrete stairs, partial-depth walls, window frames and multiple room connections.
+- Default world `EternalNightR3` uses modular, navigable interior floors with genuine concrete stairs, partial-depth walls, window frames and multiple room connections.
 - Old `EternalNight` remains selectable and unchanged. New geometry blocks append IDs 77–82 without renumbering prior saves.
 - The cloudless sky shader now transitions from permanently dark at low altitude to eerily bright, clear blue between Y=210 and Y=470. Current 64-high terrain means high-altitude access is a separate future milestone.
 

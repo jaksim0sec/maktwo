@@ -4,6 +4,8 @@ import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab} from '../core/shapes.js';
+import {FORMED} from '../core/construction.js';
+import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -28,9 +30,9 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 // Six directional masks; every rectangular run of the same block becomes ONE quad.
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
 export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}={}){
- const adjacent=new Map(neighbors.map(([dx,dz,data])=>[`${dx},${dz}`,data]));
+ const adjacent=new Map(neighbors.map(([dx,dz,data,forms])=>[`${dx},${dz}`,{data,forms}]));
  const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
- const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
+ const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,forms=chunk.forms;
  for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
   const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
@@ -43,20 +45,23 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     const y=n===1?layer:k;
     const z=n===2?layer:j;
     const idx=(y*SIZE+z)*SIZE+x,id=data[idx];
-    if(id===B.AIR||CROSS[id]){mask[i]=0;continue}
-    let other;
+    if(id===B.AIR||CROSS[id]||forms?.[idx]){mask[i]=0;continue}
+    let neighborIdx,other,otherForm;
     if(n===0){
      const next=x+sign;
-     other=next>=0&&next<SIZE?data[idx+sign]:edgeData?edgeData[(y*SIZE+z)*SIZE+(sign===1?0:SIZE-1)]:B.AIR;
+     if(next>=0&&next<SIZE){neighborIdx=idx+sign;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
+     else{neighborIdx=(y*SIZE+z)*SIZE+(sign===1?0:SIZE-1);other=edgeData?.data[neighborIdx];otherForm=edgeData?.forms?.[neighborIdx]}
     }else if(n===1){
      const next=y+sign;
-     other=next<0?B.BEDROCK:next>=HEIGHT?B.AIR:data[idx+sign*SIZE*SIZE];
+     if(next<0)other=B.BEDROCK;
+     else if(next<HEIGHT){neighborIdx=idx+sign*SIZE*SIZE;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
     }else{
      const next=z+sign;
-     other=next>=0&&next<SIZE?data[idx+sign*SIZE]:edgeData?edgeData[(y*SIZE+(sign===1?0:SIZE-1))*SIZE+x]:B.AIR;
+     if(next>=0&&next<SIZE){neighborIdx=idx+sign*SIZE;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
+     else{neighborIdx=(y*SIZE+(sign===1?0:SIZE-1))*SIZE+x;other=edgeData?.data[neighborIdx];otherForm=edgeData?.forms?.[neighborIdx]}
     }
     const transparent=TRANSPARENT[id];
-    mask[i]=OPAQUE[other]||(id===other&&(transparent||CUTOUT[id]))||(!transparent&&other===B.GLASS)
+    mask[i]=(!otherForm&&OPAQUE[other])||(id===other&&(transparent||CUTOUT[id]))||(!transparent&&other===B.GLASS)
       ?0:id|(id===B.WATER&&n!==1?y<<8:0);
    }
    for(let j=0;j<nv;j++)for(let k=0;k<nu;){
@@ -82,7 +87,26 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.CONCRETE_SLAB,B.CONCRETE_STAIRS,B.THIN_WALL_NS,B.THIN_WALL_EW,B.WINDOW_NS,B.WINDOW_EW,B.UPPER_STAIR_TREAD,B.FLOOR_FINISH,B.CEILING_FINISH].includes(id))continue;
+  const idx=(y*SIZE+z)*SIZE+x,id=chunk.data[idx],form=FORMED[forms?.[idx]];
+  if(form){
+   for(const face of form.faces){
+    if(face.side>=0){
+     const [dx,dy,dz]=FACES[face.side].d;
+     const nx=x+dx,ny=y+dy,nz=z+dz;
+     const edge=nx<0||nx>=SIZE||nz<0||nz>=SIZE;
+     const neighbor=edge?adjacent.get(`${dx},${dz}`):chunk;
+     const i=(ny*SIZE+(nz+SIZE)%SIZE)*SIZE+(nx+SIZE)%SIZE;
+     if(OPAQUE[neighbor?.data[i]]&&!neighbor?.forms?.[i])continue;
+    }
+    const shade=FACES[face.material].shade+4*materialFor(id,face.material);
+    const vertices=face.points.map(([a,b,c])=>[ox+x+a,y+b,oz+z+c]);
+    for(let i=1;i<vertices.length-1;i++){
+     for(const j of [0,i,i+1])opaque.push(...vertices[j],...COLORS[id],shade);
+    }
+   }
+   continue;
+  }
+  if(!CROSS[id]||id===B.DOOR_TOP)continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,stateAt(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,stateAt(wx,y,wz));continue}
@@ -93,6 +117,15 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
   flowerMesh(opaque,wx,y,wz,visualSeed,id);
 
  }
+ for(const mount of chunk.mounts?.values()||[]){
+  for(const [u,v,d,w,h,t,color,lit] of MOUNT_PARTS[mount.id]){
+   const paint=rgb(color);
+   for(const face of FACES){
+    const vertices=face.corners.map(([a,b,c])=>mountPoint(mount,u+a*w,v+b*h,d+c*t));
+    quad(opaque,vertices,paint,lit?-1.5:face.shade);
+   }
+  }
+ }
  return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
 }
 
@@ -101,7 +134,7 @@ export function meshChunk(world,chunk){
  const neighbors=[];
  for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
   const neighbor=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
-  if(neighbor)neighbors.push([dx,dz,neighbor.data]);
+  if(neighbor)neighbors.push([dx,dz,neighbor.data,neighbor.forms]);
  }
  return meshChunkData(chunk,{neighbors,states:world.blockStates,visualSeed:world.seed});
 }

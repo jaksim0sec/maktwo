@@ -2,7 +2,7 @@ import {fbm,clamp} from '../util/math.js';
 // A single multi-scale terrain profile: basins, erosion-like ravines and alpine ridges
 // share one continuous heightfield. Deterministic across chunk boundaries.
 const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};
-export function integratedTerrain(x,z,seed,version=2){
+export function integratedTerrain(x,z,seed){
  const warpX=fbm(x*.0031,z*.0031,seed+101,3)*68;
  const warpZ=fbm(x*.0031,z*.0031,seed+209,3)*68;
  const xx=x+warpX,zz=z+warpZ;
@@ -22,14 +22,12 @@ export function integratedTerrain(x,z,seed,version=2){
  const moisture=fbm(x*.006,z*.006,seed+728,3),temperature=fbm(x*.003,z*.003,seed+813,3);
  let biome=height>43?'mountains':height<=18&&moisture>.08?'marsh':moisture>.16?'forest':temperature>.12&&moisture<-.12?'desert':'plains';
  if(mountain>.65&&height>35)biome='mountains';
- if(version>=3){
-  if(height>=50||height>=39&&temperature<-.20)biome='alpine';
-  else if(height>=40&&temperature>.22&&moisture<-.10)biome='volcanic';
-  else if(canyon>.60&&temperature>.05&&moisture<.03)biome='badlands';
-  else if(height<=24&&moisture>.14)biome='wetlands';
-  else if(moisture>.08&&temperature<-.04)biome='boreal';
-  else if(moisture>.11&&temperature>.08&&height>=24)biome='meadow';
-  else if(height>=32&&moisture<.06&&temperature<.13)biome='limestone';
- }
+ if(height>=50||height>=39&&temperature<-.20)biome='alpine';
+ else if(height>=40&&temperature>.22&&moisture<-.10)biome='volcanic';
+ else if(canyon>.60&&temperature>.05&&moisture<.03)biome='badlands';
+ else if(height<=24&&moisture>.14)biome='wetlands';
+ else if(moisture>.08&&temperature<-.04)biome='boreal';
+ else if(moisture>.11&&temperature>.08&&height>=24)biome='meadow';
+ else if(height>=32&&moisture<.06&&temperature<.13)biome='limestone';
  return {height,biome,mountain,canyon,moisture,basin};
 }

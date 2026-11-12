@@ -14,7 +14,7 @@ export function blueprintFor(rx,rz,seed){
  const type=ARCHETYPES[Math.floor(n(1)*ARCHETYPES.length)];
  const width=18+Math.floor(n(2)*6),depth=20+Math.floor(n(3)*5);
  const x=rx*GRID+4,z=rz*GRID+4;
- const ground=integratedTerrain(x+width/2,z+depth/2,seed,5).height;
+ const ground=integratedTerrain(x+width/2,z+depth/2,seed).height;
  const buried=n(4)>.78?2:0,base=Math.max(6,Math.min(40,ground-1-buried));
  const maxFloors=Math.floor((HEIGHT-base-2)/STOREY);
  if(maxFloors<2)return null;

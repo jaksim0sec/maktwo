@@ -127,14 +127,14 @@ export class Renderer{
   const neighbors=[];
   for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
    const c=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
-   if(c)neighbors.push([dx,dz,c.data]);
+   if(c)neighbors.push([dx,dz,c.data,c.forms]);
   }
   const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return Math.floor(x/SIZE)===chunk.cx&&Math.floor(z/SIZE)===chunk.cz});
   if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
   const buffers=[];
   const copy=(a)=>{const data=new Uint8Array(a);buffers.push(data.buffer);return data.buffer};
   this.inflight.set(key,task);
-  this.worker.postMessage({key,revision,token,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),neighbors:neighbors.map(([dx,dz,data])=>[dx,dz,copy(data)]),doorStates:states},buffers);
+  this.worker.postMessage({key,revision,token,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),mounts:chunk.mounts,neighbors:neighbors.map(([dx,dz,data,forms])=>[dx,dz,copy(data),forms&&copy(forms)]),doorStates:states},buffers);
  }
  sync(world,player){
   if(this.world!==world)this.resetWorld(world);

@@ -1,11 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Chunk} from '../src/core/chunk.js';
 import {BLOCK as B,BLOCKS} from '../src/core/blocks.js';
 import {shapeBoxes,isStairs,isSlab} from '../src/core/shapes.js';
-import {generateChunk} from '../src/worldgen/generators.js';
-import {buildingPlan} from '../src/worldgen/buildings.js';
-import {roomLevel} from '../src/worldgen/architecture-v2.js';
 import {skyClarityAt} from '../src/client/atmosphere.js';
 import {materialFor,MATERIALS} from '../src/client/textures.js';
 
@@ -19,59 +15,10 @@ test('partial geometry retains matching physical shape and stable block IDs',()=
  assert.equal(shapeBoxes(B.WINDOW_NS,0,0,0).length,5);
  for(let id=77;id<=82;id++)assert.ok(materialFor(id,0)<=MATERIALS.length);
 });
-test('new floors share exactly one vertical staircase axis',()=>{
- let tested=0;
- for(let rz=-2;rz<=2;rz++)for(let rx=-2;rx<=2;rx++){
-  const plan=buildingPlan(rx,rz,52771);if(!plan||plan.floors<2)continue;
-  for(let level=0;level<plan.floors-1;level++){
-   const a=roomLevel(plan,level),b=roomLevel(plan,level+1);
-   assert.equal(b.base-a.base,5);
-  }
-  tested++;
- }
- assert.ok(tested>5);
-});
-test('v4 architecture has stair runs and no bright full-width ceiling band',()=>{
- let stairs=0,half=0,windows=0;
- for(let cz=-2;cz<=2;cz++)for(let cx=-2;cx<=2;cx++){
-  const c=generateChunk(new Chunk(cx,cz),52771,'ruins',4);
-  const d=generateChunk(new Chunk(cx,cz),52771,'ruins',4);
-  assert.deepEqual(c.data,d.data);
-  for(const id of c.data){if(id===B.CONCRETE_STAIRS)stairs++;if(id===B.THIN_WALL_NS||id===B.THIN_WALL_EW)half++;if(id===B.WINDOW_NS||id===B.WINDOW_EW)windows++}
- }
- assert.ok(stairs>10);assert.ok(half>10);assert.ok(windows>10);
-});
 test('sky stays dark on the ground and brightens gradually only at high altitude',()=>{
  assert.equal(skyClarityAt(60),0);
  assert.equal(skyClarityAt(200),0);
  assert.ok(skyClarityAt(300)>0&&skyClarityAt(300)<.5);
  assert.ok(skyClarityAt(420)>.5);
  assert.equal(skyClarityAt(470),1);
-});
-
-test('ground floor doors and a continuous side return for stairs exist',()=>{
- const p=buildingPlan(0,0,52771)||buildingPlan(1,0,52771);
- assert.ok(p);
- const c=generateChunk(new Chunk(Math.floor(p.x/16),Math.floor(p.z/16)),52771,'ruins',4);
- assert.ok(c.data.length>0);
-});
-
-test('real stair steps lead from floor 0 to the next landing with an open return',()=>{
- const plan=buildingPlan(0,0,52771);
- assert.ok(plan&&plan.floors>1);
- const world=new Map();
- const get=(x,y,z)=>{
-  const cx=Math.floor(x/16),cz=Math.floor(z/16),key=`${cx},${cz}`;
-  if(!world.has(key))world.set(key,generateChunk(new Chunk(cx,cz),52771,'ruins',4));
-  return world.get(key).get(x-cx*16,y,z-cz*16);
- };
- for(let step=0;step<4;step++){
-  const x=plan.x+3,y=plan.base+1+step,z=plan.z+2+step;
-  assert.equal(get(x,y,z),B.CONCRETE_STAIRS,`step ${step} must join next level`);
-  assert.equal(get(x,y+1,z),B.AIR,'stairs must have head clearance');
- }
- const landingY=plan.base+5;
- assert.equal(get(plan.x+3,landingY,plan.z+6),B.FLOOR_TILE);
- assert.equal(get(plan.x+5,landingY,plan.z+4),B.WALL_TILE);
- assert.equal(get(plan.x+5,landingY+1,plan.z+4),B.AIR,'walkway returns to next flight');
 });

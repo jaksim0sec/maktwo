@@ -1,14 +1,63 @@
 import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
-import {SurvivalInventory,RECIPES,harvestDrop} from '../core/inventory.js';
+import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
-import {WORLD_PRESETS,PALETTES,paletteItems,worldLabel} from '../core/catalog.js';
+import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {screenRay,canvasPoint} from './picking.js';
+import {FORMS,supportsForms,formCode} from '../core/construction.js';
+import {isWallItem} from '../core/mounts.js';
+import {solidBlockOverlap,isSlab,isStairs} from '../core/shapes.js';
 const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);for(const preset of WORLD_PRESETS)this.manager.add(preset.name,preset.seed,preset.mode,preset.version||1);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.inventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get('EternalNightR3')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.rotation=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
+ bindWorld(){
+  this.stopMountEvents?.();
+  this.stopMountEvents=this.world.events.on('mount-detach',mount=>{
+   if(!this.player.creative)this.entities.spawnDrop(mount.id,mount.x,mount.y,mount.z);
+  });
+ }
+ toggleCreative(){
+  const p=this.player;
+  this.survivalInventory.save();
+  p.creative=!p.creative;
+  if(!p.creative){p.fly=false;p.vy=0;}
+  this.selected=-1;this.inventoryPage=0;
+  this.renderHotbar();this.updateModeControls();
+ }
+ toggleFlight(){
+  if(!this.player.creative)return;
+  this.player.fly=!this.player.fly;this.player.vy=0;
+  this.updateModeControls();
+ }
+ updateModeControls(){
+  const p=this.player,mode=$('mode'),flight=$('flight-toggle');
+  mode.textContent=p.creative?'모드 · 크리에이티브':'모드 · 서바이벌';
+  mode.setAttribute('aria-pressed',String(p.creative));
+  if(flight){
+   flight.hidden=!p.creative;
+   flight.textContent=p.fly?'비행 끄기 · F':'비행 켜기 · F';
+   flight.setAttribute('aria-pressed',String(p.fly));
+  }
+ }
+ updateFormControls(){
+  const id=this.paletteItems[this.selected],shape=$('build-form'),rotate=$('build-rotate');
+  if(!shape||!rotate)return;
+  shape.hidden=!supportsForms(id);
+  shape.textContent=FORMS[this.form]+' · R';
+  rotate.hidden=shape.hidden||this.form<3;
+  rotate.textContent=`${this.rotation*90}° · T`;
+ }
+ changeForm(){
+  if(!supportsForms(this.paletteItems[this.selected]))return;
+  this.form=(this.form+1)%FORMS.length;this.updateFormControls();
+ }
+ rotateForm(){
+  if(!supportsForms(this.paletteItems[this.selected])||this.form<3)return;
+  this.rotation=(this.rotation+1)&3;this.updateFormControls();
+ }
  get paletteItems(){return this.inventory.quickSlots}
  renderHotbar(){
   const bar=$('hotbar');bar.replaceChildren();for(let i=0;i<7;i++){
@@ -35,8 +84,8 @@ class Game{
   }
   for(const el of visible){
    const id=Number(el.dataset.block),n=this.inventory.count(id),count=el.querySelector('.slot-count');
-   if(count)count.textContent=n>1?String(n):'';
-   el.title=`${blockLabel(id)} · ${n}개`;
+   if(count)count.textContent=n===Infinity?'∞':n>1?String(n):'';
+   el.title=`${blockLabel(id)} · ${n===Infinity?'무제한':n+'개'}`;
   }
   if(this.panel==='inventory')this.updateHologram();
  }
@@ -44,7 +93,7 @@ class Game{
  // Inventory lives in the actual WebGL scene, not a DOM/modal overlay.
  get uiOpen(){return Boolean(this.panel)}
  setPanel(name){
-  const prior=this.panel;this.panel=name||null;if(this.panel!=='inventory'){this.inventoryPalette=null;this.station=null;}this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
+  const prior=this.panel;this.panel=name||null;if(this.panel!=='inventory'){this.inventoryPalette=null;this.inventoryPage=0;this.station=null;}this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
   $('toolbar')?.classList.toggle('hidden',!this.menuOpen);
   $('help')?.classList.toggle('hidden',!this.helpOpen);
   $('menu-btn')?.setAttribute('aria-expanded',String(this.menuOpen));
@@ -68,33 +117,37 @@ class Game{
  }
  togglePanel(name){if(this.panel===name)this.requestGameFocus();else this.setPanel(name)}
  toggleMenu(){this.togglePanel('settings')}
- openCraft(){if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.updateHologram()}
+ openCraft(){if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.inventoryPage=0;this.updateHologram()}
  togglePalette(){this.openCraft()}
- // The available inventory and recipe book are derived from acquired resources,
- // not from a global creative-mode item catalogue.
  activeStation(){
+  if(this.player.creative)return 'bench';
   const s=this.station,p=this.player;if(!s||s.world!==this.world||this.world.get(s.x,s.y,s.z,false)!==B.WORKBENCH)return 'hand';
   return Math.hypot(p.x-(s.x+.5),p.y-(s.y+.5),p.z-(s.z+.5))<=5?'bench':'hand';
  }
  updateHologram(){
-  const category=this.inventoryPalette||'blocks';
-  if(category==='craft'){
-   const station=this.activeStation();this.visibleRecipes=this.inventory.knownRecipes(station);
-   const items=this.visibleRecipes.map(recipe=>({...block(recipe.id),name:recipe.label,count:this.inventory.count(recipe.id),craftable:this.inventory.canCraft(recipe,station),recipe}));
-   this.hologram.setInventory('craft',items,-1,station);
-  }else{
-   this.visibleItems=paletteItems(category).filter(id=>this.inventory.count(id)>0);
-   const items=this.visibleItems.map(id=>({...block(id),name:blockLabel(id),count:this.inventory.count(id)}));
-   this.hologram.setInventory(category,items,-1,this.activeStation());
-  }
+  const category=this.inventoryPalette||'blocks',station=this.activeStation(),craft=category==='craft';
+  const entries=craft?this.inventory.knownRecipes(station):paletteItems(category).filter(id=>this.inventory.count(id)>0);
+  const pageSize=this.hologram.compact?6:10,total=Math.max(1,Math.ceil(entries.length/pageSize));
+  this.inventoryPage=Math.min(total-1,Math.max(0,this.inventoryPage));
+  const start=this.inventoryPage*pageSize,page=entries.slice(start,start+pageSize);
+  if(craft)this.visibleRecipes=page;else this.visibleItems=page;
+  const items=page.map(entry=>{
+   const id=craft?entry.id:entry;
+   return {...block(id),name:craft?entry.label:blockLabel(id),count:this.inventory.count(id),
+    ...(craft?{craftable:this.inventory.canCraft(entry,station),recipe:entry}:{})};
+  });
+  this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total});
  }
  inventoryClick(hit=this.hologram.click()){
   if(!hit)return;
   if(hit==='close'){this.requestGameFocus();return}
   if(hit==='hand'){this.select(-1,{toggle:false});this.requestGameFocus();return}
+  if(hit.startsWith('page:')){
+   this.inventoryPage+=hit==='page:next'?1:-1;this.updateHologram();return;
+  }
   if(hit.startsWith('tab:')){
    const category=hit.slice(4);if(!PALETTES[category])return;
-   this.inventoryPalette=category;this.updateHologram();return;
+   this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
   }
   if(hit.startsWith('item:')){
    const index=Number(hit.slice(5));if(!Number.isInteger(index)||index<0)return;
@@ -102,7 +155,8 @@ class Game{
     const recipe=this.visibleRecipes[index],station=this.activeStation();if(!recipe)return;
     if(recipe.station==='bench'&&station!=='bench'){this.status('이 제작은 작업대 근처에서만 가능해요');return}
     if(this.inventory.craft(recipe,station)){
-     this.inventory.assignQuickSlot(recipe.id);
+     const slot=this.inventory.assignQuickSlot(recipe.id,this.player.creative&&this.paletteItems.every(id=>id!==null)?Math.max(0,this.selected):null);
+     if(this.player.creative&&slot>=0){this.renderHotbar();this.select(slot,{toggle:false});this.requestGameFocus();return}
      this.renderHotbar();this.status(`${recipe.label} 제작 완료`);this.updateHologram();
     }else this.status('제작 재료가 부족해요');
    }else{
@@ -136,13 +190,17 @@ class Game{
   bindClick('resume',()=>this.requestGameFocus());
   bindClick('help-btn',()=>this.togglePanel('help'));
   bindClick('close-help',()=>this.requestGameFocus());
-  bindClick('save',()=>{this.world.save();this.inventory.save();this.status('월드·소지품 저장 완료')});
+  bindClick('save',()=>{this.world.save();this.survivalInventory.save();this.status('월드·소지품 저장 완료')});
   bindClick('water-repair',()=>{
    const count=this.world.drainPlacedWater(this.player.x,this.player.y,this.player.z,24);
    this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
   });
-  bindClick('mode',()=>this.status('서바이벌에서는 비행할 수 없어요'));
-  const selectWorld=$('world');selectWorld.replaceChildren(...WORLD_PRESETS.map(preset=>{const option=document.createElement('option');option.value=preset.name;option.textContent=preset.label;return option}));
+  bindClick('mode',()=>this.toggleCreative());
+  bindClick('flight-toggle',()=>this.toggleFlight());
+  bindClick('build-form',()=>this.changeForm());
+  bindClick('build-rotate',()=>this.rotateForm());
+  this.updateModeControls();
+  const selectWorld=$('world');selectWorld.replaceChildren(...this.worldPresets.map(preset=>{const option=document.createElement('option');option.value=preset.name;option.textContent=preset.label;return option}));
   selectWorld.value=this.world.name;selectWorld.addEventListener('change',e=>this.travel(e.target.value));
   bindClick('spawn',()=>{const t=this.world.spawn();Object.assign(this.player,t,{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('시작 위치로 이동')});
   $('seed').textContent=String(this.world.seed);
@@ -198,23 +256,25 @@ class Game{
    if(e.code.startsWith('Digit')&&i>=1&&i<=7){const index=i-1;if(index<this.paletteItems.length)this.select(index)}
    if(e.code==='KeyL')this.togglePalette();
    if(e.code==='KeyQ'){this.select(-1,{toggle:false});return}
-   // Creative/test-only spawn, flight, explosion shortcuts are disabled in survival.
-   if(e.code==='KeyP'){this.world.save();this.inventory.save()}
+   if(e.code==='KeyF')this.toggleFlight();
+   if(e.code==='KeyR')this.changeForm();
+   if(e.code==='KeyT')this.rotateForm();
+   if(e.code==='KeyP'){this.world.save();this.survivalInventory.save()}
   });
-  window.addEventListener('beforeunload',()=>{this.world.save();this.inventory.save()});
+  window.addEventListener('beforeunload',()=>{this.world.save();this.survivalInventory.save()});
  }
  select(i,{toggle=true}={}){
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
   this.selected=toggle&&this.selected===i?-1:(i>=0&&(this.paletteItems[i]===null||this.inventory.count(this.paletteItems[i])===0)?-1:i);
   this.mining.reset();this.showMining(0);
   document.querySelectorAll('.slot').forEach(el=>{const active=Number(el.dataset.slot)===this.selected;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
-  $('block-name').textContent=this.selected<0?'':`${blockLabel(this.paletteItems[this.selected])} · ${this.inventory.count(this.paletteItems[this.selected])}개`;
-  this.updateControlHint();if(this.panel==='inventory')this.updateHologram();
+  $('block-name').textContent=this.selected<0?'':blockLabel(this.paletteItems[this.selected]);
+  this.updateFormControls();this.updateControlHint();if(this.panel==='inventory')this.updateHologram();
  }
 
  renderHearts(hp){const hearts=$('health');if(!hearts)return;const points=Math.ceil(Math.max(0,hp)/2);if(this.lastHearts===points)return;this.lastHearts=points;hearts.replaceChildren();for(let i=0;i<10;i++){const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');icon.classList.add('health-heart');if(i>=points)icon.classList.add('empty');const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z');icon.append(path);hearts.append(icon)}}
  status(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2100)}
- travel(name){this.manager.active.save();this.inventory.save();this.world=this.manager.travel(name);this.inventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.player.fly=false;this.renderHotbar();this.entities=new EntityManager(this.world);this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('월드 이동: '+worldLabel(name))}
+ travel(name){this.survivalInventory.save();this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('월드 이동: '+worldLabel(name))}
  interaction(dt,input){
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
   this.interactTimer=Math.max(0,this.interactTimer-dt);
@@ -225,7 +285,7 @@ class Game{
   this.target=raycast(this.world,origin,ray,7.5,{hitWater:!miningMode&&this.selected>=0,hitDecor:miningMode});
   if(input.use&&this.target&&this.target.id===B.WORKBENCH){
    this.setPanel('inventory');this.station={world:this.world,x:this.target.x,y:this.target.y,z:this.target.z};
-   this.inventoryPalette='craft';this.updateHologram();this.status('작업대 · 발견한 제작법을 선택하세요');
+   this.inventoryPalette='craft';this.inventoryPage=0;this.updateHologram();this.status('작업대 · 발견한 제작법을 선택하세요');
    this.interactTimer=.2;return;
   }
   if(input.use&&this.target&&(this.target.id===B.DOOR||this.target.id===B.DOOR_TOP)){
@@ -246,7 +306,17 @@ class Game{
    if(this.interactTimer>0||!this.target)return;
    this.placeLatch=true;
    const id=this.paletteItems[this.selected];if(!this.inventory.has(id)){this.status(`${blockLabel(id)}이 부족해요 · 채굴하거나 제작하세요`);this.interactTimer=.25;return}
-   const t=this.target,replaceWater=t.id===B.WATER,x=t.x+(replaceWater?0:t.normal.x),y=t.y+(replaceWater?0:t.normal.y),z=t.z+(replaceWater?0:t.normal.z);
+   const t=this.target;
+   if(t.mounted)return;
+   if(isWallItem(id)&&t.anchor&&Math.abs(t.normal.y)<1e-6&&Math.hypot(t.normal.x,t.normal.z)>.5){
+    if(this.world.placeMount(id,t)){this.inventory.remove(id);this.refreshInventoryUI()}
+    else this.status('이 면에 배치할 공간이 없어요');
+    this.interactTimer=.20;return;
+   }
+   if(id===B.SHOP_SIGN){this.status('간판을 붙일 벽을 선택하세요');this.interactTimer=.20;return}
+   const n=t.normal,replaceWater=t.id===B.WATER;
+   const axis=Math.abs(n.y)>.001?'y':Math.abs(n.x)>=Math.abs(n.z)?'x':'z';
+   const x=t.x+(!replaceWater&&axis==='x'?Math.sign(n.x):0),y=t.y+(!replaceWater&&axis==='y'?Math.sign(n.y):0),z=t.z+(!replaceWater&&axis==='z'?Math.sign(n.z):0);
    const old=this.world.get(x,y,z);
    if(block(old).replaceable){
     if(id===B.DOOR){
@@ -256,10 +326,13 @@ class Game{
       else{this.inventory.remove(id);this.refreshInventoryUI();this.status('나무 문 설치 · 클릭해서 열고 닫기')};
      }else this.status('문은 위로 두 칸의 공간이 필요해요');
     }else{
-     if(this.world.set(x,y,z,id)){
-      if([B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CONCRETE_STAIRS,B.CONCRETE_SLAB,B.CHAIR].includes(id)){const facing=((Math.round(p.yaw/(Math.PI/2))%4)+4)%4;const upper=[B.STONE_SLAB,B.WOOD_SLAB,B.CONCRETE_SLAB].includes(id)&&t.normal.y===-1;this.world.setShapeState(x,y,z,{facing,upper})}
-      if(collides(this.world,p.x,p.y,p.z,p.width,p.height))this.world.set(x,y,z,old);
-      else{this.inventory.remove(id);this.refreshInventoryUI();this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5)}
+     const form=supportsForms(id)?formCode(this.form,this.rotation):0;
+     const facing=(Math.round(p.yaw/(Math.PI/2))+4)&3;
+     const state={facing,upper:isSlab(id)&&n.y===-1};
+     if(!solidBlockOverlap({getShapeState:()=>state},x,y,z,id,p,1e-5,form)&&this.world.set(x,y,z,id,{form})){
+      if(isStairs(id)||isSlab(id))this.world.setShapeState(x,y,z,state);
+      this.inventory.remove(id);this.refreshInventoryUI();
+      this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5);
      }
     }
     this.interactTimer=.20;
@@ -269,20 +342,21 @@ class Game{
   if(!miningMode){this.mining.reset();this.showMining(0);return}
 
   const target=this.target&&this.target.id!==B.BEDROCK&&this.target.id!==B.WATER?this.target:null;
-  const result=this.mining.update(target,true,dt);this.showMining(result.ratio);
+  const result=p.creative&&target?{ratio:1,completed:this.interactTimer===0}:this.mining.update(target,true,dt);this.showMining(result.ratio);
   if(result.completed&&target){
-   if(this.world.get(target.x,target.y,target.z)===target.id){
-    const mined=target.id===B.DOOR||target.id===B.DOOR_TOP?
-     this.world.removeDoor(target.x,target.y,target.z):this.world.set(target.x,target.y,target.z,B.AIR);
+   if(target.mounted||this.world.get(target.x,target.y,target.z)===target.id){
+    const {x,y,z,id}=target;
+    const mined=target.mounted?this.world.removeMount(x,y,z):id===B.DOOR||id===B.DOOR_TOP?
+     this.world.removeDoor(x,y,z):this.world.set(x,y,z,B.AIR);
     if(mined){const item=harvestDrop(target.id);
-     if(item!==null)this.entities.spawnDrop(item,target.x+.5,target.y+.45,target.z+.5);
+     if(!p.creative&&item!==null)this.entities.spawnDrop(item,target.x+.5,target.y+.45,target.z+.5);
      this.effects.burst(target.x+.5,target.y+.5,target.z+.5,block(target.id).color,12)}
    }
    this.interactTimer=.12;this.showMining(0);
   }
  }
 
- tick(dt){this.portalCooldown=Math.max(0,this.portalCooldown-dt);const p=this.player,input=this.input.read();p.update(this.world,dt,input);if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){const names=[...this.manager.worlds.keys()];this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;}this.world.tick();this.entities.tick(dt,p,this.inventory);this.effects.tick(dt);if(this.entities.collected){this.entities.collected=false;this.renderHotbar();this.refreshInventoryUI()}this.interaction(dt,input);if(p.dead){p.hp=20;p.dead=false;Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('시작 지점으로 돌아왔어요')}}
+ tick(dt){this.portalCooldown=Math.max(0,this.portalCooldown-dt);const p=this.player,input=this.input.read();p.update(this.world,dt,input);if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){const names=[...this.manager.worlds.keys()];this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;}this.world.tick();this.entities.tick(dt,p,p.creative?null:this.inventory);this.effects.tick(dt);if(this.entities.collected){this.entities.collected=false;this.renderHotbar();this.refreshInventoryUI()}this.interaction(dt,input);if(p.dead){p.hp=20;p.dead=false;Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('시작 지점으로 돌아왔어요')}}
  frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.panel==='inventory'){this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
  hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';this.renderHearts(p.hp);document.body.classList.toggle('submerged',this.world.get(p.x,p.y+p.eye,p.z,false)===B.WATER);$('flight').textContent=p.fly?'비행 중':'걷는 중'}

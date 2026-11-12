@@ -1,3 +1,4 @@
+import {FORMED,formedOverlap} from './construction.js';
 import {block,BLOCK as B} from './blocks.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 export const isStairs=id=>id===B.STONE_STAIRS||id===B.WOOD_STAIRS||id===B.CONCRETE_STAIRS;
@@ -47,10 +48,12 @@ export function bodyOverlapsBox(body,b,epsilon=1e-5){const r=(body.width||.6)/2,
  &&body.z+r-epsilon>b.z&&body.z-r+epsilon<b.z+b.d
  &&body.y+h-epsilon>b.y&&body.y+epsilon<b.y+b.h;
 }
-export function solidBlockOverlap(world,x,y,z,id,body,epsilon=1e-5){
+export function solidBlockOverlap(world,x,y,z,id,body,epsilon=1e-5,form=world.getForm?.(x,y,z)){
  if(!block(id).solid)return false;
+ if(FORMED[form])return formedOverlap(FORMED[form],x,y,z,body,epsilon);
  if(isDoor(id))return doorIntersectsBody(x,id===B.DOOR_TOP?y-1:y,z,world.getDoorState?.(x,y,z),body,epsilon);
- const boxes=shapeBoxes(id,x,y,z,world.getShapeState?.(x,y,z));if(boxes)return boxes.some(b=>bodyOverlapsBox(body,b,epsilon));
+ const state=isStairs(id)||isSlab(id)?world.getShapeState?.(x,y,z):undefined;
+ const boxes=shapeBoxes(id,x,y,z,state);if(boxes)return boxes.some(b=>bodyOverlapsBox(body,b,epsilon));
  if(id===B.FENCE)return fenceBoxes(x,y,z).some(b=>bodyOverlapsBox(body,b,epsilon));
  return bodyOverlapsBox(body,{x,y,z,w:1,h:1,d:1},epsilon);
 }

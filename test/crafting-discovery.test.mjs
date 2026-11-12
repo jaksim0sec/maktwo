@@ -76,7 +76,7 @@ test('client accesses the bench in range, crafting UI uses real ingredient grid 
  assert.match(game,/this\.inventory\.quickSlots\[i\]/);
  assert.match(hologram,/recipeGrid\(card\.recipe\)/);
  assert.match(sw,/src\/core\/crafting\.js/);
- assert.match(sw,/maktwo-shell-v1\.10\.0/);
+ assert.match(sw,/maktwo-shell-v\d+\.\d+\.\d+/);
 });
 
 test('workbench meshing is identical in the worker and on the main thread',async()=>{

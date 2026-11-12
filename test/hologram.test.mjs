@@ -12,7 +12,7 @@ const aimAt=(anchor,card)=>normalize([
 ]);
 test('spatial bag consists of small separated in-world tiles, no fullscreen slab',()=>{
  const cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`Block ${i}`,color:'#456789'})));
- assert.equal(cards.length,16);
+ assert.equal(cards.length,15);
  assert.ok(cards.every(c=>c.w<.52&&c.h<.48));
  assert.equal(cards.filter(c=>c.id.startsWith('item:')).length,10);
  assert.ok(cards.some(c=>c.id==='hand'));

@@ -12,9 +12,9 @@ test('stairs and slabs keep physical shape and mesh data aligned',()=>{
  const mesh=meshChunk(w,w.getChunk(0,0));assert.ok(mesh.opaque.length>0);
  assert.equal(mesh.opaque.length%21,0);assert.ok(materialFor(B.STONE_STAIRS,0)>0);
 });
-test('integrated terrain preserves saved legacy world generation',()=>{
+test('the same seed uses the current terrain across older and newer version inputs',()=>{
  const legacy=new World({mode:'normal',seed:82417,version:1});
- const modern=new World({mode:'normal',seed:82417,version:2});
- assert.equal(legacy.terrainVersion,1);assert.equal(modern.terrainVersion,2);
- assert.deepEqual(legacy.getChunk(0,0).data,new World({mode:'normal',seed:82417,version:1}).getChunk(0,0).data);
+ const modern=new World({mode:'normal',seed:82417,version:5});
+ assert.equal(legacy.version,modern.version);
+ assert.deepEqual(legacy.getChunk(-1,2).data,modern.getChunk(-1,2).data);
 });

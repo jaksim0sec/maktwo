@@ -1,7 +1,9 @@
 import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.js';
 import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
-import {solidBlockOverlap,fenceBoxes,shapeBoxes} from './shapes.js';
+import {FORMED,hitFormed} from './construction.js';
+import {hitMount} from './mounts.js';
+import {solidBlockOverlap,fenceBoxes,shapeBoxes,isStairs,isSlab} from './shapes.js';
 export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
@@ -30,17 +32,17 @@ function climbStep(world,e,width,height){
  }
  return false;
 }
-export function collides(world,x,y,z,width=.6,height=1.8){const e=1e-5,body={x,y,z,width,height};
+export function collides(world,x,y,z,width=.6,height=1.8){const e=1e-5,body={x,y,z,width,height},cell={form:0};
  for(let bx=Math.floor(x-width/2+e);bx<=Math.floor(x+width/2-e);bx++)
  for(let by=Math.floor(y+e);by<=Math.floor(y+height-e);by++)
  for(let bz=Math.floor(z-width/2+e);bz<=Math.floor(z+width/2-e);bz++){
-  const id=world.get(bx,by,bz);
-  if(solidBlockOverlap(world,bx,by,bz,id,body,e))return true;
+  const id=world.get(bx,by,bz,true,cell);
+  if(solidBlockOverlap(world,bx,by,bz,id,body,e,cell.form))return true;
  }
  return false;
 }
 export function inWater(world,e){return world.get(e.x,e.y+.5,e.z)===B.WATER}
-export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);recoverDoorOverlap(world,e,w,h);const wasGrounded=e.grounded;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?toVoxels(6):GRAVITY)*dt,-35,25);else e.vy=0;
+export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);recoverDoorOverlap(world,e,w,h);const wasGrounded=e.grounded;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?toVoxels(6):GRAVITY)*dt,-35,25);
  const sub=Math.max(1,Math.ceil(Math.hypot(e.vx,e.vy,e.vz)*dt/.18));const step=dt/sub;e.grounded=false;
  for(let n=0;n<sub;n++){
   for(const [axis,vel] of [['x','vx'],['z','vz']]){const old=e[axis];e[axis]+=e[vel]*step;if(collides(world,e.x,e.y,e.z,w,h)){// Step up a low obstacle when walking.
@@ -77,19 +79,39 @@ export function intersectDoor(origin,direction,x,y,z,state){
 }
 // 3D voxel DDA with face normal, also works through chunk boundaries.
 export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hitDecor=false}={}){let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z);const d=direction,step=[Math.sign(d.x),Math.sign(d.y),Math.sign(d.z)],coords=[x,y,z],dir=[d.x,d.y,d.z],pos=[origin.x,origin.y,origin.z];const tDelta=dir.map(v=>v===0?Infinity:Math.abs(1/v));const tMax=dir.map((v,i)=>v===0?Infinity:((step[i]>0?coords[i]+1-pos[i]:pos[i]-coords[i])/Math.abs(v)));let normal={x:0,y:0,z:0},t=0;
- for(let n=0;n<256&&t<=maxDistance;n++){const id=world.get(x,y,z);if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
-  if(isDoor(id)){
-   const baseY=id===B.DOOR_TOP?y-1:y;
-   const door=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
-   if(door&&door.distance>=t-1e-5&&door.distance<=maxDistance)return{x,y,z,id,normal:door.normal,distance:door.distance};
-  }else if(shapeBoxes(id,x,y,z,world.getShapeState?.(x,y,z))){
-   let closest=null;for(const bounds of shapeBoxes(id,x,y,z,world.getShapeState?.(x,y,z))){const hit=intersectAabb(origin,direction,[bounds.x,bounds.y,bounds.z],[bounds.x+bounds.w,bounds.y+bounds.h,bounds.z+bounds.d]);if(hit&&hit.distance>=t-1e-5&&(!closest||hit.distance<closest.distance))closest=hit}
-   if(closest&&closest.distance<=maxDistance)return{x,y,z,id,normal:closest.normal,distance:closest.distance};
-  }else if(id===B.FENCE){
-   let closest=null;for(const bounds of fenceBoxes(x,y,z)){
-    const hit=intersectAabb(origin,direction,[bounds.x,bounds.y,bounds.z],[bounds.x+bounds.w,bounds.y+bounds.h,bounds.z+bounds.d]);
-    if(hit&&(!closest||hit.distance<closest.distance))closest=hit;
+ const cell={form:0,pickMount:true,mount:null};
+ for(let n=0;n<256&&t<=maxDistance;n++){
+  const id=world.get(x,y,z,true,cell);
+  let hit=null;
+  if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
+   if(FORMED[cell.form])hit=hitFormed(FORMED[cell.form],x,y,z,origin,direction);
+   else if(isDoor(id)){
+    const baseY=id===B.DOOR_TOP?y-1:y;
+    hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
+   }else{
+    const state=isStairs(id)||isSlab(id)?world.getShapeState?.(x,y,z):undefined;
+    const boxes=id===B.FENCE?fenceBoxes(x,y,z):shapeBoxes(id,x,y,z,state);
+    if(boxes){
+     for(const {x:bx,y:by,z:bz,w,h,d} of boxes){
+      const next=intersectAabb(origin,direction,[bx,by,bz],[bx+w,by+h,bz+d]);
+      if(next&&next.distance>=t-1e-5&&(!hit||next.distance<hit.distance)){
+       hit=next;
+       if(id===B.THIN_WALL_NS||id===B.THIN_WALL_EW){
+        hit.anchor={x:bx+w*(1+next.normal.x)/2,y:by+h*(1+next.normal.y)/2,z:bz+d*(1+next.normal.z)/2};
+       }
+      }
+     }
+    }else{
+     const anchor=block(id).render==='cube'?{x:x+.5+normal.x*.5,y:y+.5+normal.y*.5,z:z+.5+normal.z*.5}:null;
+     hit={distance:t,normal,anchor};
+    }
    }
-   if(closest&&closest.distance<=maxDistance)return{x,y,z,id,normal:closest.normal,distance:closest.distance};
-  }else return{x,y,z,id,normal,distance:t};
- }let a=0;if(tMax[1]<tMax[a])a=1;if(tMax[2]<tMax[a])a=2;t=tMax[a];if(t>maxDistance)break;tMax[a]+=tDelta[a];coords[a]+=step[a];[x,y,z]=coords;normal={x:0,y:0,z:0};normal[['x','y','z'][a]]=-step[a]}return null}
+  }
+  if(cell.mount){
+   const mounted=hitMount(cell.mount,origin,direction,intersectAabb);
+   if(mounted&&mounted.distance>=t-1e-5&&mounted.distance<=maxDistance&&(!hit||mounted.distance<hit.distance)){
+    return {x,y,z,id:cell.mount.id,distance:mounted.distance,mounted:true};
+   }
+  }
+  if(hit&&hit.distance>=t-1e-5&&hit.distance<=maxDistance)return{x,y,z,id,...hit};
+ let a=0;if(tMax[1]<tMax[a])a=1;if(tMax[2]<tMax[a])a=2;t=tMax[a];if(t>maxDistance)break;tMax[a]+=tDelta[a];coords[a]+=step[a];[x,y,z]=coords;normal={x:0,y:0,z:0};normal[['x','y','z'][a]]=-step[a]}return null}

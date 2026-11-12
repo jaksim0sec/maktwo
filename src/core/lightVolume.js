@@ -67,9 +67,9 @@ export function makeOccluderSnapshot(world,origin,width=LIGHT_WIDTH,height=LIGHT
   const cx=chunk.cx*16,cz=chunk.cz*16;
   if(cx+16<=ox||cx>=ox+width||cz+16<=oz||cz>=oz+depth)continue;
   for(let z=Math.max(0,oz-cz);z<Math.min(16,oz+depth-cz);z++)for(let y=Math.max(0,oy);y<Math.min(64,oy+height);y++)for(let x=Math.max(0,ox-cx);x<Math.min(16,ox+width-cx);x++){
-   const id=chunk.data[(y*16+z)*16+x];
+   const idx=(y*16+z)*16+x,id=chunk.data[idx];
    // Avoid importing the block registry into the Worker payload.
-   if(world.isLightBlocking(id,cx+x,y,cz+z))data[(((cz+z-oz)*height)+(y-oy))*width+(cx+x-ox)]=1;
+   if(world.isLightBlocking(id,cx+x,y,cz+z,chunk.forms?.[idx]||0))data[(((cz+z-oz)*height)+(y-oy))*width+(cx+x-ox)]=1;
   }
  }
  return data;

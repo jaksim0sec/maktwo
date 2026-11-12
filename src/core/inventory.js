@@ -66,3 +66,26 @@ export class SurvivalInventory{
  }
 }
 
+
+export class CreativeInventory {
+ constructor(items){
+  this.items=new Set(items);
+  this.quickSlots=[B.CONCRETE,B.PLANKS,B.TORCH,B.SHOP_SIGN,B.GLASS,null,null];
+ }
+ count(id){return this.items.has(id)?Infinity:0}
+ has(id){return this.items.has(id)}
+ knownRecipes(){return RECIPES}
+ canCraft(recipe){return RECIPES.includes(recipe)}
+ craft(recipe){return this.canCraft(recipe)}
+ remove(id){return this.has(id)}
+ save(){}
+ assignQuickSlot(id,index=null){
+  if(!this.has(id))return -1;
+  const existing=this.quickSlots.indexOf(id);
+  if(existing>=0)return existing;
+  const slot=index??this.quickSlots.indexOf(null);
+  if(slot<0||slot>=HOTBAR_SIZE)return -1;
+  this.quickSlots[slot]=id;
+  return slot;
+ }
+}

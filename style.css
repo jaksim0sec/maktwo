@@ -41,3 +41,8 @@ body.submerged #underwater-filter{opacity:1;backdrop-filter:blur(1.15px);-webkit
 
 /* A depleted quick-slot must vanish without leaving a reserved gutter. */
 #hotbar:empty{display:none}
+
+#shape-controls{display:flex;gap:5px}
+#shape-controls button{padding:4px 9px;background:#181c20cf;border:1px solid #ffffff28;border-radius:7px;font-size:11px;color:#f3eadb}
+#shape-controls:has(button:not([hidden])){padding-bottom:3px}
+#flight-toggle[hidden],#shape-controls button[hidden]{display:none}
