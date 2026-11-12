@@ -17,7 +17,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -79,12 +79,12 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
-  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
+ if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
-  if(id===B.FENCE){gardenMesh(opaque,id,wx,y,wz);continue}
+  if(id===B.FENCE||id===B.WORKBENCH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
   const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
   const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
@@ -132,6 +132,20 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
 
 export function gardenMesh(dest,id,x,y,z){
  const box=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
+ if(id===B.WORKBENCH){
+  // One reusable furniture model, separate from the chunk's greedy cube path.
+  const part=(dx,dy,dz,w,h,d,color,mat=0)=>{
+   const rgbColor=rgb(color);for(let fi=0;fi<FACES.length;fi++){
+    const face=FACES[fi],verts=face.corners.map(([a,b,c])=>[x+dx+a*w,y+dy+b*h,z+dz+c*d]);
+    quad(dest,verts,rgbColor,face.shade+4*mat);
+   }
+  };
+  part(.045,.77,.045,.91,.22,.91,'#b29472',14);
+  part(.07,.71,.07,.86,.07,.86,'#614d3a');
+  for(const dx of [.11,.72])for(const dz of [.11,.72])part(dx,0,dz,.17,.76,.17,'#8d6b4b',10);
+  for(let zRow=0;zRow<3;zRow++)part(.18,.990,.20+zRow*.24,.63,.005,.012,'#735944');
+  return;
+ }
  if(id===B.PATH){
   const color=rgb('#8b897d'),layer=materialFor(B.STONE,2);
   for(const f of FACES){const vertices=f.corners.map(([a,b,c])=>[x+.06+a*.88,y+.013+b*.035,z+.06+c*.88]);quad(dest,vertices,color,f.shade+4*layer)}

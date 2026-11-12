@@ -1,5 +1,6 @@
 import {BLOCK_SIZE} from '../core/scale.js';
 import {drawItemIcon} from './item-icons.js';
+import {recipeGrid} from '../core/crafting.js';
 // A collection of small, world-anchored surfaces, not a screen-space modal.
 // The scene's depth buffer occludes each tile just like any other world object.
 const VS=`#version 300 es
@@ -47,7 +48,7 @@ function cardGeometry(palette,items,compact=false){
  for(let i=0;i<items.length;i++){
   const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
   const x=compact?(col-1)*.40:(col-2)*.52,y=(compact?.06:.15)-row*(compact?.49:.53);
-  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,blockId:items[i].id,count:items[i].count,craftable:items[i].craftable,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
+  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,blockId:items[i].id,count:items[i].count,craftable:items[i].craftable,recipe:items[i].recipe,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
  }
  return cards;
 }
@@ -120,7 +121,7 @@ export class Hologram{
  followPlayer(player){if(this.opened&&followAnchor(this.anchor,player))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null}
- setInventory(palette,items,selected){this.palette=palette;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
+ setInventory(palette,items,selected,station='hand'){this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
    const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;
@@ -148,8 +149,15 @@ export class Hologram{
    const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,'rgba(54,60,65,.81)');grad.addColorStop(1,'rgba(29,34,38,.89)');
    rounded(ctx,x+5,y+8,w-10,h-16,22,grad,active?'rgba(235,200,155,.76)':'rgba(235,235,232,.25)');
    if(isHeader){ctx.font=font(29,true);ctx.fillStyle=active?'#f8dfb7':'#e6e7e3';ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9);ctx.textAlign='left';return}
-   drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
-   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
+   if(this.palette==='craft'&&card.recipe){
+    const cells=recipeGrid(card.recipe);const startX=x+w/2-43,startY=y+25,step=29;
+    for(let c=0;c<9;c++){
+     const xx=startX+c%3*step,yy=startY+Math.floor(c/3)*step;
+     ctx.fillStyle='rgba(8,12,14,.36)';ctx.fillRect(xx,yy,27,27);
+     if(cells[c])drawItemIcon(ctx,cells[c],xx+2,yy+2,23);
+    }
+   }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
+   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;

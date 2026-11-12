@@ -7,6 +7,8 @@
 | Layer | Responsibility | Contract |
 | --- | --- | --- |
 | `src/core/blocks.js` | Immutable block IDs, shared block metadata | Append IDs; never reorder old IDs |
+| `src/core/crafting.js` | Shaped recipes and workbench vs pocket size | Immutable ingredients and normalized grids, no renderer dependency |
+| `src/core/inventory.js` | World-scoped item ledger, discovery, seven quick slots | Read v1 saves; store separate versioned inventory, preserve voxel save |
 | `src/core/catalog.js` | Display categories and world choices | Stable world names are save keys |
 | `src/core/shapes.js` | Per-block collision shapes | Collision uses the same geometry family as meshing |
 | `src/core/world.js` | Chunk edits, interactive state, persistence | No direct WebGL dependencies; old worlds unchanged |
@@ -27,7 +29,7 @@ Reference ideas (not dependencies or copied source): FastNoiseLite's domain warp
 
 1. Tests must cover old save indices and seeds, door clearance, player collision, negative chunk boundaries, cross-chunk decorations and worker meshes.
 2. Only the `Highlands` preset uses the new terrain algorithm. Existing saved names/seeds and generation outputs are untouched.
-3. All new garden objects use block IDs 20+, stored as ordinary edited blocks. No save migration is necessary.
+3. New items append stable block IDs (workbench ID 23); never reorder. Crafting discovery, item counts and quickslots use the separate inventory save, not voxel world edits.
 4. Avoid repeating hard-coded names and special cases across DOM, input handlers and the renderer. Register them in the appropriate catalog or mesh/collider module.
 5. Review any change that increases the number of synchronous world reads or vertex uploads on low-power mobile devices.
 6. PWA caches must be complete, versioned snapshots; the world itself stays in localStorage and is never evicted by the service worker.

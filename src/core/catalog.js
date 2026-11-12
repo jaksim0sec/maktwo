@@ -9,7 +9,7 @@ export const WORLD_PRESETS=Object.freeze([
  {name:'Highlands',seed:62031,mode:'highlands',label:'협곡 고원 · 실험'},
 ]);
 export const PALETTES=Object.freeze({
- blocks:{label:'건축',items:HOTBAR},
+ blocks:{label:'건축',items:[B.GRASS,B.DIRT,B.STONE,B.COBBLE,B.SAND,B.WOOD,B.PLANKS,B.GLASS,B.DOOR,B.WORKBENCH]},
  lights:{label:'조명',items:LIGHTBAR},
  garden:{label:'정원',items:[B.PATH,B.FENCE,B.GLOW_MUSHROOM,B.FLOWER,B.LEAVES]},
  craft:{label:'제작',items:RECIPES.map(r=>r.id)},

@@ -20,5 +20,5 @@ test('wood ends show growth rings and planks subtle seams, all within one 32px m
  assert.ok(spread(end)>27);assert.ok(spread(plank)>20);
  assert.ok(endGrain(1,2,TEXTURE_SIZE)!==endGrain(17,18,TEXTURE_SIZE));
  assert.ok(plankGrain(10,0,32)<plankGrain(10,5,32));
- assert.equal(makeTextureLayers().data.byteLength,13*32*32*4);
+ assert.equal(makeTextureLayers().data.byteLength,14*32*32*4);
 });

@@ -48,17 +48,17 @@ test('mobile camera needs around two full width swipes instead of five to turn a
   for(let x=300;x>=60;x-=20){g.move(swipe+1,x,300);const [dx,dy]=g.consumeLook();applyCameraLook(p,dx,dy)}
   g.up(swipe+1,60,300,t+300);t+=350;
  }
- assert.ok(Math.abs(p.yaw)>Math.PI*2,'three swipes should exceed one rotation');
+ assert.ok(Math.abs(p.yaw)>Math.PI*2,`three swipes should exceed one rotation, got ${p.yaw}`);
 });
 test('world anchored inventory faces player but stays upright and its positions do not follow camera',()=>{
  const p={x:0,y:27,z:0,eye:1.59,yaw:0,pitch:-.55};const anchor=createAnchor(p);const center=[...anchor.center];
  p.yaw=1;p.pitch=.7;p.x=.8;
  assert.equal(faceAnchor(anchor,p),true);assert.deepEqual(anchor.center,center);assert.deepEqual(anchor.up,[0,1,0]);
- const tiles=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:'아이템'+i})));
+ const tiles=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`아이템${i}`})));
  assert.ok(tiles.every(c=>c.w<=.5&&c.h<.48));
 });
 test('material layers keep one compact texture array, with varied color per material',()=>{
- const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,13);assert.equal(data.byteLength,13*32*32*4);
+ const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,14);assert.equal(data.byteLength,14*32*32*4);
  const hasColor=(m)=>{const offset=m*size*size*4;for(let i=offset;i<offset+size*size*4;i+=4)if(data[i]!==data[i+1]||data[i+1]!==data[i+2])return true;return false};
  assert.ok([0,1,5,9,12].every(hasColor),'materials should have authored color variation');
 });

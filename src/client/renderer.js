@@ -41,7 +41,7 @@ void main(){
  // Ambient retains the material color; lamp light adds a restrained amber tint.
  // Avoid multiplying grass green to bright chartreuse near multiple torches.
  float warmth=max(emission.r,max(emission.g,emission.b));
- vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.20)+vec3(.47,.195,.060)*warmth*.64;
+ vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.12)+vec3(.50,.135,.035)*warmth*.60;
  c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);

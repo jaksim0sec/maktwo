@@ -66,12 +66,12 @@ test('world anchored holo billboard faces the moving player without moving its c
 });
 test('hotbar labels localized without modifying stable block IDs',()=>{
  assert.equal(blockLabel(B.GRASS),'잔디');assert.equal(blockLabel(B.DOOR),'나무 문');
- assert.equal(HOTBAR.length,10);assert.equal(HOTBAR.at(-1),B.DOOR);
+ assert.equal(HOTBAR.length,7);assert.equal(HOTBAR[3],B.DOOR);
 });
 test('offline service worker includes new ray picker, door and texture modules',()=>{
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
  for(const p of ['src/client/picking.js','src/client/textures.js','src/core/door.js'])assert.ok(sw.includes(p));
- assert.match(sw,/maktwo-shell-v1\.7\.0/);
+ assert.match(sw,/maktwo-shell-v1\.8\.0/);
 });
 
 test('raycast only hits the physical door panel, not its empty cell',()=>{

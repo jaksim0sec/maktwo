@@ -32,7 +32,8 @@ test('crafting requires all ingredients, adds output once, and survives reload',
  assert.equal(inv.craft(makePlanks),false);
  inv.add(B.WOOD,1);assert.equal(inv.craft(makePlanks),true);assert.equal(inv.count(B.WOOD),0);
  const planks=inv.count(B.PLANKS),doors=inv.count(B.DOOR);
- assert.ok(inv.craft(makeDoor));assert.equal(inv.count(B.DOOR),doors+1);assert.equal(inv.count(B.PLANKS),planks-4);
+ assert.equal(inv.craft(makeDoor),false,'door requires a workbench');
+ inv.add(B.PLANKS,2);assert.ok(inv.craft(makeDoor,'bench'));assert.equal(inv.count(B.DOOR),doors+1);assert.equal(inv.count(B.PLANKS),planks+2-6);
  const reloaded=new SurvivalInventory(storage,'World');assert.deepEqual([...reloaded.items],[...inv.items]);
 });
 test('invalid stacks, nonpositive counts and overflows cannot mint resources',()=>{
@@ -59,13 +60,13 @@ test('landscape installed PWA and readable portrait fallback, with atomic offlin
  assert.equal(manifest.orientation,'landscape-primary');assert.match(css,/@media\(pointer:coarse\) and \(orientation:portrait\)/);
  assert.match(read('index.html'),/id="rotate-screen"/);assert.match(pwa,/screen\.orientation\.lock\('landscape'\)/);
  for(const name of ['src/core/inventory.js','src/client/item-icons.js'])assert.ok(sw.includes(name),name);
- assert.match(sw,/maktwo-shell-v1\.7\.0/);
+ assert.match(sw,/maktwo-shell-v1\.8\.0/);
 });
 test('scene stays unobstructed and warm light shader is restrained',()=>{
  const css=read('style.css'),shader=read('src/client/renderer.js');
  assert.match(css,/#hud\{display:none/);
  assert.match(css,/#camera-btn\{display:none/);
  assert.match(css,/#player-status\{position:fixed;z-index:5;bottom/);
- assert.match(shader,/vec3\(\.47,\.195,\.060\)\*warmth\*\.64/);
+ assert.match(shader,/vec3\(\.50,\.135,\.035\)\*warmth\*\.60/);
  assert.doesNotMatch(shader,/emission\*1\.38/);
 });

@@ -21,9 +21,17 @@
 
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
-# MakTwo · Endless Night v1.6.0
+# MakTwo · Endless Night v1.8.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
+
+## v1.8 crafting and progression
+
+- A **seven-slot quickbar** replaces the old ten-item creative list. The player can assign discovered, owned items from the in-world inventory; extra items remain in the inventory instead of vanishing. Quickbar and discovered items are saved per world.
+- Crafting recipes are **unlocked by seeing every ingredient type at least once**. Spending the last ingredient does not relock the recipe. Previously saved v1 inventories migrate when loaded; voxel/door saves stay untouched.
+- The pocket crafting book is 2×2. Four planks craft a placeable **workbench**; interacting with it within range opens a **3×3 shaped recipe book** with ingredient diagrams. The workbench grants access to doors, fences, glass, paths and lanterns. Recipe selection automatically fills and consumes the required grid inputs, with exact item counts and output-stack checks; manual drag-and-drop placement into individual cells is not yet implemented.
+- Existing block IDs 0–22 are unchanged; workbench is appended as ID 23. The workbench uses a small dedicated furniture mesh and one additional 32×32 texture layer.
+- Local torch/lantern/campfire illumination shifts back to subdued orange rather than yellow-green. PWA cache advances atomically to v1.8.0.
 
 ## Run
 
@@ -51,11 +59,11 @@ npm test
 | Phone **tap** | Place at the tapped screen position; tapping a door opens/closes it |
 | Phone **stationary hold either half (420ms+)** | Mine a targeted block until completed; moving to look cancels the hold |
 | Phone Jump / Descend buttons | Jump or fly downward |
-| 1..0 / bottom hotbar / wheel | Select block; tap same slot again or Q to unequip |
+| 1..7 / bottom hotbar / wheel | Select block; tap same slot again or Q to unequip |
 | E / I / Bag | Open an **in-world** holographic bag. Its center stays anchored; its face billboard-rotates toward your character |
-| L | Switch between building blocks and lights |
+| L / Craft button | Open the discovered pocket recipe book |
 | M / Settings icon | Open HTML settings, switch world, save and recover water |
-| F / P | Toggle flight / save the current world |
+| P | Save the current world |
 
 ## Offline & installation
 

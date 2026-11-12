@@ -2,7 +2,7 @@
 // all opaque blocks, retaining the existing seven-float greedy mesh format.
 // Each pixel modulates the block's authored RGB color, not replacing its palette.
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문'];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면'];
 export function materialFor(id,face){
  switch(id){
   case 1:return face===2?1:face===3?3:2;
@@ -16,6 +16,7 @@ export function materialFor(id,face){
   case 10:return 11;
   case 13:return 12;
   case 18:return 13;
+  case 23:return face===2?14:10;
   default:return 0;
  }
 }
@@ -50,7 +51,7 @@ export function plankGrain(x,y,size,n=0){
 }
 // Compact, intentionally pixelated material art. Every surface has its own
 // spatial structure (chips, fibres, mortar, joints), not just random grayscale.
-// 13 x 32 x 32 RGBA8 = 52KiB, unchanged from the original texture allocation.
+// 14 x 32 x 32 RGBA8 ~= 56KiB. Texture array grows by one tiny layer.
 export function makeTextureLayers(size=TEXTURE_SIZE){
  const layers=MATERIALS.length,out=new Uint8Array(size*size*layers*4);
  for(let m=0;m<layers;m++)for(let y=0;y<size;y++)for(let x=0;x<size;x++){
@@ -125,6 +126,13 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
    else f*=.88+.045*Math.sin(px*.72+.2*Math.sin(py*.25));
    if(px>23&&px<27&&py>12&&py<15)f*=1.1;
    r=1;g=.96;b=.88;
+  }else if(m===13){ // Crafting table: a pixelated nine-cell tool-marked tabletop.
+   const cellX=Math.floor(px/10.67),cellY=Math.floor(py/10.67);
+   const groove=px%10.67<1.0||py%10.67<1.0;
+   f=.92+.07*patch+.025*(n-.5);
+   if(groove)f*=.66;
+   if((cellX+cellY)%2===0&&px%10.67>2&&py%10.67>2)f*=1.025;
+   r=1;g=.94;b=.83;
   }
   const a=(m*size*size+y*size+x)*4;
   const shade=Math.min(1.18,Math.max(.53,f));
