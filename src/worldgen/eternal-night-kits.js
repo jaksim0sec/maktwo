@@ -23,3 +23,12 @@ export function cityKits(building,seed,maxLuxury) {
   const main=choices[0].kit;
   return [origin<.33?choices[1].kit:main,main,choices[1].kit,choices[2].kit,origin>.5?main:choices[3].kit];
 }
+
+export function cityFloorKit(base,floor,limit) {
+  const n=floor.luxury/limit;
+  const index=floor.program==='workshops'?0:floor.program==='housing'?(n<.36?1:2):
+    floor.program==='exchange'||floor.program==='court'?(n>.64?4:3):n>.51?3:1;
+  const interior=palettes[index];
+  return {...base,floor:interior.floor,partition:interior.partition,door:interior.door,
+    staircase:interior.staircase,sign:interior.sign,interior:interior.interior};
+}

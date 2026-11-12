@@ -1,6 +1,7 @@
 import {CORE_ZONE, districtIdAt, sampleFloorRect} from './eternal-night-core-floor.js';
 import {BUILDING_DEFAULTS, buildingAt, cutPolygon, designBuilding, stairRisers} from './eternal-night-buildings.js';
 import {designRoofWalkway, designWalkways, segmentY} from './eternal-night-walkways.js';
+import {populatePrecincts} from './eternal-night-precincts.js';
 function populate(layout, grid, partitioned, {unit,buildingDensity,highRise}) {
   const {size, step, left, top, luxury, noise, buildable} = grid;
   const {labels, sections, tangentX, tangentZ} = partitioned;
@@ -249,6 +250,53 @@ function partition(layout, grid) {
 }
 
 
+function assignPrecinctLuxury(layout,volumes,walkways) {
+  const stops=Array.from({length:volumes.length},()=>new Map());
+  const adjacency=Array.from({length:volumes.length},()=>[]);
+  const distance=new Float64Array(volumes.length).fill(Infinity),queue=new Queue();
+  const addStop=(port,value)=>{
+    const levels=stops[port.building];
+    levels.set(port.level,Math.max(value,levels.get(port.level)??0));
+  };
+  for(const link of walkways) {
+    const [a,b]=link.ports;
+    if(!a||a.building===null)continue;
+    if(link.kind==='core') {
+      distance[a.building]=0;queue.push([0,a.building]);addStop(a,1);
+    } else if(b&&b.building!==null) {
+      const length=link.segments.reduce((s,part)=>s+part.length,0);
+      const cost=length+Math.abs(a.y-b.y)*2+volumes[a.building].storeyHeight+volumes[b.building].storeyHeight;
+      adjacency[a.building].push([b.building,cost]);adjacency[b.building].push([a.building,cost]);
+      addStop(a,link.typology==='through'?.93:.74);addStop(b,link.typology==='through'?.93:.74);
+    } else if(link.kind==='roof') {
+      const parent=volumes[a.building].support;
+      if(parent!==null) {
+        adjacency[a.building].push([parent,32]);adjacency[parent].push([a.building,32]);addStop(a,.51);
+      }
+    }
+  }
+  while(queue.entries.length) {
+    const [cost,id]=queue.pop();
+    if(cost!==distance[id])continue;
+    for(const [next,length] of adjacency[id])if(cost+length<distance[next]) {
+      distance[next]=cost+length;queue.push([cost+length,next]);
+    }
+  }
+  for(const v of volumes)for(const f of v.floors) {
+    const relative=(f.y+v.storeyHeight*.5-layout.floorY)/layout.floorHeight;
+    const local=f.level/Math.max(1,v.floors.length-1);
+    const service=Math.exp(-distance[v.id]/(layout.width*.55));
+    let door=0;
+    for(const [level,weight] of stops[v.id])door=Math.max(door,weight*Math.exp(-Math.abs(level-f.level)*.29));
+    f.access=clamp(.34*service+.66*door,0,1);
+    const floorValue={market:.045,exchange:.105,court:.065,shops:.01,workshops:-.05,housing:-.015}[f.program]??0;
+    const scarcity=.16*Math.exp(-((relative-.42)**2)/.058)-.26*Math.max(0,(relative-.60)/.40)**1.3;
+    const cheapRoof=(v.support!==null?.10:0)+Math.max(0,local-.78)*.34;
+    const variation=(fract(layout.noiseSeed,v.id,30+Math.floor(f.level/5))-.5)*.055;
+    f.luxury=clamp(v.luxury*.62+f.access*.21+floorValue+scarcity-cheapRoof+variation,0,layout.districtLuxuryMax);
+  }
+}
+
 export function createDistrictPlan(layout, resolution = 128, options = {}) {
   if (!Number.isInteger(resolution) || resolution<16 || resolution>192) throw new RangeError('Invalid district resolution');
   const {unit=BUILDING_DEFAULTS.unit,buildingDensity=BUILDING_DEFAULTS.buildingDensity,highRise=false}=options;
@@ -274,9 +322,11 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   }
   const grid={size,step,left,top,zones,luxury,noise,ids,buildable};
   const partitioned=partition(layout,grid);
-  const {volumes,occupied,roofLinks}=populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
+  const {volumes,occupied,roofLinks,precincts,lanes}=highRise?
+    populatePrecincts(layout,grid,partitioned,{unit,buildingDensity},fract):populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
   const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise);
   for(const link of roofLinks){link.id=walkways.length;walkways.push(link);}
+  if(highRise)assignPrecinctLuxury(layout,volumes,walkways);
   const columns=Array.from({length:cells},()=>[]);
   const pathColumns=Array.from({length:cells},()=>[]);
   for (const v of volumes) for (let z=Math.floor(v.gz); z<Math.ceil(v.gz+v.gd); z++) {
@@ -295,7 +345,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
     for(const part of link.segments)indexPart(link,part);
     for(const part of link.landings)indexPart(link,part);
   }
-  return {...grid,...partitioned,volumes,links,walkways,columns,pathColumns,layout,unit,buildingDensity};
+  return {...grid,...partitioned,volumes,links,walkways,columns,pathColumns,layout,unit,buildingDensity,precincts,lanes};
 }
 
 export function districtColumn(plan,x,z) {
@@ -307,6 +357,7 @@ export function districtColumn(plan,x,z) {
 
 export function volumeLuxury(plan,volume,y) {
   const level=Math.floor(Math.max(0,y-volume.y0)/volume.storeyHeight);
+  if(volume.highRise)return volume.floors[Math.min(level,volume.floors.length-1)].luxury;
   const centerY=volume.y0+(level+.5)*volume.storeyHeight;
   const relative=clamp((centerY-plan.layout.floorY)/plan.layout.floorHeight,0,1);
   const typeBias=[.01,-.055,.09,.065,-.07,-.025,0][volume.type];

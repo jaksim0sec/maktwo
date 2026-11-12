@@ -62,7 +62,7 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, verticalSpansAt, zoneAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
 import { BUILDING_TYPES, createDistrictPlan, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
-import { buildingAt, cutPolygon, storeyAt } from "../../src/worldgen/eternal-night-buildings.js";
+import { buildingAt, cutPolygon, cutPolygonSpans, storeyAt } from "../../src/worldgen/eternal-night-buildings.js";
 import { segmentY } from "../../src/worldgen/eternal-night-walkways.js";
 
 const noiseOptions = [
@@ -247,12 +247,12 @@ function floorPlan(ctx,v,f,px,pz,detail) {
     }
     const stair=v.stairs[f.level];
     ctx.fillStyle="#9aa6ad";
-    for(const t of [stair.landing,...stair.treads]) {
+    for(const t of stair?[stair.landing,...stair.treads]:[]) {
       ctx.fillRect(px(t.x0),pz(t.z0),px(t.x1)-px(t.x0),pz(t.z1)-pz(t.z0));
       ctx.strokeRect(px(t.x0),pz(t.z0),px(t.x1)-px(t.x0),pz(t.z1)-pz(t.z0));
     }
     ctx.strokeStyle="#d1dce4";
-    for(const {from,to} of stair.rails) {
+    for(const {from,to} of stair?.rails??[]) {
       ctx.beginPath();ctx.moveTo(px(from[0]),pz(from[2]));ctx.lineTo(px(to[0]),pz(to[2]));ctx.stroke();
     }
   }
@@ -343,18 +343,18 @@ function sliceView(target, axis) {
   for (const v of detail?[focus]:plan.volumes) {
     if (alongX ? fixed<v.z0||fixed>=v.z1 : fixed<v.x0||fixed>=v.x1) continue;
     for(const f of v.floors) {
-      const cut=cutPolygon(f.outline,axis,fixed);
-      if(!cut)continue;
+      const spans=cutPolygonSpans(f.outline,axis,fixed);
+      if(!spans.length)continue;
       ctx.fillStyle=shade(v,f.y);
       ctx.globalAlpha=.37;
-      fill(...cut,f.y,f.top);
+      for(const cut of spans)fill(...cut,f.y,f.top);
       for(const hole of f.holes.filter(h=>h.kind==="atrium")) {
         const voidCut=rectCut(hole);
         if(voidCut){ctx.globalAlpha=1;ctx.fillStyle="#111419";fill(...voidCut,f.y,f.top);}
       }
       ctx.globalAlpha=1;
       ctx.fillStyle=shade(v,f.y);
-      slab(cut,f.holes,f.y);
+      for(const cut of spans)slab(cut,f.holes,f.y);
       if(detail) {
         const lateral=alongX?1:0, longitudinal=1-lateral;
         for(const {a,b} of f.partitions) {
@@ -362,7 +362,7 @@ function sliceView(target, axis) {
           ctx.fillRect(px(a[longitudinal])-.6,py(f.top),1.2,py(f.y)-py(f.top));
         }
         const stair=v.stairs[f.level];
-        if(rectCut(stair.landing)||rectCut(f.holes.find(h=>h.kind==="stair")??v.roof.holes[0])) {
+        if(stair&&(rectCut(stair.landing)||rectCut(f.holes.find(h=>h.kind==="stair")??v.roof.holes[0]))) {
           ctx.fillStyle="#a2adb7";
           for(const t of [stair.landing,...stair.treads]) {
             const tread=rectCut(t);
@@ -371,8 +371,7 @@ function sliceView(target, axis) {
         }
       }
     }
-    const roof=cutPolygon(v.roof.outline,axis,fixed);
-    if(roof)slab(roof,v.roof.holes,v.roof.y);
+    for(const roof of cutPolygonSpans(v.roof.outline,axis,fixed))slab(roof,v.roof.holes,v.roof.y);
   }
   for(const link of plan.walkways) {
     ctx.fillStyle=pathColor[link.kind];
@@ -438,7 +437,7 @@ function draw() {
   const value = v => Number(v).toFixed(3);
   const location = `X ${x.toFixed(1)} · Y ${Number(y.toFixed(2))} · Z ${z.toFixed(1)}`;
   const info = volume ? `${volume.typology} #${volume.id+1} · ${storeyAt(volume,y).level+1}/${volume.floors.length}층 · 호화도 ${value(luxury)}` :
-    path ? pathName[path.kind] :
+    path ? ({through:"상가 관통형",annex:"공중 점포 증축형",stacked:"다층 교량형",hung:"매달린 통로형"}[path.typology]??pathName[path.kind]) :
     zone===CORE_ZONE.DISTRICT&&y>=layout.floorY ? "빈 공간 · 호화도 없음" : zoneNames[zone];
   const sectionName = column?.section>=0 ? `섹션 ${column.section+1} · 상위 호화도 ${value(column.luxury)} · 노이즈 ${value(column.noise)}` : "";
   get("readout").replaceChildren(location+"  /  "+info,document.createElement("br"),sectionName);

@@ -9,6 +9,23 @@ import {partById} from '../src/core/part-library.js';
 import {meshChunkData} from '../src/client/mesher.js';
 import {Chunk,SIZE} from '../src/core/chunk.js';
 
+test('market precincts pack connected modules and upper districts have their own programmes',()=>{
+  const plan=createCityPlan(9999);
+  const roots=plan.volumes.filter(v=>v.support===null);
+  const occupied=roots.reduce((sum,v)=>sum+v.gw*v.gd,0);
+  assert.ok(occupied/plan.buildable.reduce((sum,n)=>sum+n,0)>.57);
+  assert.ok(plan.precincts.some(p=>p.modules.length>=5));
+  assert.ok(plan.volumes.filter(v=>v.support!==null).length>=25);
+  assert.ok(roots.some(v=>v.floors.some(f=>f.program==='market'&&f.rooms.filter(r=>r.kind==='shop').length>=6)));
+  const tall=roots.find(v=>v.floors.length>=70);
+  assert.ok(new Set(tall.floors.map(f=>f.program)).size>=4);
+  assert.ok(tall.floors.every(f=>Number.isFinite(f.luxury)&&Number.isFinite(f.access)));
+  assert.ok(tall.floors.at(-1).luxury<Math.max(...tall.floors.slice(10,50).map(f=>f.luxury)));
+  assert.ok(new Set(plan.links.map(l=>l.typology)).size>=4);
+  assert.ok(plan.links.some(l=>l.typology==='annex'&&l.landings.some(p=>p.kind==='annex-bay')));
+  assert.ok(roots.some(v=>v.floors.some(f=>f.outline.length>8)));
+});
+
 test('the city voxelizes high-rise floors, varied parts and multiple bridge heights',()=>{
   const plan=createCityPlan(9999);
   const tower=plan.volumes.find(v=>v.floors.length>=70&&v.floors.length<=80);
@@ -72,11 +89,14 @@ test('a player can walk from the test spawn through the doorway onto the main wa
   assert.ok(Math.abs(player.y-y)<.05&&player.grounded,'the deck supported the player');
 });
 
-test('an enclosed switchback stair takes a walking player to the next floor',()=>{
+test('switchback stairs reach low, middle and upper landings at every generated storey pitch',()=>{
   const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
   const plan=createCityPlan(world.seed);
-  const building=plan.volumes[plan.walkways.find(l=>l.kind==='core').ports[0].building];
-  const s=building.stairs[1], treads=s.treads;
+  const samples=new Map();
+  for(const b of plan.volumes)if(b.floors.length>6&&!samples.has(b.storeyHeight))samples.set(b.storeyHeight,b);
+  assert.ok(samples.size>=3);
+  for(const building of samples.values())for(const level of [1,Math.floor(building.floors.length/2),building.floors.length-2]) {
+  const s=building.stairs[level], treads=s.treads;
   const alongX=building.stairFacing===2;
   const center=(r,axis)=>Math.floor((r[axis+'0']+r[axis+'1'])/2)+.5;
   const waypoint=(lane,depth)=>alongX?[center(depth,'x'),center(lane,'z')]:[center(lane,'x'),center(depth,'z')];
@@ -87,7 +107,8 @@ test('an enclosed switchback stair takes a walking player to the next floor',()=
       player.yaw=Math.atan2(player.x-tx,player.z-tz);
       player.update(world,1/60,{forward:true});
     }
-    assert.ok(Math.hypot(player.x-tx,player.z-tz)<.15);
+    assert.ok(Math.hypot(player.x-tx,player.z-tz)<.15,`pitch ${building.storeyHeight} floor ${level}: missed landing`);
   }
   assert.ok(player.grounded&&Math.abs(player.y-Math.round(s.toY))<.05);
+  }
 });

@@ -8,7 +8,7 @@ import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':high-rise':name;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
  getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);

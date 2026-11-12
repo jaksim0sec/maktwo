@@ -1,5 +1,5 @@
 import {CORE_ZONE, zoneAt} from './eternal-night-core-floor.js';
-import {containsRect, cutPolygon, stairModule} from './eternal-night-buildings.js';
+import {containsRect, insidePolygon, stairModule} from './eternal-night-buildings.js';
 
 const EPS=1e-7;
 const DIR=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
@@ -114,7 +114,18 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   const clearDeck=(a,b,except)=>{
     if(!clearHoles(a,b)||!clearCore(a,b)||!insideCoreFloor(a)||!insideCoreFloor(b))return false;
     for(const key of keys(spanBox(a,b),margin))for(const root of structureBuckets.get(key)??[]) {
-      if(root.id!==except&&Math.min(a[1],b[1])<root.y1+unit&&Math.max(a[1],b[1])+unit*2.5>root.y0&&intersectsBox(a,b,root,margin))return false;
+      if(root.id===except||Math.min(a[1],b[1])>=root.y1+unit||Math.max(a[1],b[1])+unit*2.5<=root.y0)continue;
+      if(!highRise){if(intersectsBox(a,b,root,margin))return false;continue;}
+      const min=Math.max(0,Math.floor((Math.min(a[1],b[1])-root.y0)/root.storeyHeight));
+      const max=Math.min(root.floors.length-1,Math.floor((Math.max(a[1],b[1])+unit*2.5-root.y0)/root.storeyHeight));
+      for(let level=min;level<=max;level++) {
+        const floor=root.floors[level];
+        if(!floor.bounds) {
+          const x=floor.outline.map(p=>p[0]),z=floor.outline.map(p=>p[1]);
+          floor.bounds={x0:Math.min(...x),x1:Math.max(...x),z0:Math.min(...z),z1:Math.max(...z)};
+        }
+        if(intersectsBox(a,b,floor.bounds,margin-EPS))return false;
+      }
     }
     return true;
   };
@@ -128,14 +139,30 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     for(const p of link.ports)openPort(p,buildings);
     link.id=walkways.length;
     if(highRise) {
-      const a=link.ports[0],b=link.ports[1];
-      const mix=Math.imul(a?.building??0,31)^Math.imul(b?.building??0,131)^Math.round(a?.y??0)^layout.noiseSeed;
-      link.architecture=link.kind==='core'?'arcade':link.kind==='tower'?'open':['enclosed','arcade','open','hung'][mix&3];
+      link.architecture??=link.kind==='core'?'arcade':'open';
     }
     walkways.push(link);
     for(const {from,to} of link.segments)insert(deckBuckets,{...spanBox(from,to),low:Math.min(from[1],to[1]),high:Math.max(from[1],to[1])});
+    for(const {a,b,y} of link.landings.filter(p=>p.kind==='annex-bay'))insert(deckBuckets,{...spanBox(a,b),low:y,high:y+3});
     if(link.kind==='bridge')bridges.push(link);
   };
+
+  function annexBays(link) {
+    const bays=[];
+    for(const segment of link.segments) {
+      if(segment.kind!=='deck'||segment.length<unit*5)continue;
+      const {from,to,length,heading}=segment,dx=(to[0]-from[0])/length,dz=(to[2]-from[2])/length;
+      for(const side of [1,-1])for(let distance=unit*2.6;distance+unit*2.6<length;distance+=unit*4.5) {
+        const offset=(width/2+unit*.70)*side;
+        const a=[from[0]+dx*(distance-unit*1.35)-dz*offset,from[1],from[2]+dz*(distance-unit*1.35)+dx*offset];
+        const b=[a[0]+dx*unit*2.7,a[1],a[2]+dz*unit*2.7];
+        if(!clearDeck(a,b)||!clearExisting(a,b))continue;
+        bays.push({kind:'annex-bay',a,b,side,heading,y:a[1],outline:section(a,b,unit*2.6)});
+        if(bays.length>=2)return bays;
+      }
+    }
+    return bays;
+  }
 
   const index=(x,z)=>z*size+x;
   const cellPoint=(i,y=0)=>[left+(i%size+.5)*step,y,top+(Math.floor(i/size)+.5)*step];
@@ -156,7 +183,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     }
     return found;
   };
-  const publicPorts=roots.flatMap(b=>b.ports.filter(p=>p.level===b.entryLevel));
+  const publicPorts=roots.filter(b=>!highRise||b.floors.length>1).flatMap(b=>b.ports.filter(p=>p.level===b.entryLevel));
   const used=new Set();
   const towerY=layout.floorY+4*unit;
   const towerPorts=[];
@@ -248,18 +275,20 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
       if(a.building>=b.building)continue;
       if(highRise&&Math.abs(a.y-b.y)>unit*6)continue;
       const length=distance(portPoint(a),portPoint(b));
-      if(length>limit || length<3*unit)continue;
+      if(length>limit || length<(highRise?width+.12:3*unit))continue;
       const x=b.x-a.x,z=b.z-a.z;
       if(x*a.dx+z*a.dz<=0 || x*b.dx+z*b.dz>=0)continue;
-      pairs.push([length+(highRise?Math.abs(a.y-b.y)*.7:0),a,b]);
+      const near=buildings[a.building].precinct===buildings[b.building].precinct;
+      pairs.push([length+(highRise?Math.abs(a.y-b.y)*.7+(near?-4:0):0),a,b]);
     }
   }
-  const connected=new Set(),degrees=new Map();
+  const connected=new Set(),degrees=new Map(),paired=new Map();
   for(const [,a,b] of pairs.sort((p,q)=>p[0]-q[0])) {
     const key=p=>`${p.building}:${highRise?p.level:0}`;
     const aKey=key(a),bKey=key(b),pair=`${aKey}/${bKey}`;
-    if(used.has(a)||used.has(b)||connected.has(pair)||(degrees.get(aKey)||0)>=2||(degrees.get(bKey)||0)>=2)continue;
-    const start=portPoint(a),end=portPoint(b),s=stub(a,Math.max(unit*1.1,margin+.1)),t=stub(b,Math.max(unit*1.1,margin+.1));
+    const capacity=highRise?3:2;
+    if(used.has(a)||used.has(b)||connected.has(pair)||(degrees.get(aKey)||0)>=capacity||(degrees.get(bKey)||0)>=capacity)continue;
+    const start=portPoint(a),end=portPoint(b),s=stub(a,Math.max(unit*1.1,margin+.02)),t=stub(b,Math.max(unit*1.1,margin+.02));
     if(!clearDeck(start,s,a.building)||!clearDeck(t,end,b.building))continue;
     for(const path of octilinear(s,t)) {
       if(path.length<2)continue;
@@ -271,6 +300,22 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
         (i>0&&i<points.length-2&&!clearDeck(points[i],p))))continue;
       const link=makeWalkway('bridge',[a,b],points,width,unit);
       if(!link)continue;
+      if(highRise) {
+        const siteKey=a.building+':'+b.building;
+        const earlier=paired.get(siteKey);
+        const pa=buildings[a.building].floors[a.level].program,pb=buildings[b.building].floors[b.level].program;
+        const retail=p=>p==='exchange'||p==='market'||p==='shops';
+        const span=Math.max(...link.segments.map(part=>part.length));
+        if(earlier&&Math.abs(earlier.ports[0].y-a.y)>unit*4){link.typology='stacked';link.architecture='open';}
+        else if(retail(pa)&&retail(pb)&&span<unit*11){link.typology='through';link.architecture='enclosed';}
+        else if((retail(pa)||retail(pb))&&span>=unit*5&&a.y<layout.floorY+layout.floorHeight*.42){
+          const bays=annexBays(link);
+          if(bays.length){link.typology='annex';link.architecture='arcade';link.landings.push(...bays);}
+          else {link.typology='hung';link.architecture='hung';}
+        }
+        else {link.typology='hung';link.architecture='hung';}
+        if(!earlier)paired.set(siteKey,link);
+      }
       add(link);connected.add(pair);used.add(a);used.add(b);
       degrees.set(aKey,(degrees.get(aKey)||0)+1);degrees.set(bKey,(degrees.get(bKey)||0)+1);
       break;
@@ -283,17 +328,22 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
 export function designRoofWalkway(b,parent,unit) {
   const {roof,roofAccess}=parent, width=unit*1.4, margin=width/2;
   const atop=(x,z)=>{
-    const cut=cutPolygon(roof.outline,'x',z);
-    return cut && x>=cut[0] && x<=cut[1] && !roof.holes.some(h=>containsRect(h,x,z));
+    return insidePolygon(roof.outline,x,z) && !roof.holes.some(h=>containsRect(h,x,z));
   };
   if(![b.x0,b.x1].every(x=>[b.z0,b.z1].every(z=>atop(x,z))) ||
     roof.holes.some(h=>h.x0<b.x1 && h.x1>b.x0 && h.z0<b.z1 && h.z1>b.z0))return null;
+  for(let x=b.x0;x<b.x1;x+=.75)for(let z=b.z0;z<b.z1;z+=.75)if(!atop(x,z))return null;
   const supported=([x,,z])=>[-margin,margin].every(dx=>[-margin,margin].every(dz=>atop(x+dx,z+dz)));
+  const supportedSpan=(a,b)=>{
+    const count=Math.ceil(distance(a,b));
+    for(let i=1;i<count;i++)if(!supported([a[0]+(b[0]-a[0])*i/count,a[1],a[2]+(b[2]-a[2])*i/count]))return false;
+    return true;
+  };
   for(const port of b.ports) {
     const p=portPoint(port),s=stub(port,unit);
     if(!supported(p)||!supported(s))continue;
     const route=octilinear(s,roofAccess).find(points=>points.every((q,i)=>supported(q)&&(!i ||
-      (!intersectsBox(points[i-1],q,b,margin)&&roof.holes.every(h=>!intersectsBox(points[i-1],q,h,margin))))));
+      (supportedSpan(points[i-1],q)&&!intersectsBox(points[i-1],q,b,margin)&&roof.holes.every(h=>!intersectsBox(points[i-1],q,h,margin))))));
     if(!route)continue;
     port.open=true;
     b.floors[port.level].doors.push(port);
