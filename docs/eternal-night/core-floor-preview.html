@@ -6,29 +6,30 @@
 <title>영원한 밤 · 단일 코어층</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#16191e;color:#e9edf2}
-*{box-sizing:border-box}body{margin:0;padding:24px;min-height:100vh}
-main{max-width:950px;margin:auto}header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-h1{font-size:21px;letter-spacing:-.04em;margin:0 0 16px}small{color:#9ca8b7}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 255px;gap:24px;align-items:start}
-canvas{display:block;width:100%;max-width:640px;aspect-ratio:1;background:#111419;image-rendering:auto;border:1px solid #35404c;border-radius:12px}
-.controls{display:grid;gap:11px}label{display:grid;gap:5px;font-size:13px;color:#c9d4dc}
-input{width:100%;background:#232a34;color:#eef3fa;border:1px solid #46515f;border-radius:7px;padding:8px;font:inherit}
-details{border-top:1px solid #39414a;padding-top:12px}summary{cursor:pointer;color:#e6eaf1;margin-bottom:10px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.legend{display:flex;flex-wrap:wrap;gap:10px 15px;margin-top:14px;color:#b9c4cf;font-size:12px}
+*{box-sizing:border-box}body{margin:0;padding:12px;min-height:100dvh}
+main{max-width:1100px;margin:auto}header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:19px;letter-spacing:-.04em;margin:0 0 8px}small{color:#9ca8b7}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+canvas{display:block;width:100%;background:#111419;border:1px solid #35404c;border-radius:8px}#map{width:min(100%,61dvh,640px);height:auto;aspect-ratio:1}#section{height:15dvh;max-height:150px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}label{display:grid;gap:2px;font-size:11px;color:#c9d4dc}label span{display:flex;justify-content:space-between;gap:4px;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
+
+.grid{display:contents}
+.legend{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:5px;color:#b9c4cf;font-size:11px}
 .legend span::before{content:"";width:9px;height:9px;display:inline-block;background:var(--dot);border-radius:2px;margin-right:6px}
-#readout{height:20px;font-variant-numeric:tabular-nums;color:#b9c4cf;font-size:12px;margin:10px 0}
+#readout{height:15px;font-variant-numeric:tabular-nums;color:#b9c4cf;font-size:11px;margin:3px 0}
 #error{color:#ff9a9a;font-size:12px;min-height:16px}
-@media(max-width:700px){body{padding:14px}.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr}details{grid-column:1/-1}.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){body{padding:7px}.layout{grid-template-columns:1fr;gap:5px}#map{width:min(100%,33dvh);height:auto}#section{height:12dvh}.controls{gap:2px 8px}h1{font-size:16px;margin-bottom:3px}header small,aside>small{display:none}}
 </style>
 </head>
 <body>
 <main>
-<header><h1>단일 코어층 · 평면 생성</h1><small>한 층의 구역과 호화도</small></header>
+<header><h1>단일 코어층 · XZ 평면 / XY 단면</h1><small>한 층의 구역과 호화도</small></header>
 <div class="layout">
 <section>
 <canvas id="map" width="512" height="512" aria-label="코어층 배치와 호화도 지도"></canvas>
-<p id="readout">지도를 가리키면 좌표와 호화도가 표시됩니다</p>
+<canvas id="section" width="512" height="150" aria-label="선택한 Z 위치의 X-Y 수직 단면"></canvas>
+<p id="readout">Z 0 · X-Y 단면</p>
 <div class="legend">
 <span style="--dot:#8794a0">바닥</span><span style="--dot:#e33c45">중앙 통로</span>
 <span style="--dot:#25a7d7">공중정원</span><span style="--dot:#438de9">미니 통로</span>
@@ -36,19 +37,17 @@ details{border-top:1px solid #39414a;padding-top:12px}summary{cursor:pointer;col
 </div>
 </section>
 <aside class="controls">
-<label>시드<input id="seed" type="number" step="1" value="42"></label>
-<label>코어 가로폭 · 블록<input id="width" type="number" min="100" max="200000" step="16" value="1024"></label>
-<details>
-<summary>비율 · 중심에서 변까지 거리 기준</summary>
+<label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
+<label><span>가로폭 <output id="width-value">1024</output></span><input id="width" type="range" min="512" max="4096" step="64" value="1024"></label>
+<label><span>층고 <output id="height-value">540</output></span><input id="height" type="range" min="180" max="900" step="6" value="540"></label>
 <div class="grid" id="ratio-controls"></div>
-</details>
 <div id="error" role="status"></div>
 <small>가로폭과 층고는 시험용 기본값입니다. 지형 색은 생성기의 구역 ID와 호화도에 대응합니다.</small>
 </aside>
 </div>
 </main>
 <script type="module">
-import { CORE_FLOOR_DEFAULTS, CORE_ZONE, createFloorLayout, sampleFloorRect } from "../../src/worldgen/eternal-night-core-floor.js";
+import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, sampleFloorRect, verticalSpansAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
 const ratioLabels = {
   centerRadius:"중앙부 반경",mainShaftRadius:"중앙 원통",gardenOffset:"정원 위치",
@@ -59,14 +58,31 @@ const ratioLabels = {
 const controlHost=document.querySelector("#ratio-controls");
 for (const [key, label] of Object.entries(ratioLabels)) {
   const item=document.createElement("label");
-  item.textContent=label;
+  const line=document.createElement("span");
+  const caption=document.createElement("span");
+  caption.textContent=label;
+  const value=document.createElement("output");
+  line.append(caption,value);
   const input=document.createElement("input");
-  input.type="number";input.min="0.001";input.max="0.99";input.step="0.001";
+  input.type="range";
+  const limits={
+    centerRadius:[0.18,0.3],mainShaftRadius:[0.03,0.08],gardenOffset:[0.10,0.19],
+    gardenRadius:[0.015,0.065],miniShaftOffset:[0.7,0.95],miniShaftRadius:[0.02,0.065],
+    roadHalfWidth:[0.01,0.055],rimWidth:[0.015,0.09],
+    luxuryFalloff:[0.2,0.7],noiseCellSize:[0.03,0.25]
+  }[key];
+  input.min=limits[0];input.max=limits[1];input.step="0.001";
   input.value=CORE_FLOOR_DEFAULTS.ratios[key];input.dataset.ratio=key;
-  item.append(input);controlHost.append(item);
+  value.textContent=input.value;
+  input.addEventListener("input",()=>{value.textContent=input.value});
+  item.append(line,input);controlHost.append(item);
 }
 const canvas=document.querySelector("#map"),ctx=canvas.getContext("2d",{alpha:false});
 const readout=document.querySelector("#readout"),error=document.querySelector("#error");
+const section=document.querySelector("#section"),sectionCtx=section.getContext("2d",{alpha:false});
+const sectionImage=sectionCtx.createImageData(section.width,section.height);
+const span=new Float64Array(3);
+let sectionZ=0;
 let layout,queued=false;
 const width=canvas.width,height=canvas.height;
 const zones=new Uint8Array(width*height),weights=new Float32Array(width*height);
@@ -80,7 +96,11 @@ function paint(){
   const ratios={};
   for(const input of controlHost.querySelectorAll("input"))ratios[input.dataset.ratio]=Number(input.value);
   try{
-    layout=createFloorLayout({width:Number(document.querySelector("#width").value),seed:Number(document.querySelector("#seed").value),ratios});
+    layout=createFloorLayout({
+      width:Number(document.querySelector("#width").value),
+      floorHeight:Number(document.querySelector("#height").value),
+      seed:Number(document.querySelector("#seed").value),ratios
+    });
     error.textContent="";
   }catch(e){error.textContent=e.message;return}
   const step=layout.width/width;
@@ -102,9 +122,34 @@ function paint(){
     pixels[o+3]=255;
   }
   ctx.putImageData(frame,0,0);
+  drawSection();
+}
+function drawSection(){
+  if(!layout)return;
+  const sw=section.width,sh=section.height,data=sectionImage.data;
+  const topY=layout.floorTop,bottomY=layout.slabBottom,extent=topY-bottomY;
+  for(let xPixel=0;xPixel<sw;xPixel++){
+    const x=layout.centerX-layout.halfWidth+(xPixel+0.5)*layout.width/sw;
+    const count=verticalSpansAt(layout,x,sectionZ,span);
+    for(let yPixel=0;yPixel<sh;yPixel++){
+      const y=topY-(yPixel+0.5)*extent/sh;
+      const inside=count && y>=span[0] && y<span[1];
+      const structure=inside?span[2]:0;
+      const color=structure===CORE_STRUCTURE.MAIN_SHAFT?[227,60,69]
+        :structure===CORE_STRUCTURE.MINI_SHAFT?[67,141,233]
+        :structure===CORE_STRUCTURE.SLAB?[134,146,158]:[17,20,25];
+      const index=(yPixel*sw+xPixel)*4;
+      data[index]=color[0];data[index+1]=color[1];data[index+2]=color[2];data[index+3]=255;
+    }
+  }
+  sectionCtx.putImageData(sectionImage,0,0);
 }
 function queue(){if(!queued){queued=true;requestAnimationFrame(paint)}}
-document.querySelectorAll("input").forEach(input=>input.addEventListener("input",queue));
+document.querySelectorAll("input").forEach(input=>input.addEventListener("input",()=>{
+  const output=document.querySelector("#"+input.id+"-value");
+  if(output)output.textContent=input.value;
+  queue();
+}));
 canvas.addEventListener("pointermove",event=>{
   if(!layout)return;
   const bounds=canvas.getBoundingClientRect();
@@ -114,10 +159,11 @@ canvas.addEventListener("pointermove",event=>{
   const x=(layout.centerX-layout.halfWidth+(col+0.5)*layout.width/width).toFixed(1);
   const z=(layout.centerZ-layout.halfWidth+(row+0.5)*layout.width/height).toFixed(1);
   const i=row*width+col;
+  sectionZ=Number(z);drawSection();
   const names=["허공","공용 바닥","중앙 통로","공중정원","미니 통로","주 동선","대단지","중앙부"];
-  readout.textContent="x "+x+" · z "+z+" · "+names[zones[i]]+" · 호화도 "+weights[i].toFixed(3);
+  readout.textContent="x "+x+" · z "+z+" · y "+layout.slabBottom+"~"+layout.floorTop+" · "+names[zones[i]]+" · 호화도 "+weights[i].toFixed(3);
 });
-canvas.addEventListener("pointerleave",()=>{readout.textContent="지도를 가리키면 좌표와 호화도가 표시됩니다"});
+canvas.addEventListener("pointerleave",()=>{readout.textContent="Z "+sectionZ.toFixed(1)+" · X-Y 단면 · y "+layout.slabBottom+"~"+layout.floorTop});
 queue();
 </script>
 </body>
