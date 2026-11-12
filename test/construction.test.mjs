@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {World} from '../src/core/world.js';
 import {collides,raycast} from '../src/core/physics.js';
-import {FORMED,formCode} from '../src/core/construction.js';
+import {FORMED,formCode,orientedForm,placementRotation} from '../src/core/construction.js';
 import {meshChunk} from '../src/client/mesher.js';
 import {CreativeInventory,SurvivalInventory} from '../src/core/inventory.js';
 import {CREATIVE_ITEMS} from '../src/core/catalog.js';
@@ -83,4 +83,46 @@ test('rotated construction keeps cube texture turns, chair collision and mounted
  assert.equal(raycast(world,{x:6,y:25.5,z:2.77},{x:-1,y:0,z:0}).id,B.PLANKS);
  const {opaque}=meshChunk(world,world.getChunk(0,0));
  assert.ok(opaque.some((value,i)=>i%7===6&&value===297&&opaque[i-5]===26));
+});
+
+test('legacy panel inventory merges into one item while installed panels keep their angle',()=>{
+ const records=new Map(),storage={getItem:k=>records.get(k),setItem:(k,v)=>records.set(k,v)};
+ records.set('maktwo:survival:Overworld',JSON.stringify({
+  version:2,items:[[B.WINDOW_NS,999],[B.WINDOW_EW,5]],seen:[B.WINDOW_EW],
+  quickSlots:[B.WINDOW_EW,B.WINDOW_NS,null,null,null,null,null],
+ }));
+ const inventory=new SurvivalInventory(storage);
+ assert.equal(inventory.count(B.WINDOW_NS),1004);
+ assert.deepEqual(inventory.quickSlots.slice(0,2),[B.WINDOW_NS,null]);
+ assert.equal(inventory.remove(B.WINDOW_NS),true);
+ assert.equal(CREATIVE_ITEMS.includes(B.WINDOW_EW),false);
+ let world=new World({mode:'flat',storage});
+ world.set(4,25,2,B.WINDOW_NS);
+ world.setShapeState(4,25,2,{panelTurn:1});
+ world.set(5,25,1,B.THIN_WALL_NS);
+ world.setShapeState(5,25,1,{panelTurn:1});
+ world.save();
+ world=new World({mode:'flat',storage});
+ assert.equal(world.getShapeState(4,25,2).panelTurn,1);
+ assert.equal(collides(world,5.72,25.4,1.28,.06,.1),true);
+ assert.equal(collides(world,5.8,25.4,1.8,.06,.1),false);
+ const hit=raycast(world,{x:4.88,y:25.5,z:2.88},{x:-Math.SQRT1_2,y:0,z:-Math.SQRT1_2});
+ assert.equal(hit.id,B.WINDOW_NS);
+ assert.ok(hit.normal.x>.7&&hit.normal.z>.7);
+ const {opaque}=meshChunk(world,world.getChunk(0,0));
+ let diagonalEdge=false;
+ for(let i=0;i<opaque.length;i+=21){
+  const a=opaque.subarray(i,i+3),b=opaque.subarray(i+7,i+10),c=opaque.subarray(i+14,i+17);
+  if(![a,b,c].every(([x,y,z])=>x>=5&&x<=6&&y>=25&&y<=26&&z>=1&&z<=2))continue;
+  if(a[1]!==b[1]&&a[1]!==c[1])continue;
+  for(const point of [b,c])if(a[1]===point[1]&&a[0]!==point[0]&&a[2]!==point[2])diagonalEdge=true;
+ }
+ assert.equal(diagonalEdge,true);
+ assert.deepEqual(placementRotation(B.WINDOW_NS,0),{step:45,offset:0});
+ assert.deepEqual(placementRotation(B.CONCRETE,3),{step:90,offset:45});
+ assert.deepEqual(placementRotation(B.CONCRETE,4),{step:45,offset:0});
+ world.set(7,25,3,B.CONCRETE,{form:orientedForm(4,45)});
+ const ramp=raycast(world,{x:7.2,y:26.8,z:3.4},{x:0,y:-1,z:0});
+ assert.ok(Math.abs(ramp.distance-1.5)<1e-6);
+ assert.ok(ramp.normal.x<0&&ramp.normal.z<0);
 });

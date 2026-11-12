@@ -3,7 +3,7 @@ import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
-import {shapeBoxes,isStairs,isSlab,rotateCellXZ} from '../core/shapes.js';
+import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 
@@ -113,7 +113,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     const shade=FACES[face.material].shade+4*materialFor(id,face.material);
     const vertices=face.points.map(([a,b,c])=>[ox+x+a,y+b,oz+z+c]);
     for(let i=1;i<vertices.length-1;i++){
-     for(const j of [0,i,i+1])opaque.push(...vertices[j],...COLORS[id],shade);
+     for(const j of [0,i,i+1])(TRANSPARENT[id]?transparent:opaque).push(...vertices[j],...COLORS[id],shade);
     }
    }
    continue;
@@ -248,6 +248,19 @@ export function flowerMesh(dest,x,y,z,seed=0,id=B.FLOWER){
 }
 // Partial voxel shapes keep the authored block material and physical AABBs aligned.
 export function shapeMesh(dest,id,x,y,z,state){
+ const diagonal=isPanel(id)?diagonalPanel(id,state):null;
+ if(diagonal){
+  for(let index=0;index<diagonal.length;index++){
+   const glass=(id===B.WINDOW_NS||id===B.WINDOW_EW)&&index===0;
+   const paint=glass?rgb('#25343b'):COLORS[id];
+   for(const face of diagonal[index].faces){
+    const shade=FACES[face.material].shade+4*materialFor(glass?B.DIRTY_GLASS:id,face.material);
+    const points=face.points.map(([a,b,c])=>[x+a,y+b,z+c]);
+    for(let i=1;i<points.length-1;i++)for(const j of [0,i,i+1])dest.push(...points[j],...paint,shade);
+   }
+  }
+  return;
+ }
  const boxes=shapeBoxes(id,x,y,z,state)||[];
  const c=rgb(BLOCKS[id].color);
  for(let index=0;index<boxes.length;index++){

@@ -3,7 +3,7 @@ import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
 import {FORMED,hitFormed} from './construction.js';
 import {hitMount} from './mounts.js';
-import {solidBlockOverlap,fenceBoxes,shapeBoxes,isStairs,isSlab} from './shapes.js';
+import {solidBlockOverlap,fenceBoxes,shapeBoxes,isStairs,isSlab,isPanel,diagonalPanel} from './shapes.js';
 export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
@@ -89,9 +89,15 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
     const baseY=id===B.DOOR_TOP?y-1:y;
     hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
    }else{
-    const state=isStairs(id)||isSlab(id)||id===B.CHAIR?world.getShapeState?.(x,y,z):undefined;
-    const boxes=id===B.FENCE?fenceBoxes(x,y,z):shapeBoxes(id,x,y,z,state);
-    if(boxes){
+    const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
+    const diagonal=isPanel(id)?diagonalPanel(id,state):null;
+    const boxes=diagonal?null:id===B.FENCE?fenceBoxes(x,y,z):shapeBoxes(id,x,y,z,state);
+    if(diagonal){
+     for(const part of diagonal){
+      const next=hitFormed(part,x,y,z,origin,direction);
+      if(next&&next.distance>=t-1e-5&&(!hit||next.distance<hit.distance))hit=next;
+     }
+    }else if(boxes){
      for(const {x:bx,y:by,z:bz,w,h,d} of boxes){
       const next=intersectAabb(origin,direction,[bx,by,bz],[bx+w,by+h,bz+d]);
       if(next&&next.distance>=t-1e-5&&(!hit||next.distance<hit.distance)){

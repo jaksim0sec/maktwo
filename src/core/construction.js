@@ -1,11 +1,34 @@
-import {BLOCK as B, BLOCKS} from './blocks.js';
+import {BLOCK as B, BLOCKS, itemId} from './blocks.js';
 
 export const FORMS = ['정육면체', '하단 반블록', '상단 반블록', '45° 벽', '경사'];
-export const supportsForms = id => id !== B.BEDROCK && id !== B.SAND &&
- id !== B.RED_SAND && id !== B.SHOP_SIGN && BLOCKS[id]?.render === 'cube';
+const MATERIAL={rotation:90,forms:true};
+const ROTATABLE={rotation:90,forms:false};
+const PANEL={rotation:45,forms:false,panel:true};
+const FIXED={rotation:0,forms:false};
+
+export const BUILD_TYPES=Object.freeze(BLOCKS.map(({id,render})=>{
+ if(id===B.AIR||id===B.BEDROCK||id===B.PORTAL||id===B.DOOR_TOP||render==='fluid')return FIXED;
+ if(render==='panel'||render==='frame')return PANEL;
+ if((render==='cube'||render==='glass')&&id!==B.SAND&&id!==B.RED_SAND&&id!==B.SHOP_SIGN)return MATERIAL;
+ return ROTATABLE;
+}));
+export const buildType=id=>BUILD_TYPES[itemId(id)]??FIXED;
+export const supportsForms=id=>buildType(id).forms;
+export function placementRotation(id,form){
+ const type=buildType(id);
+ if(type.forms&&form===3)return {step:90,offset:45};
+ return {step:type.forms&&form===4?45:type.rotation,offset:0};
+}
 export function formCode(form, rotation) {
  if (form < 3) return form;
  return (form === 3 ? 3 : 7) + (rotation & 3);
+}
+export function orientedForm(form,angle){
+ if(form===4){
+  const eighth=Math.round(angle/45)&7;
+  return eighth&1?11+(eighth>>1):7+(eighth>>1);
+ }
+ return formCode(form,Math.floor(angle/90));
 }
 
 // Clip a cube by one plane once. All three consumers use the resulting convex solid.
@@ -45,6 +68,7 @@ export const FORMED = [
  null, clipped([0,1,0],.5,2), clipped([0,-1,0],-.5,3),
  ...[[1,0,1],[-1,0,1],[-1,0,-1],[1,0,-1]].map(p=>clipped(p,(p[0]+p[2])/2,0)),
  ...[[0,1,-1],[-1,1,0],[0,1,1],[1,1,0]].map(p=>clipped(p,Math.max(0,p[0],p[2]),2)),
+ ...[[-.5,1,-.5],[-.5,1,.5],[.5,1,.5],[.5,1,-.5]].map(p=>clipped(p,Math.max(0,p[0])+Math.max(0,p[2]),2)),
 ];
 
 export function formedOverlap(shape,x,y,z,body,epsilon) {
