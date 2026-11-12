@@ -3,7 +3,7 @@ const cap=v=>Math.max(-180,Math.min(180,v));
 export class Input{
  constructor(canvas){
   this.canvas=canvas;this.keys=new Set();this.held={};this.locked=false;this.uiMode=false;
-  this.dx=0;this.dy=0;this.pointer={left:false,start:0};this.pendingTaps=0;this.gestures=new GestureState();
+  this.dx=0;this.dy=0;this.pointer={left:false,start:0,x:0,y:0};this.pendingTaps=0;this.tapPoint=null;this.mouseLook=false;this.lastMouse=null;this.gestures=new GestureState();
   document.addEventListener('keydown',e=>{
    if(this.uiMode||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',...Array.from({length:10},(_,i)=>`Digit${i}`)].includes(e.code))e.preventDefault();
@@ -17,16 +17,23 @@ export class Input{
    this.dx=0;this.dy=0;if(!this.locked)this.pointer.left=false;
   });
   document.addEventListener('mousemove',e=>{
-   if(this.locked&&!this.uiMode){this.dx=cap(this.dx+cap(e.movementX));this.dy=cap(this.dy+cap(e.movementY));}
+   if(this.uiMode)return;
+   if(this.locked){this.dx=cap(this.dx+cap(e.movementX));this.dy=cap(this.dy+cap(e.movementY));}
+   else if(this.mouseLook&&this.lastMouse){this.dx=cap(this.dx+cap(e.clientX-this.lastMouse.x));this.dy=cap(this.dy+cap(e.clientY-this.lastMouse.y));}
+   this.lastMouse={x:e.clientX,y:e.clientY};
   });
+  // Primary click edits the actual cursor pixel. Secondary drag rotates the camera.
+  // No automatic pointer lock: the user must be able to target off-center blocks.
   canvas.addEventListener('mousedown',e=>{
-   if(e.button!==0||this.uiMode)return;
-   if(!this.locked){canvas.requestPointerLock?.();return}
-   this.pointer.left=true;this.pointer.start=performance.now();
+   if(this.uiMode)return;
+   if(e.button===2){e.preventDefault();this.mouseLook=true;this.lastMouse={x:e.clientX,y:e.clientY};return;}
+   if(e.button!==0)return;
+   const rect=canvas.getBoundingClientRect();this.pointer={left:true,start:performance.now(),x:e.clientX-rect.left,y:e.clientY-rect.top};
   });
   document.addEventListener('mouseup',e=>{
+   if(e.button===2){this.mouseLook=false;this.lastMouse=null;return;}
    if(e.button!==0||!this.pointer.left)return;
-   if(!this.uiMode&&performance.now()-this.pointer.start<HOLD_MS)this.pendingTaps++;
+   if(!this.uiMode&&performance.now()-this.pointer.start<HOLD_MS){this.pendingTaps++;this.tapPoint={x:this.pointer.x,y:this.pointer.y}}
    this.pointer.left=false;
   });
   canvas.addEventListener('contextmenu',e=>e.preventDefault());
@@ -55,19 +62,21 @@ export class Input{
    if(e.pointerType==='touch'||e.pointerType==='pen')this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),true);
   });
  }
- clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.dx=0;this.dy=0;this.gestures.reset()}
+ clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset()}
  setUiMode(open){this.uiMode=Boolean(open);this.clear()}
  read(){
   if(this.uiMode)return{forward:false,backward:false,left:false,right:false,moveX:0,moveY:0,jump:false,crouch:false,sprint:false,use:false,mine:false,place:false};
   const k=this.keys,m=this.gestures.movement();
   const taps=this.pendingTaps+this.gestures.consumeTaps();this.pendingTaps=0;
+  const fingerTap=this.gestures.consumeTapPoint();const picked=this.tapPoint||fingerTap;this.tapPoint=null;
+  const minePoint=this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:this.gestures.miningPoint(performance.now());
   return{
    forward:k.has('KeyW')||k.has('ArrowUp'),backward:k.has('KeyS')||k.has('ArrowDown'),
    left:k.has('KeyA')||k.has('ArrowLeft'),right:k.has('KeyD')||k.has('ArrowRight'),
    moveX:m.x,moveY:-m.y,
    jump:Boolean(k.has('Space')||this.held.jump),crouch:Boolean(k.has('ShiftLeft')||this.held.crouch),
    sprint:k.has('ControlLeft')||k.has('ControlRight'),
-   use:taps>0,mine:Boolean((this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS)||this.gestures.mining(performance.now())||this.held.mine),place:false
+   use:taps>0,mine:Boolean(minePoint||this.held.mine),aim:(minePoint||picked),place:false
   };
  }
  consumeLook(){

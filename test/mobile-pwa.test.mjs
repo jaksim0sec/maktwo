@@ -113,7 +113,7 @@ test('offline worker activates and serves cached navigation, modules, and icons 
  const navigation=await run('fetch',{request:{url:scope,method:'GET',mode:'navigate'}});
  assert.equal(navigation.status,200);
  assert.match(await navigation.text(),/index\.html/);
- const module=await run('fetch',{request:{url:scope+'src/client/game.js?v=1.0.0',method:'GET',mode:'cors'}});
+ const module=await run('fetch',{request:{url:scope+'src/client/game.js?v=1.1.0',method:'GET',mode:'cors'}});
  assert.equal(module.status,200);
  assert.match(await module.text(),/src\/client\/game\.js/);
  const icon=await run('fetch',{request:{url:scope+'icons/maktwo-192.png',method:'GET',mode:'cors'}});

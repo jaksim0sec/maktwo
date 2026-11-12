@@ -1,15 +1,15 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.0.0';
+const CACHE_NAME='maktwo-shell-v1.1.0';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
  './src/client/game.js','./src/client/input.js','./src/client/gestures.js',
- './src/client/pwa.js','./src/client/camera.js','./src/client/hologram.js',
+ './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/camera.js','./src/client/hologram.js',
  './src/client/renderer.js','./src/client/mesher.js','./src/client/mesh.worker.js',
  './src/client/light.worker.js','./src/core/blocks.js','./src/core/chunk.js',
  './src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/physics.js',
- './src/core/scale.js','./src/core/systems.js','./src/core/world.js',
+ './src/core/scale.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/worldgen/generators.js'
 ];
 self.addEventListener('install',event=>{

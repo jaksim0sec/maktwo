@@ -4,7 +4,7 @@ export const TAP_DRIFT_PX = 11;
 export const MOVE_DEADZONE = 9;
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
 export class GestureState {
- constructor(){this.fingers=new Map();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;}
+ constructor(){this.fingers=new Map();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;this.tapPoints=[];}
  down(id,x,y,center,time){
   if(this.fingers.has(id))return false;
   const side=x<center?'left':'right';
@@ -25,9 +25,11 @@ export class GestureState {
  }
  up(id,x,y,time,cancel=false){
   const f=this.fingers.get(id);if(!f)return;
-  if(!cancel&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX&&!f.dragged&&time-f.time<HOLD_MS)this.taps++;
+  if(!cancel&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX&&!f.dragged&&time-f.time<HOLD_MS){this.taps++;this.tapPoints.push({x,y});}
   this.fingers.delete(id);this[f.side]=null;
  }
+ miningPoint(now){const f=this.right===null?null:this.fingers.get(this.right);return f&&!f.dragged&&now-f.time>=HOLD_MS?{x:f.x,y:f.y}:null}
+ consumeTapPoint(){this.taps=0;const p=this.tapPoints.at(-1)||null;this.tapPoints.length=0;return p}
  movement(){
   if(this.left===null)return{x:0,y:0};
   const f=this.fingers.get(this.left),dx=f.x-f.startX,dy=f.y-f.startY,r=Math.hypot(dx,dy);
@@ -41,5 +43,5 @@ export class GestureState {
  }
  consumeTaps(){const count=this.taps;this.taps=0;return count;}
  consumeLook(){const v=[this.lookX,this.lookY];this.lookX=0;this.lookY=0;return v;}
- reset(){this.fingers.clear();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;}
+ reset(){this.tapPoints=[];this.fingers.clear();this.left=null;this.right=null;this.lookX=0;this.lookY=0;this.taps=0;}
 }

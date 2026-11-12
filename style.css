@@ -39,3 +39,7 @@ body.holo-open #mine-progress{opacity:0}
 
 /* Direct-touch build controls and safe-area aware compact quickbar. */
 @media (pointer:coarse){.touchbuttons{bottom:calc(147px + env(safe-area-inset-bottom,0px));right:11px;grid-template-columns:repeat(2,49px)}.touchbuttons button{height:44px;border-radius:12px;background:#282b30b5;backdrop-filter:blur(8px)}#hotbar-dock{bottom:calc(5px + env(safe-area-inset-bottom,0px));width:calc(100% - 12px);max-width:680px}#hotbar{min-width:0;flex:1;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}#hotbar::-webkit-scrollbar{display:none}.slot{flex:0 0 37px;min-width:37px}#bag-btn,#palette-toggle{flex-shrink:0}#screen{touch-action:none;overscroll-behavior:none}body{overscroll-behavior:none}}
+
+/* Free-cursor building: guide follows the click point, not the camera centre. */
+#crosshair{opacity:.75}body.holo-open #crosshair{opacity:0}
+#target{max-width:min(320px,80vw);overflow:hidden;text-overflow:ellipsis}

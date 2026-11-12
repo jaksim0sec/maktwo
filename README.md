@@ -1,35 +1,35 @@
-# MakTwo · Endless Night v1.0.0
+# MakTwo · Endless Night v1.1.0
 
-An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
+An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
 ## Run
 
 ```bash
-node server.mjs
+python3 -m http.server 8080
 # visit http://localhost:8080
 ```
 
-Node 18+ is enough. WebGL2 must be available in the browser. Do **not** open `index.html` with `file://`, because ES modules normally need an HTTP origin.
+No build or external dependencies are required. Node 18+ is needed for tests. WebGL2 must be available in the browser. Do **not** open `index.html` with `file://`, because ES modules normally need an HTTP origin.
 
 ```bash
 npm test
 ```
 
-## Current controls (v1.0)
+## Current controls (v1.1)
 
 | Input | Action |
 |---|---|
 | PC WASD / Space / Shift | Move / jump / crouch |
-| PC mouse | Look (click once to capture the mouse) |
-| PC **short left click** | Place one block if an item is equipped |
-| PC **hold left click (420ms+)** | Begin mining; hold until the selected block's break time is reached |
+| PC **right mouse drag** | Look around without capturing the pointer |
+| PC **short left click** | Place one block at the **clicked pixel** if an item is equipped; click a wooden door to open/close it |
+| PC **hold left click (420ms+)** | Mine the exact block under the held cursor; hold for the target block's break time |
 | Phone **drag left half** | Analog movement, based on displacement from touch start (no joystick overlay) |
 | Phone **drag right half** | Look around; two simultaneous fingers supported |
-| Phone **tap** | Place if an item is equipped; tapping the hotbar chooses an item |
+| Phone **tap** | Place at the tapped screen position; tapping a door opens/closes it |
 | Phone **hold right half (420ms+)** | Mine a targeted block until completed; moving to look cancels the hold |
 | Phone Jump / Descend buttons | Jump or fly downward |
 | 1..0 / bottom hotbar / wheel | Select block; tap same slot again or Q to unequip |
-| E / I / Bag | Open world-anchored holographic building bag (portrait-responsive) |
+| E / I / Bag | Open an **in-world** holographic bag. Its center stays anchored; its face billboard-rotates toward your character |
 | L | Switch between building blocks and lights |
 | M / Settings icon | Open HTML settings, switch world, save and recover water |
 | F / P | Toggle flight / save the current world |
@@ -45,7 +45,7 @@ npm test
 
 - One voxel side is physically **0.8 m**, including the WebGL world/hologram projection. The logical grid, chunk IDs, generated terrain and saved edits remain **integer voxel coordinates**. The player's physical height remains ~1.9 m and eye height ~1.7 m; creature render meshes remain meter-sized.
 - Streaming loads 37 chunks in a rounded 3-chunk ring instead of 49 square-ring chunks, with a smaller 56-chunk residency target. No change to the existing 16×16×64 storage size or generation algorithm.
-- PC/multitouch gestures are handled as discrete taps versus holds, with cancellation after drag, visibility change and opening the UI.
+- PC/multitouch gestures are handled as discrete taps versus holds at their actual screen coordinates. The game world can be manipulated without pointer lock; desktop right-drag rotates the camera.
 
 ## Historical version notes (superseded controls are not current)
 
@@ -65,7 +65,10 @@ npm test
 | `core/lighting.js` | Chunk-indexed emissive fixture lookup |
 | `core/lightVolume.js` | Occlusion-aware emissive light propagation in a compact 3D voxel grid |
 | `client/light.worker.js` | Off-main-thread light volume generation |
-| `client/hologram.js` | In-world 3D projected, textured inventory plane with pointer-lock reticle |
+| `client/hologram.js` | Depth-tested 3D card array with world-anchored center, viewer-facing billboard basis and screen ray hits |
+| `client/picking.js` | Pixel-accurate screen ray casting shared by desktop and mobile building |
+| `client/textures.js` | Deterministic 32×32 texture-array materials, one GPU upload and mipmaps |
+| `core/door.js` | Reusable two-block door geometry and collision bounds |
 | `core/chunk.js` | Fixed 16 × 16 × 64 typed-array voxel storage |
 | `core/world.js` | Block access, streaming, edits, tick scheduling, local saves, multiverse |
 | `core/physics.js` | AABB collision, swept substeps, movement, voxel DDA raycast |
@@ -76,17 +79,17 @@ npm test
 | `client/mesher.js` | Greedy face merging and transparent mesh bucket |
 | `client/renderer.js` | WebGL2 buffers, shaders, camera, visibility culling and adaptive render scale |
 | `client/mesh.worker.js` | Background meshing of chunk snapshots with transferables |
-| `client/input.js` | Keyboard, pointer lock, touch input |
+| `client/input.js` | Keyboard, free-cursor primary tap/hold, right-drag camera and touch input |
 | `client/game.js` | Main integration and fixed timestep orchestration |
 
 ## Extension points
 
-- **Blocks:** Append an entry to `BLOCKS` (and an ID to `BLOCK`), then add a hotbar entry or behavior. The current chunk format uses `Uint8Array`, so IDs must remain 0–255, and `World.set` validates them against the registry length.
+- **Blocks:** Append an entry to `BLOCKS` (and an ID to `BLOCK`), then add a hotbar entry or behavior. Two-block doors occupy IDs 18/19; `World.blockStates` holds facing/open independently and persists in optional `states` save data. The current chunk format uses `Uint8Array`, so IDs must remain 0–255, and `World.set` validates them against the registry length.
 - **Worldgen:** Implement a deterministic `(chunk, seed) => chunk` generator and dispatch by `World.mode` inside `worldgen/generators.js`. Use world coordinates for features extending across chunks.
 - **Mobs:** Introduce new classes based on `Entity` / `Mob`, with AI in `update` and visual representation in `Renderer.dynamicData`.
-- **Rendering:** Replace procedural RGB faces with texture atlas tile indices in `mesher.js`, pass UV and tile ID through shader attributes. Current build has **no Minecraft texture atlas**.
+- **Rendering:** The world now uses 32×32 generated albedo-modulation tiles in a WebGL2 2D texture array, with face IDs packed into existing seven-float mesh vertices. Mipmaps help at distance. No borrowed Minecraft assets or extra texture HTTP fetches.
 - **Save format:** Chunk modifications persist via `localStorage`, not full chunk snapshots. For production persistence migrate to IndexedDB plus a revisioned save schema.
-- **Portals:** Place a purple portal block and walk into it to travel to the next world. The world selector is also available.
+- **Portals:** Existing purple portal blocks still travel between worlds; the main hotbar now uses slot 10 for a wooden door. The world selector remains available.
 
 ## Deliberate limitations / next work
 

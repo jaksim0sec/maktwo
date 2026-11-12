@@ -37,5 +37,5 @@ test('look is frame-driven and clamps stale pointer spikes',()=>{
 test('shader uses original authored albedo, without artificial grayscale substitution',()=>{
  const renderer=readFileSync(new URL('../src/client/renderer.js',import.meta.url),'utf8');
  assert.doesNotMatch(renderer,/warmReflectance|float gray=dot\(vColor/);
- assert.match(renderer,/vColor\*\(ambient\+emission\*1\.38\)/);
+ assert.match(renderer,/vec3 tinted=vColor/);assert.match(renderer,/tinted\*\(ambient\+emission\*1\.38\)/);
 });

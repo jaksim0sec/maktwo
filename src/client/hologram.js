@@ -50,8 +50,23 @@ export function createAnchor(player,compact=false){
  const yaw=player.yaw,pitch=player.pitch,cp=Math.cos(pitch),sp=Math.sin(pitch);
  const forward=[-Math.sin(yaw)*cp,sp,-Math.cos(yaw)*cp],right=[Math.cos(yaw),0,-Math.sin(yaw)],up=[Math.sin(yaw)*sp,cp,Math.cos(yaw)*sp];
  const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
- const center=add(add(add(eye,forward,2.65),right,compact?0:.42),up,-.24);
+ const center=add(add(add(eye,forward,2.25),right,compact?0:.42),up,-.24);
  return{center,forward,right,up};
+}
+// Keep the 3D card positions, but billboard their front faces toward the viewer.
+// Uses the viewer position, not current look direction. This is NOT a HUD overlay.
+export function faceAnchor(anchor,viewer){
+ if(!anchor)return false;
+ const eye=[viewer.x,viewer.y+viewer.eye+(viewer.visualStepOffset||0),viewer.z];
+ const v=sub(anchor.center,eye),length=Math.hypot(...v);
+ if(length<.0001)return false;
+ const forward=v.map(x=>x/length);
+ const cross=[-forward[2],0,forward[0]];let m=Math.hypot(...cross);
+ const right=m<.0001?anchor.right:cross.map(x=>x/m);
+ const up=[right[1]*forward[2]-right[2]*forward[1],right[2]*forward[0]-right[0]*forward[2],right[0]*forward[1]-right[1]*forward[0]];
+ const rotated=Math.abs(dot(forward,anchor.forward)-1)>1e-7||Math.abs(dot(right,anchor.right)-1)>1e-7;
+ if(rotated){anchor.forward=forward;anchor.right=right;anchor.up=up}
+ return rotated;
 }
 export function spatialHit(anchor,cards,camera,ray){
  if(!anchor||!cards?.length)return null;
@@ -85,6 +100,7 @@ export class Hologram{
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,15*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
  open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
+ facePlayer(player){if(this.opened&&faceAnchor(this.anchor,player))this.buildGeometry()}
  close(){this.opened=false;this.pointer=null;this.hover=null}
  setInventory(palette,items,selected){this.palette=palette;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
@@ -110,7 +126,7 @@ export class Hologram{
    ctx.fillStyle=base;ctx.fillRect(x+w/2-28,y+52,53,52);
    ctx.fillStyle='rgba(255,255,255,.32)';ctx.beginPath();ctx.moveTo(x+w/2-28,y+52);ctx.lineTo(x+w/2-12,y+38);ctx.lineTo(x+w/2+41,y+38);ctx.lineTo(x+w/2+25,y+52);ctx.fill();
    ctx.fillStyle='rgba(0,0,0,.27)';ctx.beginPath();ctx.moveTo(x+w/2+25,y+52);ctx.lineTo(x+w/2+41,y+38);ctx.lineTo(x+w/2+41,y+90);ctx.lineTo(x+w/2+25,y+104);ctx.fill();
-   ctx.textAlign='center';ctx.font=font(22,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+157,170);ctx.font=font(16);ctx.fillStyle='#aeb5b3';ctx.fillText(String(Number(card.id.slice(5))+1),x+w/2,y+184);ctx.textAlign='left';
+   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(String(Number(card.id.slice(5))+1),x+w/2,y+184);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;

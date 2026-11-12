@@ -1,6 +1,8 @@
 import {SIZE, HEIGHT} from '../core/chunk.js';
-import {BLOCK as B, BLOCKS, block} from '../core/blocks.js?v=0.9.0';
+import {BLOCK as B, BLOCKS, block} from '../core/blocks.js?v=1.1.0';
 import {hash} from '../util/math.js';
+import {materialFor} from './textures.js';
+import {doorBounds} from '../core/door.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -15,7 +17,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>render==='cross'||render==='fixture');
+const CROSS = BLOCKS.map(({render})=>render==='cross'||render==='fixture'||render==='door'||render==='door-top');
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -26,8 +28,8 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
 export function meshChunk(world,chunk){
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
- for(const f of FACES){
-  const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
+ for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
+  const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
   const edge=n===0?world.getChunk(chunk.cx+sign,chunk.cz,false):n===2?world.getChunk(chunk.cx,chunk.cz+sign,false):null;
   const data=chunk.data, edgeData=edge?.data;
@@ -70,15 +72,16 @@ export function meshChunk(world,chunk){
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
     const color=COLORS[id],variation=.95+hash(xyz[0],xyz[1],xyz[2],world.seed)*.06;
-    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],shade);
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],shade+4*materialFor(id,faceIndex));
     k+=width;
    }
   }
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH&&id!==B.LANTERN&&id!==B.CAMPFIRE)continue;
+  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH&&id!==B.LANTERN&&id!==B.CAMPFIRE&&id!==B.DOOR)continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
+  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
   if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
   const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
   const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
@@ -108,4 +111,18 @@ export function fixture(dest,id,x,y,z){
   shape(.37,.34,.37,.26,.32,.26,'#f8ae65',-1.5);
   shape(.45,.59,.45,.10,.13,.10,'#ffe0a3',-1.7);
  }
+}
+
+// The door's full two-block model is emitted once from the lower cell.
+// Rendering it separately avoids breaking greedy face merging or chunk storage.
+export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
+ const b=doorBounds(x,z,state?.facing||0,Boolean(state?.open));
+ const color=rgb('#af9372');
+ for(let f=0;f<FACES.length;f++){
+  const face=FACES[f];const verts=face.corners.map(([a,c,d])=>[b.x+a*b.w,y+.04+c*1.88,b.z+d*b.d]);
+  quad(dest,verts,color,face.shade+4*materialFor(18,f));
+ }
+ // Inlaid handle: small warm metal knob on the visible side.
+ const acrossX=b.w>b.d;
+ cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb('#cdbd8f'));
 }
