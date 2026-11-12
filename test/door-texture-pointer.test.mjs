@@ -58,7 +58,7 @@ test('world anchored holo billboard faces the moving player without moving its c
  p.x=1.4;p.y=29.25;p.z=.5;
  assert.ok(faceAnchor(anchor,p));assert.deepEqual(anchor.center,center);
  const toCard=[center[0]-p.x,center[1]-(p.y+p.eye),center[2]-p.z],length=Math.hypot(...toCard);
- assert.ok(anchor.forward.every((x,i)=>Math.abs(x-toCard[i]/length)<1e-6));
+ assert.ok(anchor.forward.every((x,i)=>Math.abs(x-(i===1?0:toCard[i]/Math.hypot(toCard[0],toCard[2])))<1e-6));
  for(const card of cards){const target=anchor.center.map((v,i)=>v+anchor.right[i]*card.x+anchor.up[i]*card.y+anchor.forward[i]*card.depth);
   const eye=[p.x,p.y+p.eye,p.z],delta=target.map((v,i)=>v-eye[i]),L=Math.hypot(...delta);
   assert.equal(spatialHit(anchor,cards,p,delta.map(v=>v/L))?.id,card.id);
@@ -71,7 +71,7 @@ test('hotbar labels localized without modifying stable block IDs',()=>{
 test('offline service worker includes new ray picker, door and texture modules',()=>{
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
  for(const p of ['src/client/picking.js','src/client/textures.js','src/core/door.js'])assert.ok(sw.includes(p));
- assert.match(sw,/maktwo-shell-v1\.4\.0/);
+ assert.match(sw,/maktwo-shell-v1\.5\.0/);
 });
 
 test('raycast only hits the physical door panel, not its empty cell',()=>{

@@ -13,7 +13,7 @@ const aimAt=(anchor,card)=>normalize([
 test('spatial bag consists of small separated in-world tiles, no fullscreen slab',()=>{
  const cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`Block ${i}`,color:'#456789'})));
  assert.equal(cards.length,15);
- assert.ok(cards.every(c=>c.w<.5&&c.h<.4));
+ assert.ok(cards.every(c=>c.w<.52&&c.h<.48));
  assert.equal(cards.filter(c=>c.id.startsWith('item:')).length,10);
  assert.ok(cards.some(c=>c.id==='hand'));
 });
@@ -22,9 +22,9 @@ test('world-anchored inventory ray-picks each card and empty hand',()=>{
  for(const card of cards){const ray=aimAt(anchor,card);assert.equal(spatialHit(anchor,cards,player,ray)?.id,card.id)}
  assert.equal(spatialHit(anchor,cards,player,[0,1,0]),null);
 });
-test('spatial inventory placement follows the players pitch but not later camera movement',()=>{
+test('spatial inventory remains upright and world-anchored after camera movement',()=>{
  const angled={...player,pitch:-.72};const anchor=createAnchor(angled);
- assert.ok(anchor.center[1]<player.y+player.eye-1);
+ assert.ok(Math.abs(anchor.center[1]-(player.y+player.eye))<.3);assert.deepEqual(anchor.up,[0,1,0]);
  const before=structuredClone(anchor);angled.yaw=1;angled.pitch=.5;
  assert.deepEqual(anchor,before,'world-space anchor must not follow a later camera turn');
 });

@@ -1,3 +1,5 @@
+> v1.5.0: Reduced HUD clutter (optional debug display), upright/larger spatial bag, faster phone camera and taps on both halves, door placement/collision recovery, stale-light-result protection, improved 32px pixel-art materials. Existing saves and mesh format are unchanged.
+
 > v1.4.0: Fixed inventory card clicking using the current pointer pixel, separated touch look gestures from hologram hover, adjusted player height to fit through the existing door, included light sources throughout the local light volume, and reduced naturally spawned sheep to six with wider spacing. No save or voxel-grid changes.
 
 > v1.3.2: Mobile inventory keeps left-zone movement and right-zone camera input, selecting a card only on a right-zone tap release. Narrow mobile quickbars scroll without pushing the tool button offscreen.
@@ -10,7 +12,7 @@
 
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
-# MakTwo · Endless Night v1.4.0
+# MakTwo · Endless Night v1.5.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -27,7 +29,7 @@ No build or external dependencies are required. Node 18+ is needed for tests. We
 npm test
 ```
 
-## Current controls (v1.1)
+## Current controls (v1.5)
 
 | Input | Action |
 |---|---|
@@ -38,7 +40,7 @@ npm test
 | Phone **drag left half** | Analog movement, based on displacement from touch start (no joystick overlay) |
 | Phone **drag right half** | Look around; two simultaneous fingers supported |
 | Phone **tap** | Place at the tapped screen position; tapping a door opens/closes it |
-| Phone **hold right half (420ms+)** | Mine a targeted block until completed; moving to look cancels the hold |
+| Phone **stationary hold either half (420ms+)** | Mine a targeted block until completed; moving to look cancels the hold |
 | Phone Jump / Descend buttons | Jump or fly downward |
 | 1..0 / bottom hotbar / wheel | Select block; tap same slot again or Q to unequip |
 | E / I / Bag | Open an **in-world** holographic bag. Its center stays anchored; its face billboard-rotates toward your character |

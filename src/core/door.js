@@ -1,6 +1,6 @@
 // Axis-aligned two-block doors. Saved orientation and open state are kept separate
 // from block IDs so old worlds and future interactive props remain extensible.
-export const DOOR_HEIGHT=1.88;
+export const DOOR_HEIGHT=1.94;
 export function doorBounds(x,z,facing=0,open=false){
  const bands=[
   {x:.08,z:.07,w:.84,d:.14}, // north: across X

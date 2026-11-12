@@ -28,3 +28,16 @@ button,select{font:inherit;color:inherit}button{cursor:pointer}button:focus-visi
 /* Narrow viewports must constrain the dock's intrinsic min-content width.
    Items scroll inside the tray; bag and palette controls stay visible. */
 @media(max-width:650px){#build-controls{grid-template-columns:minmax(0,1fr)}#hotbar-dock{width:100%;max-width:100%;min-width:0;overflow:hidden}#hotbar{min-width:0;flex:1 1 0;overflow-x:auto;overflow-y:hidden}#hotbar .slot{flex-shrink:0}}
+
+/* v1.5: the night landscape comes first. Detailed diagnostics are opt-in. */
+#hud{padding:calc(12px + env(safe-area-inset-top)) 14px 0;opacity:.75}
+.brand-mark,.brand-type span,.stats,#control-hint,#target,#flight,.touch-zones{display:none!important}
+.brand-type strong{font-size:12px;font-weight:600;letter-spacing:.03em}
+body.debug-ui .stats{display:grid!important;opacity:.9;font-size:11px;margin-right:110px}
+body.debug-ui .brand-type span{display:block!important;font-size:10px}
+#build-controls{bottom:calc(9px + env(safe-area-inset-bottom));gap:4px}
+#block-name{font-size:11px;color:#e7d9c8a8;font-weight:500}
+#hotbar-dock{padding:4px;background:rgba(20,22,25,.55);border-color:#ffffff18;box-shadow:0 3px 18px #0004;backdrop-filter:blur(12px)}
+#player-status{opacity:.75}#health{font-size:12px}
+#hotbar .slot{width:41px;height:43px}.dock-action{height:43px;min-width:48px}
+@media(max-width:650px){#hud{padding-top:calc(11px + env(safe-area-inset-top))}#build-controls{bottom:calc(5px + env(safe-area-inset-bottom))}#player-status{bottom:calc(75px + env(safe-area-inset-bottom))}#hotbar .slot{min-width:35px;width:35px;height:38px}.dock-action{height:38px;min-width:43px}}

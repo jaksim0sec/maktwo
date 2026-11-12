@@ -27,7 +27,7 @@ export class GestureState {
     if(dist>=LOOK_START_PX)f.lookActive=true;
     if(f.lookActive){
      // CSS px, not device px; keep look sensitivity comparable on phones and tablets.
-     const gain=clamp(540/f.viewportWidth,0.85,2.2);
+     const gain=clamp(1750/f.viewportWidth,2.8,5.6);
      this.lookX+=clamp(x-f.x,-48,48)*gain;
      this.lookY+=clamp(y-f.y,-48,48)*gain;
     }
@@ -38,14 +38,16 @@ export class GestureState {
  }
  up(id,x,y,time,cancel=false){
   const f=this.fingers.get(id);if(!f)return;
-  // The movement zone can never accidentally place or break a block.
-  if(!cancel&&f.side==='right'&&!f.dragged&&!f.holding&&!f.holdCancelled&&time-f.time<HOLD_MS&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX){
+  // A stationary tap on either side is an explicit world action; movement drags never edit.
+  if(!cancel&&!f.dragged&&!f.holding&&!f.holdCancelled&&time-f.time<HOLD_MS&&Math.hypot(x-f.startX,y-f.startY)<=TAP_DRIFT_PX){
    this.taps++;this.tapPoints.push({x,y});
   }
   this.fingers.delete(id);this[f.side]=null;
  }
  miningPoint(now){
-  const f=this.right===null?null:this.fingers.get(this.right);
+  const right=this.right===null?null:this.fingers.get(this.right);
+  const left=this.left===null?null:this.fingers.get(this.left);
+  const f=[right,left].find(f=>(f?.holding||f&&!f.dragged)&&!f.lookActive)||null;
   if(!f||f.lookActive||f.holdCancelled||(!f.holding&&f.dragged)||now-f.time<HOLD_MS)return null;
   f.holding=true;
   // Lock the target during a hold so subpixel finger wobble doesn't reset mining.

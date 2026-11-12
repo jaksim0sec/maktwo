@@ -31,28 +31,28 @@ function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
 function cardGeometry(palette,items,compact=false){
  const cards=[
-  {id:'tab:blocks',name:'건축',x:-.87,y:.53,w:.35,h:.22,depth:-.02},
-  {id:'tab:lights',name:'조명',x:-.44,y:.53,w:.35,h:.22,depth:-.035},
-  {id:'tab:garden',name:'정원',x:0,y:.53,w:.35,h:.22,depth:-.035},
-  {id:'hand',name:'맨손',x:.44,y:.53,w:.35,h:.22,depth:-.035},
-  {id:'close',name:'닫기',x:.87,y:.53,w:.35,h:.22,depth:-.02},
+  {id:'tab:blocks',name:'건축',x:-1.02,y:.67,w:.41,h:.25,depth:-.02},
+  {id:'tab:lights',name:'조명',x:-.51,y:.67,w:.41,h:.25,depth:-.035},
+  {id:'tab:garden',name:'정원',x:0,y:.67,w:.41,h:.25,depth:-.035},
+  {id:'hand',name:'맨손',x:.51,y:.67,w:.41,h:.25,depth:-.035},
+  {id:'close',name:'닫기',x:1.02,y:.67,w:.41,h:.25,depth:-.02},
  ];
  if(compact){
-  cards.forEach((card,i)=>{card.x=[-.62,-.31,0,.31,.62][i];card.w=.29});
+  cards.forEach((card,i)=>{card.x=[-.52,-.26,0,.26,.52][i];card.w=.25;card.y=.54});
  }
  for(let i=0;i<items.length;i++){
   const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
-  const x=compact?(col-1)*.42:(col-2)*.44,y=.12-row*.43;
-  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,x,y,w:compact?.375:.385,h:.36,depth:-.06+Math.abs(x)*.065});
+  const x=compact?(col-1)*.40:(col-2)*.52,y=(compact?.06:.15)-row*(compact?.49:.53);
+  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
  }
  return cards;
 }
 export {cardGeometry};
 export function createAnchor(player,compact=false){
- const yaw=player.yaw,pitch=player.pitch,cp=Math.cos(pitch),sp=Math.sin(pitch);
- const forward=[-Math.sin(yaw)*cp,sp,-Math.cos(yaw)*cp],right=[Math.cos(yaw),0,-Math.sin(yaw)],up=[Math.sin(yaw)*sp,cp,Math.cos(yaw)*sp];
+ const yaw=player.yaw;
+ const forward=[-Math.sin(yaw),0,-Math.cos(yaw)],right=[Math.cos(yaw),0,-Math.sin(yaw)],up=[0,1,0];
  const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
- const center=add(add(add(eye,forward,2.25),right,compact?0:.42),up,-.24);
+ const center=add(add(eye,forward,compact?2.55:2.65),up,-.16);
  return{center,forward,right,up};
 }
 // Keep the 3D card positions, but billboard their front faces toward the viewer.
@@ -60,12 +60,12 @@ export function createAnchor(player,compact=false){
 export function faceAnchor(anchor,viewer){
  if(!anchor)return false;
  const eye=[viewer.x,viewer.y+viewer.eye+(viewer.visualStepOffset||0),viewer.z];
- const v=sub(anchor.center,eye),length=Math.hypot(...v);
+ const v=sub(anchor.center,eye);v[1]=0;const length=Math.hypot(...v);
  if(length<.0001)return false;
  const forward=v.map(x=>x/length);
  const cross=[-forward[2],0,forward[0]];let m=Math.hypot(...cross);
  const right=m<.0001?anchor.right:cross.map(x=>x/m);
- const up=[right[1]*forward[2]-right[2]*forward[1],right[2]*forward[0]-right[0]*forward[2],right[0]*forward[1]-right[1]*forward[0]];
+ const up=[0,1,0];
  const rotated=Math.abs(dot(forward,anchor.forward)-1)>1e-7||Math.abs(dot(right,anchor.right)-1)>1e-7;
  if(rotated){anchor.forward=forward;anchor.right=right;anchor.up=up}
  return rotated;

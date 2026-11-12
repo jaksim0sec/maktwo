@@ -18,8 +18,10 @@ test('inventory pointer-down uses current screen pixel rather than stale previou
  mock.opened=true;mock.anchor=createAnchor(player);
  mock.cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`물건 ${i}`,color:'#777777'})));
  mock.buildGeometry=()=>{};
- const left=mock.pickAt(player,450,350,rect);assert.equal(left,'item:0');
- const right=mock.pickAt(player,650,350,rect);assert.equal(right,'item:3');
+ const toPixel=card=>{const depth=2.65-card.depth;const aspect=rect.width/rect.height;return {x:rect.width*(1+card.x/(depth*Math.tan(75*Math.PI/360)*aspect))/2,y:rect.height*(1-(card.y-.16)/(depth*Math.tan(75*Math.PI/360)))/2}};
+ const a=toPixel(mock.cards[5]),b=toPixel(mock.cards[8]);
+ const left=mock.pickAt(player,a.x,a.y,rect);assert.equal(left,'item:0');
+ const right=mock.pickAt(player,b.x,b.y,rect);assert.equal(right,'item:3');
  assert.notEqual(left,right);assert.equal(mock.click(),right);
  assert.match(source('src/client/game.js'),/hologram\.pickAt\(this\.player,event\.clientX,event\.clientY/);
 });

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {GestureState,HOLD_MS,LOOK_START_PX,MOVE_DEADZONE} from '../src/client/gestures.js';
 import {Input} from '../src/client/input.js';
 
-test('a movement-zone finger never edits blocks, even on a stationary short tap',()=>{
+test('a stationary left tap edits, while a movement drag never edits',()=>{
  const s=new GestureState();s.down(11,40,270,180,1000,360);s.up(11,41,270,1050);
- assert.equal(s.consumeTaps(),0);assert.equal(s.consumeTapPoint(),null);
+ assert.equal(s.consumeTaps(),1);assert.deepEqual(s.consumeTapPoint(),{x:41,y:270});s.down(12,45,270,180,1100,360);s.move(12,100,270);s.up(12,100,270,1200);assert.equal(s.consumeTaps(),0);
 });
 test('right-hand fine jitter produces no camera movement, a tap only on release',()=>{
  const s=new GestureState();s.down(9,260,260,180,100,360);

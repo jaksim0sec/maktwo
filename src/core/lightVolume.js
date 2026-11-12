@@ -17,7 +17,8 @@ class Heap {
 export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIGHT_HEIGHT,depth=LIGHT_DEPTH,origin=[0,0,0]}={}){
  const total=width*height*depth;
  if(occluders.length!==total)throw Error('Light volume dimensions mismatch');
- const output=new Uint8Array(total*4),colors=new Float32Array(total*3),dist=new Float32Array(total);
+ const output=new Uint8Array(total*4),colors=new Float32Array(total*3),dist=new Float32Array(total),stamp=new Uint16Array(total);
+ let sourceStamp=0;
  const plane=width*height;
  const inside=(x,y,z)=>x>=0&&x<width&&y>=0&&y<height&&z>=0&&z<depth;
  const at=(x,y,z)=>(z*height+y)*width+x;
@@ -28,7 +29,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
   if(occluders[first])continue;
   const radius=Math.min(22,Math.max(1,src.radius));
   const tint=src.rgb||[1,.58,.29],energy=src.intensity||1;
-  dist.fill(Infinity);dist[first]=0;
+  const mark=++sourceStamp;stamp[first]=mark;dist[first]=0;
   const heap=new Heap();heap.push(first,0);
   while(heap.length){
    const [index,cost]=heap.pop();if(cost>dist[index]+1e-4||cost>=radius)continue;
@@ -47,7 +48,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
      if(step.dx&&step.dz&&occluders[at(x+step.dx,y,z+step.dz)])continue;
      if(step.dy&&step.dz&&occluders[at(x,y+step.dy,z+step.dz)])continue;
     }
-    if(dd+.0001<dist[ni]){dist[ni]=dd;heap.push(ni,dd)}
+    if(stamp[ni]!==mark||dd+.0001<dist[ni]){stamp[ni]=mark;dist[ni]=dd;heap.push(ni,dd)}
    }
   }
  }

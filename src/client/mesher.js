@@ -2,7 +2,7 @@ import {SIZE, HEIGHT} from '../core/chunk.js';
 import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
-import {doorBounds} from '../core/door.js';
+import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -122,7 +122,7 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false}){
  const b=doorBounds(x,z,state?.facing||0,Boolean(state?.open));
  const color=rgb('#af9372');
  for(let f=0;f<FACES.length;f++){
-  const face=FACES[f];const verts=face.corners.map(([a,c,d])=>[b.x+a*b.w,y+.04+c*1.88,b.z+d*b.d]);
+  const face=FACES[f];const verts=face.corners.map(([a,c,d])=>[b.x+a*b.w,y+.04+c*DOOR_HEIGHT,b.z+d*b.d]);
   quad(dest,verts,color,face.shade+4*materialFor(18,f));
  }
  // Inlaid handle: small warm metal knob on the visible side.

@@ -16,7 +16,9 @@ export class World{
   for(const body of occupants||[])if(body&&!body.dead&&doorIntersectsBody(bx,baseY,bz,next,body))return false;
   return this.setDoorState(bx,baseY,bz,next);
  }
- placeDoor(x,y,z,facing=0){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<1||y+1>=HEIGHT||!block(this.get(x,y,z)).replaceable||!block(this.get(x,y+1,z)).replaceable)return false;const lower=this.get(x,y,z),upper=this.get(x,y+1,z);if(!this.set(x,y,z,B.DOOR))return false;if(!this.set(x,y+1,z,B.DOOR_TOP)){this.set(x,y,z,lower);return false}this.setDoorState(x,y,z,{facing,open:false});return true}
+ placeDoor(x,y,z,facing=0,occupants=[]){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<1||y+1>=HEIGHT||!block(this.get(x,y,z)).replaceable||!block(this.get(x,y+1,z)).replaceable)return false;const lower=this.get(x,y,z),upper=this.get(x,y+1,z);
+  const state={facing,open:false};for(const actor of occupants)if(actor&&!actor.dead&&doorIntersectsBody(x,y,z,state,actor))return false;
+  if(!this.set(x,y,z,B.DOOR))return false;if(!this.set(x,y+1,z,B.DOOR_TOP)){this.set(x,y,z,lower);return false}this.setDoorState(x,y,z,{facing,open:false});return true}
  removeDoor(x,y,z){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);const id=this.get(x,y,z);if(!isDoor(id))return false;const baseY=id===B.DOOR_TOP?y-1:y;this.blockStates.delete(this.stateKey(x,baseY,z));if(this.get(x,baseY,z)===B.DOOR)this.set(x,baseY,z,B.AIR);if(this.get(x,baseY+1,z)===B.DOOR_TOP)this.set(x,baseY+1,z,B.AIR);return true}
  get(x,y,z,create=true){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<0)return B.BEDROCK;if(y>=HEIGHT)return B.AIR;const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,create);return c?c.get(x-cx*SIZE,y,z-cz*SIZE):B.AIR}
  set(x,y,z,id,{simulate=true,record=true}={}){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<=0||y>=HEIGHT||!Number.isInteger(id)||id<0||id>=BLOCKS.length)return false;const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz);const lx=x-cx*SIZE,lz=z-cz*SIZE;const oldId=c.get(lx,y,lz);if(!c.set(lx,y,lz,id))return false;

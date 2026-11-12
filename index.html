@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo | 끝나지 않는 밤</title>
- <link rel="stylesheet" href="./style.css?v=1.4.0">
+ <link rel="stylesheet" href="./style.css?v=1.5.0">
 </head>
 <body>
  <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
@@ -28,6 +28,7 @@
   <div class="settings-heading"><div><span class="eyebrow">MAKTWO</span><h2>게임 설정</h2></div><button id="resume" class="close-control" title="설정 닫기">✕ <span>닫기</span></button></div>
   <div class="settings-section"><span class="section-caption">월드</span><label class="field-label" for="world">이동할 세계</label><select id="world" aria-label="이동할 세계"></select><span class="seed-line">월드 시드 <b id="seed"></b></span></div>
   <div class="settings-section"><span class="section-caption">플레이</span><button id="spawn" class="setting-row"><span>⌖</span> 시작 위치로 이동</button><button id="mode" class="setting-row"><span>✦</span> 비행 모드 <kbd>F</kbd></button><button id="save" class="setting-row"><span>▣</span> 월드 저장 <kbd>P</kbd></button></div>
+  <div class="settings-section"><span class="section-caption">표시</span><button id="debug-toggle" class="setting-row" aria-pressed="false"><span>◌</span> 성능·좌표 정보 보기</button></div>
   <div class="settings-section"><span class="section-caption">관리 및 도움말</span><button id="water-repair" class="setting-row" title="직접 설치한 물을 복구하고 자연 물과 건축물을 보호합니다"><span>◌</span> 설치된 물 정리</button><button id="help-btn" class="setting-row"><span>?</span> 조작법 확인 <kbd>H</kbd></button></div>
   <div class="settings-foot">이 세계의 밤은 끝나지 않습니다</div>
  </aside>
@@ -46,12 +47,12 @@
   </div>
  </div>
  <div id="mobile" aria-label="모바일 조작">
-  <div class="touch-zones" aria-hidden="true"><span>↔ 이동 영역</span><span>시점 이동 · 탭 설치 · 길게 채굴 ↗</span></div>
+  
   <div class="touchbuttons"><button data-action="jump" aria-label="점프">↑<span>점프</span></button><button data-action="crouch" aria-label="하강">↓<span>하강</span></button></div>
  </div>
  <div id="help" class="overlay hidden"><div class="help-card" role="dialog" aria-labelledby="help-title">
   <div class="help-top"><div><span class="eyebrow">GUIDE</span><h2 id="help-title">조작법</h2></div><button id="close-help" aria-label="도움말 닫기">✕</button></div>
-  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프</b><span>Space</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 우측 롱프레스</span><b>아이템</b><span>1–0 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>조명 도구</b><span>L</span><b>비행</b><span>F</span><b>동물 / 테스트</b><span>G / Shift+G</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
+  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프</b><span>Space</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 길게 누르기</span><b>아이템</b><span>1–0 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>조명 도구</b><span>L</span><b>비행</b><span>F</span><b>동물 / 테스트</b><span>G / Shift+G</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
  </div></div>
  <div id="fatal" hidden></div>
  <script>
@@ -60,6 +61,6 @@
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.4.0"></script>
+ <script type="module" src="./src/client/game.js?v=1.5.0"></script>
 </body>
 </html>
