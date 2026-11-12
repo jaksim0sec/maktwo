@@ -1,4 +1,4 @@
-import {Chunk,SIZE,HEIGHT,TURN_STYLE} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
+import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {CITY_MODE,CITY_HEIGHT,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
@@ -25,15 +25,24 @@ export class World{
  getShapeState(x,y,z){
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
   const y0=Math.floor(y),variant=y0>=0&&y0<this.height?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
-  const state={facing:variant&TURN_STYLE?variant&7:0,upper:false,variant:variant&TURN_STYLE?0:variant,...this.blockStates.get(this.stateKey(x,y,z))};
+  const cityStair=Boolean(variant&CITY_STAIR_STYLE);
+  const state={facing:variant&TURN_STYLE?variant&7:0,upper:false,
+   variant:variant&TURN_STYLE?0:variant,
+   ...(cityStair?{cityStair:true,treadHeight:((variant&CITY_STAIR_LEVEL_MASK)>>3)+1&0xff,rail:Boolean(variant&64)}:{}),
+   ...this.blockStates.get(this.stateKey(x,y,z))};
+  if(cityStair)state.treadHeight=(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4;
   const id=this.get(x,y,z,false);
   if(partById(id)?.family==='staircase'){
    const neighbor=(dx,dz,dy=0)=>{
     const nx=Math.floor(x)+dx,nz=Math.floor(z)+dz;
-    return {id:this.get(nx,y+dy,nz,false),facing:this.partFacing(nx,y+dy,nz)};
+    const other=this.get(nx,y+dy,nz,false);
+    const c=this.getChunk(Math.floor(nx/SIZE),Math.floor(nz/SIZE),false),
+     style=c?.styles?.[Chunk.index((nx%SIZE+SIZE)%SIZE,Math.floor(y+dy),(nz%SIZE+SIZE)%SIZE)]||0;
+    return {id:other,facing:this.partFacing(nx,y+dy,nz),
+     treadHeight:style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined};
    };
    state.connected=stairConnections(id,state.facing,neighbor);
-   if(variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor);
+   if(variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor,state.cityStair?state.treadHeight:undefined);
   }
   return state;
  }

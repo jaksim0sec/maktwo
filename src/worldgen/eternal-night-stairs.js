@@ -2,8 +2,8 @@
 // Existing creative parts keep their detailed independent 3-step geometry.
 // Generated buildings instead use one world-aligned tread per occupied voxel;
 // its top height and outside rail are captured in the chunk style byte.
-export const CITY_STAIR_STYLE=128;
-export const CITY_STAIR_LEVEL_MASK=24;
+import {CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
+export {CITY_STAIR_STYLE};
 
 export function encodeCityStair(surface,orientation,rail=false){
  const base=Math.ceil(surface-1e-6)-1;

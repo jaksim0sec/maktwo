@@ -1,4 +1,4 @@
-import {SIZE, TURN_STYLE, EXTERIOR_STYLE} from '../core/chunk.js';
+import {SIZE, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
 import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
@@ -25,11 +25,13 @@ const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path'
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
-function partTemplate(id,facing,connected,simple,stairRise){
- const key=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)|(simple?1<<13:0)|((stairRise===undefined?0:stairRise+1)<<14);
+function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false){
+ const key=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)
+  |(simple?1<<13:0)|((stairRise===undefined?0:Math.round(stairRise*4)+1)<<14)
+  |(cityStair?1<<18:0)|(cityStair?(Math.round(treadHeight*4)-1)<<19:0)|(rail?1<<22:0);
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
- for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise})||[]){
+ for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail})||[]){
   const color=piece.emissive?[.97,.90,.78]:COLORS[piece.material],target=piece.alpha?transparent:opaque;
   for(const face of prismFaces(piece,true)){
    const n=prismNormal(face);if(!n)continue;
@@ -148,7 +150,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   const state=style&TURN_STYLE?{facing:style&7,...authored}:variant?{variant,...authored}:authored;
   if(BLOCKS[id].render==='part'){
    const simple=detailY!==undefined&&(detailY===null||y<detailY-4||y>=detailY+12);
-   if(simple&&!(style&EXTERIOR_STYLE)&&!authored)continue;
+   if(simple&&!(style&EXTERIOR_STYLE)&&!authored&&!(style&CITY_STAIR_STYLE))continue;
    const orientation=state?.facing||0;
    let connected=null,stairRise;
    if(!simple&&partById(id)?.family==='staircase'){
@@ -159,12 +161,15 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
      const a=((nx+SIZE)%SIZE),b=((nz+SIZE)%SIZE),k=((y+dy)*SIZE+b)*SIZE+a;
      const fx=wx+dx,fz=wz+dz;
      const generated=other.styles?.[k]||0;
-     return {id:other.data?.[k]||B.AIR,facing:stateAt(fx,y+dy,fz)?.facing??(generated&TURN_STYLE?generated&7:0)};
+     return {id:other.data?.[k]||B.AIR,
+      facing:stateAt(fx,y+dy,fz)?.facing??(generated&TURN_STYLE?generated&7:0),
+      treadHeight:generated&CITY_STAIR_STYLE?(((generated&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined};
     };
     connected=stairConnections(id,orientation,neighbor);
-    if(style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor);
+    if(style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor,style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined);
    }
-   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise);
+   const cityStair=Boolean(style&CITY_STAIR_STYLE),treadHeight=cityStair?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:1;
+   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE));
    emitPart(opaque,solid,wx,y,wz);emitPart(transparent,glass,wx,y,wz);
    continue;
   }

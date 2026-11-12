@@ -42,12 +42,16 @@ export function stairConnections(id,facing,neighborAt){
  };
  return {left:same(left),right:same([-left[0],-left[1]])};
 }
-export function stairRailRise(facing,neighborAt){
+export function stairRailRise(facing,neighborAt,currentHeight){
  if(facing&1)return undefined;
  const [dx,dz]=[[0,1],[-1,0],[0,-1],[1,0]][(facing>>1)&3];
  for(const rise of [0,1]){
   const next=neighborAt(dx,dz,rise);
-  if(partById(next?.id)?.family==='staircase'&&next.facing===facing)return rise;
+  if(partById(next?.id)?.family==='staircase'&&next.facing===facing){
+   if(next.treadHeight!==undefined&&currentHeight!==undefined)
+    return Math.max(0,Math.min(1,rise+next.treadHeight-currentHeight));
+   return rise;
+  }
  }
 }
 export function partPrisms(id,x,y,z,state={}){
@@ -56,7 +60,30 @@ export function partPrisms(id,x,y,z,state={}){
  const joined=state.connected||{};
  const pieces=[];
  let geometry=partGeometry(id);
- if(state.simple){
+ if(state.cityStair&&partById(id)?.family==='staircase'){
+  // City stairs use the planned tread height, never the independent 3-riser
+  // showroom asset. One structural step occupies one voxel, with no duplicate
+  // set of handrails in each cell of a continuous switchback flight.
+  const variant=partById(id).variant||0,h=Math.max(.25,Math.min(1,state.treadHeight||.5));
+  const materials=[96,91,107,115,95],finish=[97,93,109,115,95];
+  geometry=[
+   {x:0,y:0,z:0,w:1,h:h-.04,d:1,material:materials[variant],solid:true,structural:true},
+   {x:0,y:h-.04,z:0,w:1,h:.04,d:1,material:finish[variant],solid:true,structural:true}
+  ];
+  if(!state.simple){
+   for(const z of [.07,.75])
+    geometry.push({x:.06,y:h,z,w:.88,h:.012,d:.055,material:variant===2?106:109,solid:false});
+   if(state.rail){
+    const x=state.facing===2||state.facing===6?.065:.875;
+    const railTop=h+.60;
+    for(const z of [.16,.80]){
+     geometry.push({x,y:h-.01,z,w:.055,h:.60,d:.07,material:106,solid:true});
+    }
+    geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:.45});
+    geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:.45});
+   }
+  }
+ }else if(state.simple){
   const family=partById(id).family;
   if(family==='window')geometry=[
    {x:0,y:0,z:.46,w:1,h:.085,d:.085,material:106,solid:true},
