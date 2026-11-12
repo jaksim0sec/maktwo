@@ -110,7 +110,11 @@ export function architecturalVoxel(p,story,u,v,dy,seed){
  const edge=envelope(p,u,v);
  if(core)return dy===0?B.CONCRETE:B.AIR;
  if(dy===0)return B.CONCRETE;
- if(dy===1)return edge?p.facade:B.FLOOR_FINISH;
+ if(dy===1){
+  const shopDoor=story.use==='retail'&&v===0&&u>=9&&(u-10)%7===0;
+  // Entrance finishes meet the apron flush, not a full-height masonry sill.
+  return edge&&!(v===0&&u===5)&&!shopDoor?p.facade:B.FLOOR_FINISH;
+ }
  if(dy===5)return edge?p.facade:
    story.level===p.floors-1&&hash(u,story.level,v,seed+p.salt)>.987?B.AIR:B.CEILING_FINISH;
  if(edge)return outsideWall(p,story,u,v,dy);

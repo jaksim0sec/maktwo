@@ -47,6 +47,7 @@ test('edge stairwell connects storeys in 12 half-step increments with landings',
   assert.equal(architecturalVoxel(p,s,2,j+2,dy,SEED),steps[j].id);
  }
  const ground=storyAt(p,0),upper=storyAt(p,1);
+ assert.equal(architecturalVoxel(p,ground,5,0,1,SEED),B.FLOOR_FINISH);
  assert.equal(architecturalVoxel(p,ground,5,0,2,SEED),B.AIR);
  assert.equal(architecturalVoxel(p,ground,4,2,2,SEED),B.AIR);
  assert.equal(architecturalVoxel(p,upper,4,14,2,SEED),B.AIR);
