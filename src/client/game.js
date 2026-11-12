@@ -1,5 +1,7 @@
 import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,BLOCK as B,HOTBAR,LIGHTBAR} from '../core/blocks.js';import {Renderer} from './renderer.js';import {Input} from './input.js';import {clamp} from '../util/math.js';import {explode} from '../core/systems.js';
 const $=id=>document.getElementById(id);
+// Optional buttons can be absent when the page and module use different CDN cache versions.
+const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
  constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.world=this.manager.add('Overworld',17331,'normal');this.manager.add('Flatlands',9901,'flat');this.manager.add('Islands',45716,'islands');this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=0;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.hasLockedOnce=false;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.status('영원한 밤 · L 조명 도구 · WASD 이동');requestAnimationFrame(t=>this.frame(t))}
  get paletteItems(){return this.palette==='lights'?LIGHTBAR:HOTBAR}
@@ -9,8 +11,7 @@ class Game{
   const tile=document.createElement('span');tile.className='voxel';tile.style.setProperty('--tile',block(id).color);
   el.append(num,tile);el.title=`${block(id).name} · ${i+1}`;el.setAttribute('aria-label',`${i+1}번 ${block(id).name} 선택`);el.onclick=()=>this.select(i);bar.append(el);
  }this.select(Math.min(this.selected,this.paletteItems.length-1));
- $('palette-toggle').textContent=this.palette==='lights'?'▦ 블록':'✦ 조명';
- $('palette-toggle').title='블록/조명 도구 전환 · L';
+ const paletteToggle=$('palette-toggle');if(paletteToggle){paletteToggle.textContent=this.palette==='lights'?'▦ 블록':'✦ 조명';paletteToggle.title='블록/조명 도구 전환 · L'}
  }
  togglePalette(){this.palette=this.palette==='lights'?'blocks':'lights';this.selected=0;this.renderHotbar();this.status(this.palette==='lights'?'조명 도구 · 1 횃불  2 랜턴  3 모닥불':'건축 블록')}
  // UI mode releases pointer lock once and keeps it released while controls are in use.
@@ -46,15 +47,15 @@ class Game{
  }
  bindUI(){
   this.renderHotbar();this.updateControlHint();
-  $('palette-toggle').onclick=()=>this.togglePalette();
-  $('menu-btn').onclick=()=>this.toggleMenu();
-  $('resume').onclick=()=>this.requestGameFocus();
-  $('help-btn').onclick=()=>this.setHelp(true);
-  $('close-help').onclick=()=>this.requestGameFocus();
-  $('save').onclick=()=>{this.world.save();this.status('월드 저장 완료')};
-  $('mode').onclick=()=>{this.player.fly=!this.player.fly;this.player.vy=0;this.status(this.player.fly?'비행 모드':'걷기 모드')};
+  bindClick('palette-toggle',()=>this.togglePalette());
+  bindClick('menu-btn',()=>this.toggleMenu());
+  bindClick('resume',()=>this.requestGameFocus());
+  bindClick('help-btn',()=>this.setHelp(true));
+  bindClick('close-help',()=>this.requestGameFocus());
+  bindClick('save',()=>{this.world.save();this.status('월드 저장 완료')});
+  bindClick('mode',()=>{this.player.fly=!this.player.fly;this.player.vy=0;this.status(this.player.fly?'비행 모드':'걷기 모드')});
   $('world').addEventListener('change',e=>this.travel(e.target.value));
-  $('spawn').onclick=()=>{const t=this.world.spawn();Object.assign(this.player,t,{vx:0,vy:0,vz:0});this.status('시작 위치로 이동')};
+  bindClick('spawn',()=>{const t=this.world.spawn();Object.assign(this.player,t,{vx:0,vy:0,vz:0});this.status('시작 위치로 이동')});
   $('seed').textContent=String(this.world.seed);
   for(const b of document.querySelectorAll('[data-action]')){
    const action=b.dataset.action;
