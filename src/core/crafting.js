@@ -23,7 +23,7 @@ export const RECIPES=Object.freeze([
  make('stone_slab',B.STONE_SLAB,6,'bench',['CCC'],{C:B.COBBLE},'돌 반블록 ×6'),
  make('wood_slab',B.WOOD_SLAB,6,'bench',['PPP'],{P:B.PLANKS},'나무 반블록 ×6'),
  make('chair',B.CHAIR,1,'bench',['P P','PPP','P P'],{P:B.PLANKS},'나무 의자'),
- make('flower_pot',B.FLOWER_POT,2,'hand',['C C',' C '],{C:B.COBBLE},'꽃 화분 ×2'),
+ make('flower_pot',B.FLOWER_POT,2,'bench',['C C',' C '],{C:B.COBBLE},'꽃 화분 ×2'),
 ]);
 export const recipeByName=name=>RECIPES.find(r=>r.name===name)||null;
 export function recipeGrid(recipe){const grid=Array(9).fill(0);if(!recipe)return grid;

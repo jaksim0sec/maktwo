@@ -76,7 +76,7 @@ test('client accesses the bench in range, crafting UI uses real ingredient grid 
  assert.match(game,/this\.inventory\.quickSlots\[i\]/);
  assert.match(hologram,/recipeGrid\(card\.recipe\)/);
  assert.match(sw,/src\/core\/crafting\.js/);
- assert.match(sw,/maktwo-shell-v1\.9\.1/);
+ assert.match(sw,/maktwo-shell-v1\.9\.2/);
 });
 
 test('workbench meshing is identical in the worker and on the main thread',async()=>{
@@ -89,4 +89,17 @@ test('workbench meshing is identical in the worker and on the main thread',async
   globalThis.self.onmessage({data:{cx:0,cz:0,key:'0,0',revision:0,token:1,seed:61,data:chunk.data.slice().buffer,neighbors:[],doorStates:[]}});
   assert.equal(response.error,undefined);assert.deepEqual(response.opaque,reference.opaque);
  }finally{globalThis.self=oldSelf}
+});
+
+// Importing an oversized hand recipe used to crash the entire game at startup.
+test('flower pot V pattern belongs to the 3x3 workbench, not the 2x2 hand grid',()=>{
+ const pot=recipeByName('flower_pot');
+ assert.equal(pot.station,'bench');
+ assert.equal(Math.max(...pot.pattern.map(row=>row.length)),3);
+ assert.ok(matchesPattern(recipeGrid(pot),pot));
+ const inv=new SurvivalInventory();inv.add(B.COBBLE,3);
+ assert.equal(inv.canCraft(pot,'hand'),false);
+ assert.equal(inv.canCraft(pot,'bench'),true);
+ assert.equal(inv.craft(pot,'bench'),true);
+ assert.equal(inv.count(B.FLOWER_POT),2);
 });

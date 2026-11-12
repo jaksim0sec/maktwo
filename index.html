@@ -9,7 +9,7 @@
  <link rel="manifest" href="./manifest.webmanifest">
  <link rel="apple-touch-icon" href="./icons/maktwo-192.png">
  <title>MakTwo | 끝나지 않는 밤</title>
- <link rel="stylesheet" href="./style.css?v=1.9.0">
+ <link rel="stylesheet" href="./style.css?v=1.9.2">
 </head>
 <body>
  <canvas id="screen" aria-label="MakTwo 게임 월드"></canvas>
@@ -58,11 +58,11 @@
  <div id="rotate-screen" aria-live="polite"><span class="rotate-icon" aria-hidden="true">▱</span><strong>가로로 돌려주세요</strong><span>MakTwo는 가로 화면에서 플레이할 수 있어요</span></div>
  <div id="fatal" hidden></div>
  <script>
- if(navigator.serviceWorker){const hadController=!!navigator.serviceWorker.controller;
+ if(navigator.serviceWorker){navigator.serviceWorker.getRegistration().then(reg=>reg?.update()).catch(()=>{});const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController&&!window.__maktwoReloading){window.__maktwoReloading=true;location.reload()}})}
  window.addEventListener('error',event=>{if(!event.message)return;const fatal=document.getElementById('fatal');fatal.textContent='화면 오류: '+event.message;fatal.hidden=false});
  window.addEventListener('unhandledrejection',event=>{const fatal=document.getElementById('fatal');fatal.textContent='모듈 오류: '+String(event.reason?.message||event.reason);fatal.hidden=false});
  </script>
- <script type="module" src="./src/client/game.js?v=1.8.0"></script>
+ <script type="module" src="./src/client/game.js?v=1.9.2"></script>
 </body>
 </html>
