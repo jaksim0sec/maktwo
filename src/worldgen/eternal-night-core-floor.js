@@ -152,22 +152,16 @@ function gridValue(x, z, seed) {
 }
 
 function latticeNoise(layout, x, z) {
-  const u = x * layout.inverseNoiseCellSize + layout.noiseShiftX;
-  const v = z * layout.inverseNoiseCellSize + layout.noiseShiftZ;
-  const ix = Math.floor(u);
-  const iz = Math.floor(v);
-  const fx = u - ix;
-  const fz = v - iz;
-  const sx = fx * fx * (3 - 2 * fx);
-  const sz = fz * fz * (3 - 2 * fz);
-  const seed = layout.noiseSeed;
-  const a = gridValue(ix, iz, seed);
-  const b = gridValue(ix, iz + 1, seed);
-  const near = a + sx * (gridValue(ix + 1, iz, seed) - a);
-  const far = b + sx * (gridValue(ix + 1, iz + 1, seed) - b);
-  // Weight the lattice lines and taper towards the center of each cell.
-  const meshWeight = 1 - 16 * sx * (1 - sx) * sz * (1 - sz);
-  return (near + sz * (far - near)) * meshWeight;
+  const gridX = x * layout.inverseNoiseCellSize;
+  const gridZ = z * layout.inverseNoiseCellSize;
+  const phaseX = layout.noiseShiftX * (2 * Math.PI);
+  const phaseZ = layout.noiseShiftZ * (2 * Math.PI);
+  // Bend both families of lines continuously so their crossings stay connected.
+  const u = gridX + layout.noiseShiftX + 0.22 * Math.sin(1.8 * gridZ + phaseX);
+  const v = gridZ + layout.noiseShiftZ + 0.22 * Math.sin(2.3 * gridX + phaseZ);
+  const distance = Math.min(Math.abs(u - Math.round(u)), Math.abs(v - Math.round(v)));
+  const ridge = Math.max(0, 1 - distance / 0.20);
+  return 2 * ridge * ridge * (3 - 2 * ridge) - 1;
 }
 
 function luxuryForZone(layout, x, z, ax, az, zone) {
