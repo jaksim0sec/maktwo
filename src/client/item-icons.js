@@ -1,0 +1,47 @@
+import {block,BLOCK as B} from '../core/blocks.js';
+import {makeTextureLayers,materialFor} from './textures.js';
+
+// Render tiny isometric item portraits from the same procedural material layers
+// as world blocks. No separate texture pack, network requests, or GPU draws.
+const urls=new Map();let source=null;const faceCache=new Map();
+function sampleFace(id,face){
+ const key=`${id}:${face}`;if(faceCache.has(key))return faceCache.get(key);
+ if(!source)source=makeTextureLayers();
+ const layer=materialFor(id,face)-1,canvas=document.createElement('canvas');canvas.width=canvas.height=32;
+ const ctx=canvas.getContext('2d'),image=ctx.createImageData(32,32),hex=block(id).color;
+ const base=[1,3,5].map(pos=>parseInt(hex.slice(pos,pos+2),16));
+ for(let y=0;y<32;y++)for(let x=0;x<32;x++){
+  const idx=(y*32+x)*4,k=layer>=0?((layer*32*32+y*32+x)*4):idx;
+  for(let ch=0;ch<3;ch++)image.data[idx+ch]=Math.round(base[ch]*(layer>=0?source.data[k+ch]/255:1));
+  image.data[idx+3]=255;
+ }
+ ctx.putImageData(image,0,0);faceCache.set(key,canvas);return canvas;
+}
+function poly(ctx,points,color){ctx.beginPath();ctx.moveTo(...points[0]);for(const p of points.slice(1))ctx.lineTo(...p);ctx.closePath();ctx.fillStyle=color;ctx.fill()}
+function face(ctx,id,faceIndex,points,shade){
+ ctx.save();ctx.beginPath();ctx.moveTo(...points[0]);for(const p of points.slice(1))ctx.lineTo(...p);ctx.closePath();ctx.clip();
+ // Small pixel patterns with no antialiasing: different materials remain distinct.
+ const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);const left=Math.min(...xs),top=Math.min(...ys);
+ const tile=sampleFace(id,faceIndex);
+ ctx.globalAlpha=shade;ctx.imageSmoothingEnabled=false;
+ ctx.drawImage(tile,left,top,Math.max(...xs)-left+1,Math.max(...ys)-top+1);
+ ctx.restore();
+}
+export function drawItemIcon(ctx,id,x,y,size=64){
+ ctx.save();ctx.translate(x,y);ctx.scale(size/64,size/64);
+ if(id===B.TORCH||id===B.LANTERN||id===B.CAMPFIRE||id===B.GLOW_MUSHROOM){
+  if(id===B.CAMPFIRE){poly(ctx,[[10,46],[31,33],[55,46],[34,58]],'#70523d');poly(ctx,[[15,47],[19,39],[43,47],[39,55]],'#af815b')}
+  else if(id===B.LANTERN){poly(ctx,[[19,19],[45,19],[48,49],[16,49]],'#a17948');poly(ctx,[[22,24],[42,24],[43,44],[21,44]],'#ffd38b');poly(ctx,[[18,15],[46,15],[43,21],[21,21]],'#d8b274');}
+  else if(id===B.GLOW_MUSHROOM){poly(ctx,[[29,31],[37,31],[37,57],[28,57]],'#d1bc93');poly(ctx,[[11,31],[23,20],[40,17],[54,30],[48,39],[16,39]],'#e7a877');}
+  else{poly(ctx,[[28,27],[37,27],[38,56],[29,56]],'#8b6148');poly(ctx,[[26,21],[39,21],[40,32],[26,32]],'#f8a75a');poly(ctx,[[31,8],[37,16],[38,24],[26,24],[26,17]],'#ffe2a0')}
+ }else if(id===B.DOOR){poly(ctx,[[18,9],[45,9],[48,58],[16,58]],'#674831');poly(ctx,[[21,13],[42,13],[44,53],[19,53]],'#ba8d62');poly(ctx,[[24,18],[39,18],[40,30],[23,30]],'#91704f');poly(ctx,[[23,34],[40,34],[41,48],[22,48]],'#94714f');poly(ctx,[[37,33],[41,33],[41,37],[37,37]],'#ebcf89');}
+ else if(id===B.FENCE){poly(ctx,[[11,22],[19,17],[19,55],[11,59]],'#725940');poly(ctx,[[45,16],[53,22],[53,57],[45,52]],'#876442');poly(ctx,[[16,30],[48,25],[48,32],[16,37]],'#b18a62');poly(ctx,[[16,41],[48,37],[48,44],[16,48]],'#a47c57');}
+ else if(id===B.FLOWER){poly(ctx,[[30,29],[34,29],[35,56],[30,56]],'#67905f');for(const [dx,dy] of [[0,-11],[-10,0],[10,0],[0,10]])poly(ctx,[[32+dx-8,25+dy-8],[32+dx+8,25+dy-8],[32+dx+8,25+dy+8],[32+dx-8,25+dy+8]],'#d991a4');poly(ctx,[[28,21],[36,21],[36,29],[28,29]],'#f2c37b');}
+ else if(id===B.PATH||id===B.WATER){const c=id===B.WATER?'#7194ab':'#969082';poly(ctx,[[7,34],[32,18],[57,34],[32,53]],c);poly(ctx,[[12,34],[32,23],[52,34],[32,48]],id===B.WATER?'#9fc4ce':'#b0aaa0');}
+ else{
+  const top=[[32,9],[55,22],[32,35],[9,22]],left=[[9,22],[32,35],[32,59],[9,45]],right=[[32,35],[55,22],[55,45],[32,59]];
+  face(ctx,id,2,top,1);face(ctx,id,1,left,.82);face(ctx,id,0,right,.66);
+ }
+ ctx.restore();
+}
+export function itemIconURL(id){if(urls.has(id))return urls.get(id);const cv=document.createElement('canvas');cv.width=cv.height=64;drawItemIcon(cv.getContext('2d'),id,0,0,64);const src=cv.toDataURL('image/png');urls.set(id,src);return src}

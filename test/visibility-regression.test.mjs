@@ -11,7 +11,7 @@ test('world-space inventory remains visible as a faint occluded silhouette',()=>
 });
 test('PWA installs one complete versioned asset set and never mixes revisioned source files',()=>{
  const sw=file('sw.js');
- assert.match(sw,/maktwo-shell-v1\.5\.0/);
+ assert.match(sw,/maktwo-shell-v1\.6\.0/);
  assert.match(sw,/cache\.addAll/);
  assert.match(sw,/cache:'reload'/);
  assert.match(sw,/await cache\.match\(url\)/);

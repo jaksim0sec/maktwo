@@ -30,7 +30,10 @@ void main(){
   vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vPos.xz:(axis.x>axis.z?vPos.zy:vPos.xy);
   tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
  }
- vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*1.38);
+ // Ambient retains the material color; lamp light adds a restrained amber tint.
+ // Avoid multiplying grass green to bright chartreuse near multiple torches.
+ float warmth=max(emission.r,max(emission.g,emission.b));
+ vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.20)+vec3(.47,.195,.060)*warmth*.64;
  c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);

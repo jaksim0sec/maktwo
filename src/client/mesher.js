@@ -98,9 +98,9 @@ export function meshChunk(world,chunk){
 export function fixture(dest,id,x,y,z){
  const shape=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
  if(id===B.TORCH){
-  shape(.43,.06,.43,.14,.65,.14,'#806550');
-  shape(.405,.68,.405,.19,.17,.19,'#e9ad63',-1.5);
-  shape(.445,.81,.445,.11,.11,.11,'#ffe2a3',-1.6);
+  shape(.458,.04,.458,.084,.45,.084,'#806550');
+  shape(.438,.49,.438,.124,.125,.124,'#e9ad63',-1.5);
+  shape(.464,.61,.464,.072,.092,.072,'#ffe2a3',-1.6);
  }else if(id===B.LANTERN){
   shape(.31,.12,.31,.38,.09,.38,'#746858');
   shape(.36,.22,.36,.28,.38,.28,'#ffd19a',-1.5);

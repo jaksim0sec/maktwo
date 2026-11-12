@@ -9,7 +9,7 @@
   "display": "standalone",
   "background_color": "#161c1e",
   "theme_color": "#202529",
-  "orientation": "any",
+  "orientation": "landscape-primary",
   "icons": [
     {"src":"./icons/maktwo-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
     {"src":"./icons/maktwo-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}

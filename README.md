@@ -1,3 +1,12 @@
+## v1.6: cozy survival and landscape PWA
+
+- Survival baseline: finite per-world inventory (`maktwo:survival:<world>`), starter supplies, mining yields, placement consumes resources, and a simple craft tab in the in-world hologram. Existing `mcweb:<world>` voxel and door saves are unchanged. Crafting recipes are intentionally minimal and do not attempt to model a full crafting-tree game.
+- Desktop: 1–0 select an item, Q empty hand, E/I opens the in-world inventory, its **제작** tab creates more planks, torches, doors, fences, path and lanterns from gathered materials. Left-click places or uses a door; hold to mine. Creative-only flying and debug mob spawning shortcuts are disabled in survival.
+- Mobile: both sides tap to place, hold to mine; left drag moves and right drag looks. Jump and crouch stay on the right.
+- PWA: installed Chromium-class browsers honor `landscape-primary` via the manifest; supported fullscreen/standalone environments additionally request `screen.orientation.lock('landscape')`. Browsers that do not allow programmatic locking show a rotate-to-landscape screen while portrait, instead of breaking the layout.
+- HUD: top branding and camera button hidden in play; settings remain in the menu, debug info remains opt-in. Hotbar shrunk, health centered above it. Item portraits reuse 32×32 world material layers and are cached as image URLs, requiring no external image requests or extra per-frame GPU draws.
+- Lighting: local warm amber contribution is less intense and avoids amplifying grassy tiles. Torch model and player are smaller; lamp shadows are still approximate voxel light propagation, not physically correct global illumination.
+
 > v1.5.0: Reduced HUD clutter (optional debug display), upright/larger spatial bag, faster phone camera and taps on both halves, door placement/collision recovery, stale-light-result protection, improved 32px pixel-art materials. Existing saves and mesh format are unchanged.
 
 > v1.4.0: Fixed inventory card clicking using the current pointer pixel, separated touch look gestures from hologram hover, adjusted player height to fit through the existing door, included light sources throughout the local light volume, and reduced naturally spawned sheep to six with wider spacing. No save or voxel-grid changes.
@@ -12,7 +21,7 @@
 
 > v1.1.1 hotfix: PWA JS cache version mixing prevention, occluded 3D inventory card visibility, and runtime error diagnostics.
 
-# MakTwo · Endless Night v1.5.0
+# MakTwo · Endless Night v1.6.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. The desktop mouse remains free for precise click-to-build; hold the right mouse button and drag to look around. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 

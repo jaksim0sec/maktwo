@@ -1,4 +1,5 @@
 import {BLOCK as B,HOTBAR,LIGHTBAR} from './blocks.js';
+import {RECIPES} from './inventory.js';
 // One canonical registry for user-visible categories and world definitions.
 // Stable world names are storage keys: NEVER rename an existing entry.
 export const WORLD_PRESETS=Object.freeze([
@@ -11,6 +12,7 @@ export const PALETTES=Object.freeze({
  blocks:{label:'건축',items:HOTBAR},
  lights:{label:'조명',items:LIGHTBAR},
  garden:{label:'정원',items:[B.PATH,B.FENCE,B.GLOW_MUSHROOM,B.FLOWER,B.LEAVES]},
+ craft:{label:'제작',items:RECIPES.map(r=>r.id)},
 });
 export const PALETTE_KEYS=Object.freeze(Object.keys(PALETTES));
 export const paletteItems=palette=>PALETTES[palette]?.items||HOTBAR;

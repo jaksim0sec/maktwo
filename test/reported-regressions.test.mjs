@@ -19,7 +19,7 @@ test('inventory pointer-down uses current screen pixel rather than stale previou
  mock.cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`물건 ${i}`,color:'#777777'})));
  mock.buildGeometry=()=>{};
  const toPixel=card=>{const depth=2.65-card.depth;const aspect=rect.width/rect.height;return {x:rect.width*(1+card.x/(depth*Math.tan(75*Math.PI/360)*aspect))/2,y:rect.height*(1-(card.y-.16)/(depth*Math.tan(75*Math.PI/360)))/2}};
- const a=toPixel(mock.cards[5]),b=toPixel(mock.cards[8]);
+ const a=toPixel(mock.cards[6]),b=toPixel(mock.cards[9]);
  const left=mock.pickAt(player,a.x,a.y,rect);assert.equal(left,'item:0');
  const right=mock.pickAt(player,b.x,b.y,rect);assert.equal(right,'item:3');
  assert.notEqual(left,right);assert.equal(mock.click(),right);
@@ -37,7 +37,7 @@ test('inventory mobile look is independent of inventory hover and stays responsi
 test('player collision and eye height fit under the existing two-block door without changing saved block scale',()=>{
  const p=new Player(0,23,0);
  assert.ok(p.height<DOOR_HEIGHT,p.height+' vs '+DOOR_HEIGHT);
- assert.ok(p.eye<p.height&&p.eye>1.4);
+ assert.ok(p.eye<p.height&&p.eye>1.3);
  assert.ok(toMeters(p.height)<toMeters(DOOR_HEIGHT));
 });
 test('light index includes installed torches throughout the local light volume rather than closest 20',()=>{

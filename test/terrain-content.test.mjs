@@ -13,7 +13,7 @@ test('legacy world IDs and presets remain stable when new content is added',()=>
  assert.deepEqual(WORLD_PRESETS.slice(0,3).map(x=>x.name),['Overworld','Flatlands','Islands']);
  assert.equal(B.DOOR,18);assert.equal(B.DOOR_TOP,19);
  assert.deepEqual([B.PATH,B.GLOW_MUSHROOM,B.FENCE],[20,21,22]);
- assert.deepEqual(PALETTE_KEYS,['blocks','lights','garden']);
+ assert.deepEqual(PALETTE_KEYS,['blocks','lights','garden','craft']);
  assert.deepEqual(PALETTES.garden.items,[B.PATH,B.FENCE,B.GLOW_MUSHROOM,B.FLOWER,B.LEAVES]);
  assert.equal(blockLabel(B.FENCE),'나무 울타리');
  assert.equal(block(B.GLOW_MUSHROOM).light.radius,4);

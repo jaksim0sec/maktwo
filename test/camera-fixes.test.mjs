@@ -8,11 +8,11 @@ import {moveBody} from '../src/core/physics.js';
 import {applyCameraLook,cameraEyeY,dampStepOffset} from '../src/client/camera.js';
 
 test('light sources have compact reach without recoloring source blocks',()=>{
- assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[9,11,11]);
+ assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[9,10,10]);
  assert.equal(block(B.GRASS).color,'#78966e');
  assert.equal(block(B.DIRT).color,'#806c59');
  assert.equal(block(B.STONE).color,'#858b90');
- assert.equal(block(B.TORCH).light.color,'#ff9955');
+ assert.equal(block(B.TORCH).light.color,'#ffa061');
 });
 test('step raises physical collision body immediately but eases camera',()=>{
  const world=new World({mode:'flat'}),player=new Player(.5,23.001,.5);player.grounded=true;
@@ -37,5 +37,5 @@ test('look is frame-driven and clamps stale pointer spikes',()=>{
 test('shader uses original authored albedo, without artificial grayscale substitution',()=>{
  const renderer=readFileSync(new URL('../src/client/renderer.js',import.meta.url),'utf8');
  assert.doesNotMatch(renderer,/warmReflectance|float gray=dot\(vColor/);
- assert.match(renderer,/vec3 tinted=vColor/);assert.match(renderer,/tinted\*\(ambient\+emission\*1\.38\)/);
+ assert.match(renderer,/vec3 tinted=vColor/);assert.match(renderer,/tinted\*\(ambient\+emission\*\.20\)/);
 });

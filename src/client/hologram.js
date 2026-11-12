@@ -1,4 +1,5 @@
 import {BLOCK_SIZE} from '../core/scale.js';
+import {drawItemIcon} from './item-icons.js';
 // A collection of small, world-anchored surfaces, not a screen-space modal.
 // The scene's depth buffer occludes each tile just like any other world object.
 const VS=`#version 300 es
@@ -21,7 +22,7 @@ void main(){vec4 c=texture(uAtlas,vUV);if(c.a<.015)discard;
  if(vCard==uHovered){c.rgb=mix(c.rgb,vec3(.90,.76,.54),.21);c.a=min(1.,c.a*1.1);}
  else if(vCard==uSelected){c.rgb=mix(c.rgb,vec3(.83,.75,.62),.10);}
  outColor=vec4(c.rgb,c.a*uOpacity);}`;
-const ATLAS_W=1024,ATLAS_H=768,CELL_W=192,CELL_H=230;
+const ATLAS_W=1024,ATLAS_H=1024,CELL_W=192,CELL_H=230;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const add=(a,b,k)=>a.map((v,i)=>v+b[i]*k);
@@ -32,18 +33,19 @@ function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)
 function cardGeometry(palette,items,compact=false){
  const cards=[
   {id:'tab:blocks',name:'건축',x:-1.02,y:.67,w:.41,h:.25,depth:-.02},
-  {id:'tab:lights',name:'조명',x:-.51,y:.67,w:.41,h:.25,depth:-.035},
-  {id:'tab:garden',name:'정원',x:0,y:.67,w:.41,h:.25,depth:-.035},
-  {id:'hand',name:'맨손',x:.51,y:.67,w:.41,h:.25,depth:-.035},
-  {id:'close',name:'닫기',x:1.02,y:.67,w:.41,h:.25,depth:-.02},
+  {id:'tab:lights',name:'조명',x:-.56,y:.67,w:.41,h:.25,depth:-.035},
+  {id:'tab:garden',name:'정원',x:-.11,y:.67,w:.37,h:.25,depth:-.035},
+  {id:'tab:craft',name:'제작',x:.32,y:.67,w:.37,h:.25,depth:-.035},
+  {id:'hand',name:'맨손',x:.75,y:.67,w:.41,h:.25,depth:-.035},
+  {id:'close',name:'닫기',x:1.18,y:.67,w:.41,h:.25,depth:-.02},
  ];
  if(compact){
-  cards.forEach((card,i)=>{card.x=[-.52,-.26,0,.26,.52][i];card.w=.25;card.y=.54});
+  cards.forEach((card,i)=>{card.x=[-.62,-.36,-.10,.16,.42,.68][i];card.w=.25;card.y=.54});
  }
  for(let i=0;i<items.length;i++){
   const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
   const x=compact?(col-1)*.40:(col-2)*.52,y=(compact?.06:.15)-row*(compact?.49:.53);
-  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
+  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,blockId:items[i].id,count:items[i].count,craftable:items[i].craftable,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
  }
  return cards;
 }
@@ -99,7 +101,7 @@ export class Hologram{
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,15*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
+  this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
  open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
  facePlayer(player){if(this.opened&&faceAnchor(this.anchor,player))this.buildGeometry()}
@@ -132,16 +134,13 @@ export class Hologram{
    const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,'rgba(54,60,65,.81)');grad.addColorStop(1,'rgba(29,34,38,.89)');
    rounded(ctx,x+5,y+8,w-10,h-16,22,grad,active?'rgba(235,200,155,.76)':'rgba(235,235,232,.25)');
    if(isHeader){ctx.font=font(29,true);ctx.fillStyle=active?'#f8dfb7':'#e6e7e3';ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9);ctx.textAlign='left';return}
-   const [r,g,b]=colorParts(card.color||'#888888'),base=`rgb(${r},${g},${b})`;
-   ctx.fillStyle=base;ctx.fillRect(x+w/2-28,y+52,53,52);
-   ctx.fillStyle='rgba(255,255,255,.32)';ctx.beginPath();ctx.moveTo(x+w/2-28,y+52);ctx.lineTo(x+w/2-12,y+38);ctx.lineTo(x+w/2+41,y+38);ctx.lineTo(x+w/2+25,y+52);ctx.fill();
-   ctx.fillStyle='rgba(0,0,0,.27)';ctx.beginPath();ctx.moveTo(x+w/2+25,y+52);ctx.lineTo(x+w/2+41,y+38);ctx.lineTo(x+w/2+41,y+90);ctx.lineTo(x+w/2+25,y+104);ctx.fill();
-   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(String(Number(card.id.slice(5))+1),x+w/2,y+184);ctx.textAlign='left';
+   drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
+   ctx.textAlign='center';ctx.font=font(30,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+159,173);ctx.font=font(19);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':'재료 부족'):`보유 ${card.count||0}`,x+w/2,y+184);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
-  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.selected<0?2:this.selected+4);
+  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.selected<0?2:this.selected+6);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
   // A subdued silhouette stays visible when nearby terrain would otherwise
