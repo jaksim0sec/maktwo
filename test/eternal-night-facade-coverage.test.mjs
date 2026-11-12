@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {facadeBay} from '../src/worldgen/eternal-night-facade.js';
 import {cityKits} from '../src/worldgen/eternal-night-kits.js';
+import {createCityPlan,stampCityChunk} from '../src/worldgen/eternal-night-game.js';
+import {Chunk} from '../src/core/chunk.js';
+import {partById} from '../src/core/part-library.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 
 const face=(program,level,edge,bay,span=12)=>facadeBay({
@@ -46,4 +49,29 @@ test('non-industrial buildings do not accidentally inherit the charcoal concrete
  assert.ok(Array.from({length:12},(_,seed)=>cityKits(industrial,seed,1))
    .some(kits=>kits.some(kit=>kit.body===B.CRACKED_CONCRETE)),
    'worn industrial concrete still exists where it makes architectural sense');
+});
+
+test('real voxel output contains framed windows on a residential side wall',()=>{
+ const plan=createCityPlan(9999);
+ const block=plan.volumes[0];
+ const floor=block.floors.find(f=>f.program==='housing'&&f.level>5);
+ assert.ok(floor,'a residential storey exists');
+ const a=floor.outline[2],b=floor.outline[3],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+ assert.ok(length>=12,'the sampled exterior wall is long enough');
+ const chunks=new Map(),seen=new Set();
+ const sample=(x,y,z)=>{
+  const cx=Math.floor(x/16),cz=Math.floor(z/16),key=cx+','+cz;
+  if(!chunks.has(key)){const c=new Chunk(cx,cz,768);stampCityChunk(c,9999);chunks.set(key,c)}
+  return chunks.get(key).get((Math.floor(x)%16+16)%16,Math.floor(y),(Math.floor(z)%16+16)%16);
+ };
+ let windows=0;
+ for(let t=0;t<=length;t+=.4){
+  const x=Math.floor(a[0]+(b[0]-a[0])*t/length)+.5;
+  const z=Math.floor(a[1]+(b[1]-a[1])*t/length)+.5;
+  const key=x+','+z;if(seen.has(key))continue;seen.add(key);
+  const id=sample(x,Math.round(floor.y)+2,z);
+  if(partById(id)?.family==='window')windows++;
+  assert.notEqual(id,B.CRACKED_CONCRETE,'housing exterior is not a full charcoal slab');
+ }
+ assert.ok(windows>=2,'actual side wall gets more than one framed window');
 });
