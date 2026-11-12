@@ -7,7 +7,7 @@ import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
 import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
-import {encodeCityStair,stairOuterRail,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
+import {encodeCityStair,stairOuterRail,walkwayJunction,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 
 export const CITY_MODE='eternal-city-lab';
@@ -245,13 +245,18 @@ function stampWalkway(link,part,x,z,put,empty) {
   if(!part.from||link.kind==='roof')return;
   const dx=(part.to[0]-part.from[0])/part.length,dz=(part.to[2]-part.from[2])/part.length;
   const sx=x-part.from[0],sz=z-part.from[2],along=sx*dx+sz*dz,lateral=sz*dx-sx*dz;
-  const edge=Math.abs(lateral)>link.width/2-.95;
-  const gate=link.ports.some(p=>Math.hypot(p.x-x,p.z-z)<2.15);
-  if(gate)return;
+  const doorDistance=Math.min(...link.ports.map(p=>Math.hypot(p.x-x,p.z-z)));
+  const junction=walkwayJunction({along,span:part.length,width:link.width,
+    doorDistance,sideDistance:Math.abs(lateral)});
+  const edge=junction.parapet;
+  if(junction.open)return;
   const storefront=link.typology==='annex'&&link.landings.some(p=>p.kind==='annex-bay'&&lineDistance(x,z,[p.a[0],p.a[2]],[p.b[0],p.b[2]])<2.4);
   const turn=outwardTurn(-dz*Math.sign(lateral),dx*Math.sign(lateral));
   const bay=mod(Math.floor(along),7);
-  if(edge&&style!=='hung'&&bay<=1&&empty(level-2))put(level-2,B.CONCRETE_BEAM);
+  // Each route meets an actual landing with a cantilever bracket beneath the
+  // parapet. The doorway itself stays unobstructed at player height.
+  if(edge&&(junction.endSupport||style!=='hung'&&bay<=1)&&empty(level-2))
+    put(level-2,B.CONCRETE_BEAM);
   if(style==='enclosed'||style==='arcade'||style==='hung') {
     const roofY=level+(style==='hung'?4:3);
     if(empty(roofY)&&(style!=='hung'||edge||bay===0))put(roofY,style==='enclosed'?B.CEILING_TILE:B.CONCRETE_BEAM);
@@ -263,7 +268,8 @@ function stampWalkway(link,part,x,z,put,empty) {
       if(empty(level+1))put(level+1,cityPart(face.window?'window':'wall',face.window?3:1),turn,true);
       if(empty(level+2))put(level+2,cityPart(face.vent?'ventilation':'wall',1),turn,true);
     } else {
-      put(level,cityPart('passage',style==='arcade'&&bay===0?2:4),turn,true);
+      // A continuous guardrail replaces three posts per independent module.
+      put(level,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(bay%3===0?8:0));
       if(bay===0&&(style==='arcade'||style==='hung')){
         for(let y=level+1;y<level+(style==='hung'?4:3);y++)if(empty(y))put(y,cityPart('column',3),turn,true);
       }

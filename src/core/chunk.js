@@ -3,7 +3,7 @@ export const SIZE=16,HEIGHT=64;
 export const TURN_STYLE=32;
 export const EXTERIOR_STYLE=64;
 // Reserved high bit marks a generated single-tread city stair. Legacy parts are unchanged.
-export const CITY_STAIR_STYLE=128,CITY_STAIR_LEVEL_MASK=24;
+export const CITY_GENERATED_STYLE=128,CITY_STAIR_STYLE=CITY_GENERATED_STYLE,CITY_STAIR_LEVEL_MASK=24;
 export class Chunk{
  constructor(cx,cz,height=HEIGHT){this.cx=cx;this.cz=cz;this.data=new Uint8Array(SIZE*SIZE*height);this.dirty=true;this.revision=0}
  get height(){return this.data.length/(SIZE*SIZE)}

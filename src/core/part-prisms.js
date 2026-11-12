@@ -83,6 +83,16 @@ export function partPrisms(id,x,y,z,state={}){
     geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:.45});
    }
   }
+ }else if(state.cityBridge&&partById(id)?.family==='passage'){
+  // Continuous side guard: horizontal members join across adjacent bridge
+  // cells and one thin post is emitted only at planned spacing.
+  geometry=[
+   {x:0,y:0,z:.78,w:1,h:.15,d:.2,material:107,solid:true},
+   {x:0,y:.78,z:.86,w:1,h:.065,d:.08,material:106,solid:true},
+   {x:0,y:.43,z:.87,w:1,h:.036,d:.06,material:106,solid:true}
+  ];
+  if(!state.simple&&state.bridgePost)
+   geometry.push({x:.46,y:.11,z:.83,w:.07,h:.75,d:.11,material:106,solid:true});
  }else if(state.simple){
   const family=partById(id).family;
   if(family==='window')geometry=[

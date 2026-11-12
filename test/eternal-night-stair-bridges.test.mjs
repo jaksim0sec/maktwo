@@ -54,3 +54,12 @@ test('landing connectors leave the doorway open but provide joined parapet away 
  assert.equal(walkwayJunction({along:1,span:20,width:2.35,doorDistance:4,sideDistance:1}).endSupport,true);
  assert.equal(walkwayJunction({along:10,span:20,width:2.35,doorDistance:8,sideDistance:1}).parapet,true);
 });
+
+test('continuous bridge guard uses joined horizontal bars with one post per interval',()=>{
+ const id=116+4,solo=partPrisms(id,0,30,0,{facing:0});
+ const joined=partPrisms(id,0,30,0,{facing:0,cityBridge:true,bridgePost:false});
+ const posted=partPrisms(id,0,30,0,{facing:0,cityBridge:true,bridgePost:true});
+ assert.ok(joined.length<solo.length,'ordinary show-room passage is not stamped repeatedly');
+ assert.equal(posted.length,joined.length+1);
+ assert.ok(joined.every(p=>p.vertices.every(v=>v.x>=-.00001&&v.x<=1.00001)));
+});
