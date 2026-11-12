@@ -3,7 +3,7 @@ import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
-import {PART_FAMILIES} from '../core/part-library.js';
+import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {screenRay,canvasPoint} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
@@ -53,13 +53,13 @@ class Game{
   shape.hidden=!forms;
   shape.textContent=FORMS[this.form];
   rotate.hidden=!step;
-  const auto=id===B.DOOR||isStairs(id);
+  const auto=id===B.DOOR||isStairs(id)||Boolean(partById(id));
   rotate.textContent=auto&&this.manualAngle===null?'회전 · 자동':`회전 · ${this.placementAngle(id)}°`;
  }
  placementAngle(id){
   const {step,offset}=placementRotation(id,this.form);
   if(!step)return 0;
-  const automatic=id===B.DOOR||isStairs(id)?this.player.yaw*180/Math.PI:offset;
+  const automatic=id===B.DOOR||isStairs(id)||partById(id)?this.player.yaw*180/Math.PI:offset;
   const angle=(this.manualAngle??automatic)%360;
   return (Math.round((angle-offset)/step)*step+offset+360)%360;
  }
@@ -356,7 +356,7 @@ class Game{
     }else{
      const angle=this.placementAngle(id),type=buildType(id);
      const form=type.forms?orientedForm(this.form,angle):0;
-     const state={facing:Math.floor(angle/90),upper:isSlab(id)&&n.y===-1};
+     const state={facing:partById(id)?Math.round(angle/45):Math.floor(angle/90),upper:isSlab(id)&&n.y===-1};
      if(type.panel)state.panelTurn=angle/45;
      if(!solidBlockOverlap({getShapeState:()=>state},x,y,z,id,p,1e-5,form)&&this.world.set(x,y,z,id,{form})){
       if((angle&&!form)||state.upper)this.world.setShapeState(x,y,z,state);

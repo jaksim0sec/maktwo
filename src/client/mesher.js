@@ -6,6 +6,8 @@ import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
+import {partById} from '../core/part-library.js';
+import {partPrisms,prismFaces,prismNormal,stairConnections} from '../core/part-prisms.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -122,13 +124,29 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
   const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
   const variant=chunk.styles?.[idx]||0,state=variant?{variant,...authored}:authored;
   if(BLOCKS[id].render==='part'){
-   for(const piece of shapeBoxes(id,wx,y,wz,state)||[]){
+   const orientation=state?.facing||0;
+   let connected=null;
+   if(partById(id)?.family==='staircase'){
+    connected=stairConnections(id,orientation,(dx,dz)=>{
+     const nx=x+dx,nz=z+dz,offX=nx<0?-1:nx>=SIZE?1:0,offZ=nz<0?-1:nz>=SIZE?1:0;
+     const other=(offX||offZ)?adjacent.get(`${offX},${offZ}`):chunk;
+     if(!other)return {id:B.AIR,facing:0};
+     const a=((nx+SIZE)%SIZE),b=((nz+SIZE)%SIZE),k=(y*SIZE+b)*SIZE+a;
+     const fx=wx+dx,fz=wz+dz;
+     return {id:other.data?.[k]||B.AIR,facing:stateAt(fx,y,fz)?.facing||0};
+    });
+   }
+   const pieces=partPrisms(id,wx,y,wz,{...state,connected});
+   for(const piece of pieces||[]){
     const color=COLORS[piece.material],target=piece.alpha?transparent:opaque;
-    for(let fi=0;fi<FACES.length;fi++){
-     const face=FACES[fi],vertices=face.corners.map(([a,b,c])=>[piece.x+a*piece.w,piece.y+b*piece.h,piece.z+c*piece.d]);
-     quad(target,vertices,color,face.shade+4*materialFor(piece.material,fi));
+    for(const face of prismFaces(piece,true)){
+     const n=prismNormal(face);if(!n)continue;
+     const shade=(.74+.26*Math.abs(n[1]))+4*materialFor(piece.material,0);
+     for(let j=1;j<face.length-1;j++)for(const i of [0,j,j+1])
+      target.push(...face[i],...color,shade);
     }
    }
+   if(partById(id)?.family==='ventilation')fanRotorMesh(opaque,wx,y,wz,id,orientation);
    continue;
   }
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state,transparent);continue}
@@ -171,7 +189,7 @@ export function meshChunk(world,chunk){
  const neighbors=[];
  for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
   const neighbor=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
-  if(neighbor)neighbors.push([dx,dz,neighbor.data,neighbor.forms]);
+  if(neighbor)neighbors.push([dx,dz,neighbor.data,neighbor.forms,neighbor.styles]);
  }
  return meshChunkData(chunk,{neighbors,states:world.blockStates,visualSeed:world.seed});
 }

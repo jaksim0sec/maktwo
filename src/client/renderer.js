@@ -133,7 +133,7 @@ export class Renderer{
    const c=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
    if(c)neighbors.push([dx,dz,c.data,c.forms,c.styles]);
   }
-  const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return Math.floor(x/SIZE)===chunk.cx&&Math.floor(z/SIZE)===chunk.cz});
+  const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return x>=chunk.cx*SIZE-1&&x<=(chunk.cx+1)*SIZE&&z>=chunk.cz*SIZE-1&&z<=(chunk.cz+1)*SIZE});
   if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
   const buffers=[];
   const copy=(a)=>{const data=new Uint8Array(a);buffers.push(data.buffer);return data.buffer};

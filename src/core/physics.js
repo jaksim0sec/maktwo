@@ -2,6 +2,8 @@ import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.j
 import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
 import {FORMED,hitFormed} from './construction.js';
+import {partById} from './part-library.js';
+import {partPrisms,partRaycast} from './part-prisms.js';
 import {hitMount} from './mounts.js';
 import {solidBlockOverlap,fenceBoxes,shapeBoxes,isStairs,isSlab,isPanel,diagonalPanel} from './shapes.js';
 export const GRAVITY=toVoxels(24);
@@ -85,6 +87,7 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
   let hit=null;
   if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
    if(FORMED[cell.form])hit=hitFormed(FORMED[cell.form],x,y,z,origin,direction);
+   else if(partById(id))hit=partRaycast(partPrisms(id,x,y,z,world.getShapeState?.(x,y,z)||{}),origin,direction,maxDistance);
    else if(isDoor(id)){
     const baseY=id===B.DOOR_TOP?y-1:y;
     hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));

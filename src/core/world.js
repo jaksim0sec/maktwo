@@ -1,5 +1,7 @@
 import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
-import {partGallerySpawn} from '../worldgen/part-gallery.js';import {LightIndex} from './lighting.js';
+import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {partById} from './part-library.js';
+import {stairConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
@@ -15,9 +17,27 @@ export class World{
  getShapeState(x,y,z){
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
   const y0=Math.floor(y),variant=y0>=0&&y0<HEIGHT?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
-  return {facing:0,upper:false,variant,...this.blockStates.get(this.stateKey(x,y,z))};
+  const state={facing:0,upper:false,variant,...this.blockStates.get(this.stateKey(x,y,z))};
+  if(partById(this.get(x,y,z,false))?.family==='staircase'){
+   state.connected=stairConnections(this.get(x,y,z,false),state.facing,(dx,dz)=>{
+    const nx=Math.floor(x)+dx,nz=Math.floor(z)+dz,other=this.get(nx,y,nz,false);
+    return {id:other,facing:this.blockStates.get(this.stateKey(nx,y,nz))?.facing||0};
+   });
+  }
+  return state;
  }
- setShapeState(x,y,z,state={}){const id=this.get(x,y,z,false);if(id===B.AIR||isDoor(id))return false;this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%4+4)%4,upper:Boolean(state.upper),...(state.panelTurn!==undefined?{panelTurn:state.panelTurn&3}:{})});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;return true}
+ setShapeState(x,y,z,state={}){
+  const id=this.get(x,y,z,false);if(id===B.AIR||isDoor(id))return false;
+  const turns=partById(id)?8:4;
+  this.blockStates.set(this.stateKey(x,y,z),{facing:((state.facing||0)%turns+turns)%turns,
+   upper:Boolean(state.upper),...(state.panelTurn!==undefined?{panelTurn:state.panelTurn&3}:{})});
+  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),lx=Math.floor(x)-cx*SIZE,lz=Math.floor(z)-cz*SIZE;
+  this.markDirty(cx,cz);
+  // Rails in the adjacent chunk depend on the updated orientation.
+  if(lx===0)this.markDirty(cx-1,cz);if(lx===SIZE-1)this.markDirty(cx+1,cz);
+  if(lz===0)this.markDirty(cx,cz-1);if(lz===SIZE-1)this.markDirty(cx,cz+1);
+  this.lightRevision++;return true;
+ }
  getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return {...this.getShapeState(x,yBase,z),open:false,...this.blockStates.get(this.stateKey(x,yBase,z))}}
  setDoorState(x,y,z,{facing=0,open=false}={}){const baseY=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);if(this.get(x,baseY,z)!==B.DOOR)return false;this.blockStates.set(this.stateKey(x,baseY,z),{facing:((facing%4)+4)%4,open:!!open});this.markDirty(Math.floor(x/SIZE),Math.floor(z/SIZE));this.lightRevision++;this.events.emit('door-change',{x,y:baseY,z});return true}
  toggleDoor(x,y,z,occupants=[]){

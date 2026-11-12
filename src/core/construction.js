@@ -3,12 +3,14 @@ import {BLOCK as B, BLOCKS, itemId} from './blocks.js';
 export const FORMS = ['정육면체', '하단 반블록', '상단 반블록', '45° 벽', '경사'];
 const MATERIAL={rotation:90,forms:true};
 const ROTATABLE={rotation:90,forms:false};
+const ARCH_PART={rotation:45,forms:false};
 const PANEL={rotation:45,forms:false,panel:true};
 const FIXED={rotation:0,forms:false};
 
 export const BUILD_TYPES=Object.freeze(BLOCKS.map(({id,render})=>{
  if(id===B.AIR||id===B.BEDROCK||id===B.PORTAL||id===B.DOOR_TOP||render==='fluid')return FIXED;
  if(render==='panel'||render==='frame')return PANEL;
+ if(render==='part')return ARCH_PART;
  if((render==='cube'||render==='glass')&&id!==B.SAND&&id!==B.RED_SAND&&id!==B.SHOP_SIGN)return MATERIAL;
  return ROTATABLE;
 }));
