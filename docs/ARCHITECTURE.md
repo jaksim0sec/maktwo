@@ -19,6 +19,25 @@
 | `src/client/hologram.js` | World-positioned inventory cards | No fullscreen UI panel or forced camera lock |
 | `sw.js` | Atomic versioned app shell | No per-request cache mutation or query-string variants |
 
+## World generation and rendering boundary
+
+`src/worldgen/` owns the deterministic terrain and building algorithms. `World` in
+`src/core/world.js` requests generated `Chunk` voxel data, applies saved edits, and
+manages loaded chunks and block states. `Chunk` in `src/core/chunk.js` contains only
+coordinates, voxel IDs, and change tracking. Existing world keys, generation
+versions, block IDs, and save format remain the compatibility contract.
+
+`meshChunkData(chunk, {neighbors, states, visualSeed})` in `src/client/mesher.js`
+turns already-loaded voxel arrays and block states into seven-float vertices.
+Neighbors are relative `[dx, dz, data]` entries; absent neighbors expose boundary
+faces. `visualSeed` preserves the old per-face and plant color variation and has
+no effect on world generation. The main-thread fallback and `mesh.worker.js` use
+this same input contract. `renderer.js` uploads the resulting geometry and does
+not evaluate terrain or building rules. The older `meshChunk(world, chunk)` entry
+point adapts already-loaded world data for existing callers without generating
+neighboring chunks. A new generator should produce the same chunk data contract;
+no mesher, worker, or renderer change is needed.
+
 ## Terrain research and limits
 
 The experimental **Highlands** preset combines low-frequency domain warp, ridge fields and curved canyon cuts, informed by the approach of domain-warp noise generators and erosion-shaped terrain mods. It does **not** simulate sediment or hydraulic erosion. Heights are capped at 56 in the existing 64-high chunk layout. A future full mountain overhaul needs vertical chunk sections and distant-terrain LOD first; raising the global chunk height in-place would double memory and could regenerate old terrain.

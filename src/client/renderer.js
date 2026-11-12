@@ -1,5 +1,5 @@
 import {block as itemBlock} from '../core/blocks.js';
-import {meshChunk,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
+import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
 import {cameraEyeY,dampStepOffset} from './camera.js';
@@ -124,16 +124,17 @@ export class Renderer{
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
   const task={world,key,chunk,revision,token};
-  if(!this.worker){const geo=meshChunk(world,chunk);this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
-  const buffers=[];
-  const copy=(a)=>{const data=new Uint8Array(a);buffers.push(data.buffer);return data.buffer};
   const neighbors=[];
   for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
    const c=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
-   if(c)neighbors.push([dx,dz,copy(c.data)]);
+   if(c)neighbors.push([dx,dz,c.data]);
   }
+  const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return Math.floor(x/SIZE)===chunk.cx&&Math.floor(z/SIZE)===chunk.cz});
+  if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
+  const buffers=[];
+  const copy=(a)=>{const data=new Uint8Array(a);buffers.push(data.buffer);return data.buffer};
   this.inflight.set(key,task);
-  this.worker.postMessage({key,revision,token,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),neighbors,doorStates:[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return Math.floor(x/SIZE)===chunk.cx&&Math.floor(z/SIZE)===chunk.cz})},buffers);
+  this.worker.postMessage({key,revision,token,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),neighbors:neighbors.map(([dx,dz,data])=>[dx,dz,copy(data)]),doorStates:states},buffers);
  }
  sync(world,player){
   if(this.world!==world)this.resetWorld(world);

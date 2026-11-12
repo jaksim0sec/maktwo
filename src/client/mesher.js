@@ -27,13 +27,15 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 
 // Six directional masks; every rectangular run of the same block becomes ONE quad.
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
-export function meshChunk(world,chunk){
+export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}={}){
+ const adjacent=new Map(neighbors.map(([dx,dz,data])=>[`${dx},${dz}`,data]));
+ const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
  for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
   const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
-  const edge=n===0?world.getChunk(chunk.cx+sign,chunk.cz,false):n===2?world.getChunk(chunk.cx,chunk.cz+sign,false):null;
-  const data=chunk.data, edgeData=edge?.data;
+  const edgeData=n===0?adjacent.get(`${sign},0`):n===2?adjacent.get(`0,${sign}`):null;
+  const data=chunk.data;
   for(let layer=0;layer<DIMS[n];layer++){
    let i=0;
    for(let j=0;j<nv;j++)for(let k=0;k<nu;k++,i++){
@@ -72,7 +74,7 @@ export function meshChunk(world,chunk){
      return p;
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
-    const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],world.seed)*.06;
+    const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],visualSeed)*.06;
     quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex));
     k+=width;
    }
@@ -82,16 +84,26 @@ export function meshChunk(world,chunk){
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.CONCRETE_SLAB,B.CONCRETE_STAIRS,B.THIN_WALL_NS,B.THIN_WALL_EW,B.WINDOW_NS,B.WINDOW_EW,B.UPPER_STAIR_TREAD,B.FLOOR_FINISH,B.CEILING_FINISH].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
-  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
-  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
+  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,stateAt(wx,y,wz));continue}
+  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,stateAt(wx,y,wz));continue}
  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.FENCE||id===B.WORKBENCH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id!==B.FLOWER&&BLOCKS[id].render!=='cross'){fixture(opaque,id,wx,y,wz);continue}
-  flowerMesh(opaque,wx,y,wz,world.seed,id);
+  flowerMesh(opaque,wx,y,wz,visualSeed,id);
 
  }
  return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
+}
+
+// Existing callers may pass a loaded world; only already-loaded voxel data is read.
+export function meshChunk(world,chunk){
+ const neighbors=[];
+ for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
+  const neighbor=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
+  if(neighbor)neighbors.push([dx,dz,neighbor.data]);
+ }
+ return meshChunkData(chunk,{neighbors,states:world.blockStates,visualSeed:world.seed});
 }
 
 // Small low-poly practical lights. Negative vertex shade tags emissive surfaces

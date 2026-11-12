@@ -3,9 +3,19 @@ import assert from 'node:assert/strict';
 import {World} from '../src/core/world.js';
 import {Chunk} from '../src/core/chunk.js';
 import {BLOCK as B} from '../src/core/blocks.js';
-import {meshChunk} from '../src/client/mesher.js';
+import {meshChunk,meshChunkData} from '../src/client/mesher.js';
 
 function snapshot(c){return c.data.slice().buffer}
+
+test('mesher consumes voxel snapshots without generator or world access',()=>{
+ const world=new World({seed:52771,mode:'ruins',version:5});
+ const chunk=world.getChunk(-1,2),neighbor=world.getChunk(0,2);
+ const expected=meshChunk(world,chunk);
+ const isolated=new Chunk(-1,2);isolated.data=chunk.data.slice();
+ const actual=meshChunkData(isolated,{neighbors:[[1,0,neighbor.data.slice()]],states:new Map(world.blockStates),visualSeed:world.seed});
+ assert.deepEqual(actual,expected);
+ assert.deepEqual(isolated.data,chunk.data);
+});
 
 test('greedy meshing merges two touching cubes into six quads',()=>{
  const c=new Chunk(0,0);c.set(1,10,1,B.STONE);c.set(2,10,1,B.STONE);
