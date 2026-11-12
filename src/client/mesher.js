@@ -80,7 +80,7 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(isStairs(id)||isSlab(id)||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
@@ -108,6 +108,12 @@ export function fixture(dest,id,x,y,z){
   for(const dx of [.3,.64])for(const dz of [.3,.64])shape(dx,.2,dz,.06,.44,.06,'#766b59');
   shape(.28,.63,.28,.44,.09,.44,'#766b59');
   shape(.45,.72,.45,.10,.11,.10,'#766b59');
+ }else if(id===B.FLUORESCENT||id===B.BROKEN_FLUORESCENT){
+  const lit=id===B.FLUORESCENT;
+  shape(.10,.80,.25,.80,.10,.50,'#5f666a');
+  shape(.14,.78,.29,.72,.055,.42,lit?'#afbcc5':'#555b5e');
+  for(const z of [.36,.57])shape(.19,.76,z,.62,.038,.065,lit?'#eff6f1':'#899094',lit?-1.20:1);
+  if(!lit)shape(.59,.72,.49,.20,.045,.05,'#4e5355');
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');

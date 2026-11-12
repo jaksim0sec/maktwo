@@ -2,7 +2,7 @@
 // all opaque blocks, retaining the existing seven-float greedy mesh format.
 // Each pixel modulates the block's authored RGB color, not replacing its palette.
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영'];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시'];
 export function materialFor(id,face){
  switch(id){
   case 1:return face===2?1:face===3?3:2;
@@ -30,7 +30,25 @@ export function materialFor(id,face){
   case 45:return face===2||face===3?7:21;
   case 46:case 48:return 8;
   case 47:return face===2||face===3?7:21;
-  case 54:return 22; // fired-earth modulation
+  case 54:return 22; // quartz
+  case 55:case 73:return 23;
+  case 56:return 24;
+  case 57:return 25;
+  case 58:return 26;
+  case 59:return 27;
+  case 60:return 28;
+  case 61:return 29;
+  case 62:return 30;
+  case 63:case 70:return 31;
+  case 64:return 32;
+  case 65:return 33;
+  case 68:return 34;
+  case 69:return 35;
+  case 71:return 36;
+  case 72:return 37;
+  case 74:return 38;
+  case 75:return 39;
+  case 76:return 40;
   default:return 0;
  }
 }
@@ -156,6 +174,67 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
    f=barkGrain(x,y,size,n,patch);if(px%9<1.0)f*=.89;
   }else if(m===21){ // Quartz crystals: pale branching veins.
    f=.87+.14*patch;if(Math.abs(py*.72-px*.40-10)<2.2)f*=1.12;
+  }else if(m>=22&&m<=39){ // Ruins: damaged manufactured surfaces with category-specific marks.
+   const seamX=Math.min(px%16,16-px%16),seamY=Math.min(py%16,16-py%16);
+   const fissure=Math.abs(py-(9+px*.19+2*Math.sin(px*.44)))<1.1;
+   const stain=Math.max(0,(py-11)/21)*(.18+.15*(1-patch));
+   f=.78+.23*patch+.095*(fine-.5)+.04*(n-.5);
+   if(m===22||m===23){ // Poured concrete, pitting and cracks.
+    if((px<1||py<1)&&fine<.72)f*=.78;
+    if(n>.966)f*=.64;
+    if(m===23&&(fissure||Math.abs(px-21-4*Math.sin(py*.2))<.7))f*=.47;
+    r=.96;g=.98;b=1;
+   }else if(m===24||m===34){ // Whitewashed walls, peeling paint and damp mold.
+    f=.90+.10*patch-stain;
+    if(fine>.79&&n>.5)f*=.65;
+    if(m===34&&patch<.48){f*=.68;r=.74;g=.87;b=.74}
+    else{r=1;g=.98;b=.94}
+   }else if(m===25||m===37||m===38){ // Grout, stone speckles and wet floors.
+    if(seamX<1||seamY<1)f*=.59;
+    if(n>.94)f*=.78;
+    if(m===37){f*=.77+Math.max(0,Math.sin(px*.27+py*.19))*.24;r=.91;g=.98;b=1}
+    if(m===38){f=.93+.065*patch;if(seamX<.85||seamY<.85)f*=.70}
+   }else if(m===26){ // Suspended ceiling grid and old water rings.
+    f=.93+.045*patch;
+    if(px<1.3||py<1.3)f*=.57;
+    const ring=Math.abs(Math.hypot(px-20,py-12)-8);
+    if(ring<1.2&&patch<.66)f*=.75;
+   }else if(m===27||m===28){ // Brushed steel, scratches and brown rust trails.
+    f=.87+.1*patch+.035*Math.sin(px*2.7);
+    if(n>.94&&py>6)f*=.55;
+    if(m===28){r=1;g=.76;b=.62;f-=stain*.65}
+    else{r=.94;g=.98;b=1}
+   }else if(m===29){ // Smudged window glass.
+    f=.94+.05*patch-.09*Math.max(0,Math.sin((px+py)*.14));
+    if(n>.95)f*=.78;r=.91;g=.97;b=1;
+   }else if(m===30){ // Shutter's repeated horizontal folds.
+    const fold=py%5;
+    f=(fold<.9?.60:fold<2?.97:.85)+.12*patch;
+    if(px%13<1&&n>.38)f*=.72;
+   }else if(m===31){ // A painted shop sign with no invented lettering.
+    f=.90+.08*patch;if(py<3||py>28)f*=.63;
+    if(n>.89&&fine>.6)f*=.59;
+    r=1;g=.96;b=.87;
+   }else if(m===32){ // Old façade brick joints.
+    const row=Math.floor(py/8),joint=(px+(row%2)*8)%16;
+    if(py%8<1||joint<1)f*=.55;else if(joint<2)f*=1.08;
+    r=.95;g=.93;b=.91;
+   }else if(m===33){ // Exposed reinforcing steel lattice.
+    f=(px%9<1.6||py%11<1.7)?.60:.89+.08*patch;
+    r=.89;g=.88;b=.88;
+   }else if(m===35){ // Angular chunks embedded in dusty rubble.
+    if(Math.abs(Math.sin(px*.43+py*.51))<.14)f*=.58;
+    if(n>.93)f*=1.14;
+   }else if(m===36){ // Worn striped shop awnings.
+    const stripe=Math.floor((px+py*.17)/6)%3;
+    f=.75+.18*patch-(stripe===1?.19:0);
+    if(stripe===1){r=1;g=.86;b=.78}else{r=.94;g=.92;b=.82}
+   }else if(m===39){ // A worn safety stripe, mostly rubbed away.
+    const stripe=Math.floor((px+py)/8)%2;
+    f=(stripe?.63:.91)+.10*patch;
+    if(fine>.82)f*=.76;
+    r=1;g=.95;b=.69;
+   }
   }else if(m===13){ // Crafting table: a pixelated nine-cell tool-marked tabletop.
    const cellX=Math.floor(px/10.67),cellY=Math.floor(py/10.67);
    const groove=px%10.67<1.0||py%10.67<1.0;

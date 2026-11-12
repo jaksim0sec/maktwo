@@ -38,6 +38,7 @@ export function drawShapeIcon(ctx,id){
  if(id===B.PATH)boxes=[{x:.06,y:.013,z:.06,w:.88,h:.035,d:.88}];
  if(id===B.GLOW_MUSHROOM)boxes=[{x:.45,y:.025,z:.45,w:.10,h:.23,d:.10},{x:.31,y:.235,z:.31,w:.38,h:.12,d:.38}];
  if(id===B.DOOR)boxes=[{x:.05,y:0,z:.42,w:.90,h:.94,d:.12}];
+ if(id===B.FLUORESCENT||id===B.BROKEN_FLUORESCENT)boxes=[{x:.10,y:.80,z:.25,w:.80,h:.10,d:.50},{x:.14,y:.76,z:.29,w:.72,h:.07,d:.42}];
  if(!boxes)return false;
  const pr=(x,y,z)=>[32+(x-z)*22,43-y*29+(x+z)*7];
  for(const b of [...boxes].sort((a,b)=>(a.x+a.z+a.y*.3)-(b.x+b.z+b.y*.3))){
