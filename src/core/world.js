@@ -7,9 +7,29 @@ export class World{
   if(record){const k=key(cx,cz),idx=Chunk.index(lx,y,lz);let edits=this.edits.get(k);if(!edits)this.edits.set(k,edits=new Map());edits.set(idx,id)}
   if(lx===0)this.markDirty(cx-1,cz);if(lx===15)this.markDirty(cx+1,cz);if(lz===0)this.markDirty(cx,cz-1);if(lz===15)this.markDirty(cx,cz+1);
   this.events.emit('block-change',{x,y,z,id});if(simulate){this.schedule(x,y,z);for(const [dx,dy,dz] of [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]])this.schedule(x+dx,y+dy,z+dz)}return true}
- markDirty(cx,cz){const c=this.chunks.get(key(cx,cz));if(c)c.dirty=true}
+ markDirty(cx,cz){const c=this.chunks.get(key(cx,cz));if(c){c.dirty=true;c.revision++}}
  schedule(x,y,z){if(y<1||y>=HEIGHT)return;const k=`${x|0},${y|0},${z|0}`;if(!this.queued.has(k)){this.queued.add(k);this.queue.push([x|0,y|0,z|0,k])}}
- tick(){this.tickCount++;this.time=(this.time+1)%24000;const budget=Math.min(this.queue.length,80);for(let i=0;i<budget;i++){const [x,y,z,k]=this.queue.shift();this.queued.delete(k);const id=this.get(x,y,z);if(id===B.SAND&&block(this.get(x,y-1,z)).replaceable){this.set(x,y-1,z,B.SAND,{simulate:true});this.set(x,y,z,B.AIR,{simulate:true})}else if(id===B.WATER){if(this.get(x,y-1,z)===B.AIR){this.set(x,y-1,z,B.WATER,{simulate:false})}else if(this.tickCount%5===0){for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,nz=z+dz;if(this.get(nx,y,nz)===B.AIR&&this.get(nx,y-1,nz)!==B.AIR)this.set(nx,y,nz,B.WATER,{simulate:false})}}}}}
+ tick(){
+  this.tickCount++;this.time=(this.time+1)%24000;
+  // A single batch splice avoids repeatedly shifting a potentially large queue.
+  // Newly scheduled updates remain queued for the next simulation tick.
+  const batch=this.queue.splice(0,Math.min(80,this.queue.length));
+  for(const [x,y,z,k] of batch){
+   this.queued.delete(k);const id=this.get(x,y,z);
+   if(id===B.SAND&&block(this.get(x,y-1,z)).replaceable){
+    this.set(x,y-1,z,B.SAND,{simulate:true});this.set(x,y,z,B.AIR,{simulate:true});
+   }else if(id===B.WATER){
+    if(this.get(x,y-1,z)===B.AIR){this.set(x,y-1,z,B.WATER,{simulate:false})}
+    else if(this.tickCount%5===0){
+     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx,nz=z+dz;
+      if(this.get(nx,y,nz)===B.AIR&&this.get(nx,y-1,nz)!==B.AIR)this.set(nx,y,nz,B.WATER,{simulate:false});
+     }
+    }
+   }
+  }
+ }
+
  stream(x,z,radius=3,budget=2){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r)continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  spawn(){let x=0,z=0;for(let r=0;r<20;r++){x=r*3;z=r*2;const y=surfaceAt(x,z,this.seed,this.mode);if(y>=SEA+1)return{x:x+.5,y:y+2,z:z+.5}}return{x:.5,y:30,z:.5}}
  save(){if(!this.storage)return false;const changes={};for(const [k,m] of this.edits)changes[k]=[...m];this.storage.setItem('mcweb:'+this.name,JSON.stringify({seed:this.seed,mode:this.mode,time:this.time,edits:changes}));return true}

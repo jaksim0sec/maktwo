@@ -1,23 +1,87 @@
-import {SEA} from '../worldgen/generators.js';
-import {SIZE,HEIGHT} from '../core/chunk.js';import {BLOCK as B,block} from '../core/blocks.js';import {hash} from '../util/math.js';
-const FACES=[
- {d:[1,0,0],corners:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]],shade:.77},
- {d:[-1,0,0],corners:[[0,0,1],[0,1,1],[0,1,0],[0,0,0]],shade:.72},
- {d:[0,1,0],corners:[[0,1,1],[1,1,1],[1,1,0],[0,1,0]],shade:1},
- {d:[0,-1,0],corners:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],shade:.52},
- {d:[0,0,1],corners:[[1,0,1],[1,1,1],[0,1,1],[0,0,1]],shade:.87},
- {d:[0,0,-1],corners:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],shade:.81}
+import {SIZE, HEIGHT} from '../core/chunk.js';
+import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
+import {hash} from '../util/math.js';
+
+// Winding and direction are kept consistent with the WebGL cull-face convention.
+const FACES = [
+  {d:[1,0,0],  n:0, u:1, v:2, corners:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]],shade:.78},
+  {d:[-1,0,0], n:0, u:1, v:2, corners:[[0,0,1],[0,1,1],[0,1,0],[0,0,0]],shade:.74},
+  {d:[0,1,0],  n:1, u:0, v:2, corners:[[0,1,1],[1,1,1],[1,1,0],[0,1,0]],shade:1},
+  {d:[0,-1,0], n:1, u:0, v:2, corners:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],shade:.56},
+  {d:[0,0,1],  n:2, u:1, v:0, corners:[[1,0,1],[1,1,1],[0,1,1],[0,0,1]],shade:.88},
+  {d:[0,0,-1], n:2, u:1, v:0, corners:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],shade:.82}
 ];
+const DIMS = [SIZE, HEIGHT, SIZE];
+const COLORS = BLOCKS.map(({color}) => rgb(color));
+const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
+const OPAQUE = BLOCKS.map(({opaque})=>opaque);
+const CROSS = BLOCKS.map(({render})=>render==='cross');
+const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
+
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
 export function quad(arr,v,color,shade){for(const i of [0,1,2,0,2,3])arr.push(...v[i],...color,shade)}
 export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){const v=face.corners.map(([a,b,c])=>[x+a*w,y+b*h,z+c*d]);quad(arr,v,color,face.shade*shade)}}
-export function meshChunk(world,chunk){const opaque=[],transparent=[];const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
- for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(id===B.AIR)continue;const def=block(id),wx=ox+x,wz=oz+z;const v=hash(wx,y,wz,world.seed),tint=.88+v*.18,color=rgb(def.color).map(q=>q*tint),isTrans=def.render==='fluid'||def.render==='glass'||def.render==='portal';const dest=isTrans?transparent:opaque;
-  if(def.render==='cross'){const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]],v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];for(const verts of [v1,v2,[...v1].reverse(),[...v2].reverse()])quad(dest,verts,color,1);continue}
-  for(const f of FACES){const [dx,dy,dz]=f.d,other=world.get(wx+dx,y+dy,wz+dz,false),oth=block(other);if(other===id&&(isTrans||def.render==='cutout'))continue;if(oth.opaque)continue;if(!isTrans&&other===B.GLASS)continue;
-   const hh=id===B.WATER?.87:1;const corners=f.corners.map(([a,b,c])=>[wx+a,y+b*hh,wz+c]);const top=f.d[1]>0,shade=f.shade*(top?1:1);const light=top?1:Math.min(1,.75+Math.max(0,y-SEA)/100);quad(dest,corners,color,shade*light);
+
+// Six directional masks; every rectangular run of the same block becomes ONE quad.
+// Cross plants remain individual crossed quads. No changes to storage or world rules.
+export function meshChunk(world,chunk){
+ const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
+ for(const f of FACES){
+  const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
+  const mask=new Int32Array(nu*nv);
+  const edge=n===0?world.getChunk(chunk.cx+sign,chunk.cz,false):n===2?world.getChunk(chunk.cx,chunk.cz+sign,false):null;
+  const data=chunk.data, edgeData=edge?.data;
+  for(let layer=0;layer<DIMS[n];layer++){
+   let i=0;
+   for(let j=0;j<nv;j++)for(let k=0;k<nu;k++,i++){
+    const x=n===0?layer:n===1?k:j;
+    const y=n===1?layer:k;
+    const z=n===2?layer:j;
+    const idx=(y*SIZE+z)*SIZE+x,id=data[idx];
+    if(id===B.AIR||CROSS[id]){mask[i]=0;continue}
+    let other;
+    if(n===0){
+     const next=x+sign;
+     other=next>=0&&next<SIZE?data[idx+sign]:edgeData?edgeData[(y*SIZE+z)*SIZE+(sign===1?0:SIZE-1)]:B.AIR;
+    }else if(n===1){
+     const next=y+sign;
+     other=next<0?B.BEDROCK:next>=HEIGHT?B.AIR:data[idx+sign*SIZE*SIZE];
+    }else{
+     const next=z+sign;
+     other=next>=0&&next<SIZE?data[idx+sign*SIZE]:edgeData?edgeData[(y*SIZE+(sign===1?0:SIZE-1))*SIZE+x]:B.AIR;
+    }
+    const transparent=TRANSPARENT[id];
+    mask[i]=OPAQUE[other]||(id===other&&(transparent||CUTOUT[id]))||(!transparent&&other===B.GLASS)
+      ?0:id|(id===B.WATER&&n!==1?y<<8:0);
+   }
+   for(let j=0;j<nv;j++)for(let k=0;k<nu;){
+    const idx=j*nu+k,mat=mask[idx];if(!mat){k++;continue}
+    let width=1,height=1;
+    while(k+width<nu&&mask[idx+width]===mat)width++;
+    heightLoop:while(j+height<nv){for(let t=0;t<width;t++)if(mask[(j+height)*nu+k+t]!==mat)break heightLoop;height++}
+    for(let jj=0;jj<height;jj++)mask.fill(0,(j+jj)*nu+k,(j+jj)*nu+k+width);
+    const id=mat&255,dest=TRANSPARENT[id]?transparent:opaque;
+    const c=[0,0,0];c[n]=layer;c[u]=k;c[v]=j;
+    const xyz=[ox+c[0],c[1],oz+c[2]],water=id===B.WATER;
+    const verts=corners.map(q=>{
+     const p=[...xyz];p[n]+=q[n];p[u]+=q[u]*width;p[v]+=q[v]*height;
+     if(water&&q[1]===1)p[1]-=.13;
+     return p;
+    });
+    // Tiny world-coordinate variation only per merged face, never per vertex.
+    const color=COLORS[id],variation=.95+hash(xyz[0],xyz[1],xyz[2],world.seed)*.06;
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],shade);
+    k+=width;
+   }
   }
  }
- return{opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
+ // Thin crossed planes must remain double-sided, irrespective of face culling.
+ for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
+  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH)continue;
+  const wx=ox+x,wz=oz+z,color=COLORS[id];
+  const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
+  const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
+  for(const verts of [v1,v2,[...v1].reverse(),[...v2].reverse()])quad(opaque,verts,color,1);
+ }
+ return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
 }

@@ -1,10 +1,32 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>BLOCKWORLD | Voxel Sandbox</title><link rel="stylesheet" href="./style.css"></head><body>
-<canvas id="screen"></canvas><div id="vignette"></div>
-<header id="hud"><div class="logo"><span class="logo-icon">▣</span> BLOCK<span>WORLD</span><small>ENGINE PREVIEW 0.1</small></div><div class="stats"><span id="biome"></span><span id="coords"></span><span id="fps"></span></div></header>
-<div id="crosshair"><i></i><i></i></div><div id="target"></div><div id="toast"></div>
-<div id="health"></div><div id="flight"></div><div id="block-name"></div><div id="hotbar"></div>
-<aside id="toolbar"><label>WORLD <select id="world"><option>Overworld</option><option>Flatlands</option><option>Islands</option></select></label><button id="spawn">⌖ Respawn</button><button id="mode">✦ Flight F</button><button id="save">▣ Save P</button><button id="help-btn">? Controls</button><span>SEED <b id="seed"></b></span></aside>
-<div id="mobile"><div class="move-hint">MOVE</div><div class="touchbuttons"><button data-action="mine">BREAK</button><button data-action="place">PLACE</button><button data-action="jump">JUMP</button><button data-action="crouch">DOWN</button></div></div>
-<div id="intro" class="overlay"><div class="intro-card"><div class="eyebrow">OPEN WORLD · PROCEDURAL VOXELS</div><h1>BLOCK<span>WORLD</span></h1><p>A little world. A lot of blocks.</p><div class="feature-pills"><span>▦ 16×16 Chunks</span><span>◈ 3 World Types</span><span>✧ Creatures</span><span>▣ Local Saves</span></div><button id="play">ENTER WORLD <b>↗</b></button><small>WASD to move · Mouse to look · Click to break · Right-click to build</small></div></div>
-<div id="help" class="overlay hidden"><div class="intro-card help"><h2>CONTROLS</h2><div class="help-grid"><b>Move</b><span>W A S D</span><b>Look</b><span>Mouse or touch</span><b>Jump</b><span>Space</span><b>Mine / Attack</b><span>Left mouse</span><b>Place block</b><span>Right mouse</span><b>Choose block</b><span>1–0 or scroll</span><b>Fly toggle</b><span>F</span><b>Spawn a mob</b><span>G</span><b>Explosion</b><span>B</span><b>Save</b><span>P</span><b>Release mouse</b><span>Esc</span></div><button id="close-help">RETURN TO WORLD</button></div></div><div id="fatal" hidden></div>
-<script type="module" src="./src/client/game.js"></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+ <meta name="theme-color" content="#272c30">
+ <title>MakTwo · Voxel Sandbox</title>
+ <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+ <canvas id="screen" aria-label="복셀 월드"></canvas>
+ <header id="hud"><div class="game-title">MakTwo <span id="biome"></span></div><div class="stats"><span id="coords"></span><span id="fps"></span></div></header>
+ <button id="menu-btn" aria-label="설정 열기" title="설정">☰</button>
+ <aside id="toolbar" class="hidden">
+  <label>월드 <select id="world"><option>Overworld</option><option>Flatlands</option><option>Islands</option></select></label>
+  <button id="spawn">스폰으로 이동</button>
+  <button id="mode">비행 모드 · F</button>
+  <button id="save">저장 · P</button>
+  <button id="help-btn">조작법 · H</button>
+  <span>시드 <b id="seed"></b></span>
+ </aside>
+ <div id="crosshair"><i></i><i></i></div><div id="target"></div>
+ <div id="toast"></div>
+ <div id="health"></div><div id="flight"></div>
+ <div id="block-name"></div><div id="hotbar"></div>
+ <div id="mobile"><div class="move-hint">이동</div><div class="touchbuttons"><button data-action="mine">파괴</button><button data-action="place">설치</button><button data-action="jump">점프</button><button data-action="crouch">하강</button></div></div>
+ <div id="help" class="overlay hidden"><div class="help-card"><h2>조작법</h2><div class="help-grid">
+  <b>이동</b><span>W A S D</span><b>시점</b><span>클릭 후 마우스</span><b>점프</b><span>Space</span><b>파괴 / 공격</b><span>왼쪽 클릭</span><b>블록 설치</b><span>오른쪽 클릭</span><b>블록 선택</b><span>1–0 / 스크롤</span><b>비행</b><span>F</span><b>몹 생성</b><span>G</span><b>폭발</b><span>B</span><b>저장</b><span>P</span><b>마우스 해제</b><span>Esc</span></div><button id="close-help">닫기</button></div></div>
+ <div id="fatal" hidden></div>
+ <script type="module" src="./src/client/game.js"></script>
+</body>
+</html>

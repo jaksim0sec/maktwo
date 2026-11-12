@@ -1,6 +1,6 @@
-# BLOCKWORLD · Voxel Sandbox Engine v0.1
+# MakTwo · Voxel Sandbox Engine v0.2
 
-A from-scratch, **dependency-free WebGL2** voxel sandbox. Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
+A from-scratch, **dependency-free WebGL2** voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
 ## Run
 
@@ -47,8 +47,9 @@ Touch users: left side drag to walk, right side drag to look; the buttons offer 
 | `worldgen/generators.js` | Seeded passes: surface, caves, ore, trees, decorations; normal/flat/islands |
 | `entities/entities.js` | Player, sheep/zombie archetypes, simple wandering/chase AI |
 | `core/effects.js` | Particle simulation |
-| `client/mesher.js` | Surface-only triangle extraction and transparent mesh bucket |
-| `client/renderer.js` | WebGL2 buffers, shaders, camera, fog, day/night brightness, entity cubes |
+| `client/mesher.js` | Greedy face merging and transparent mesh bucket |
+| `client/renderer.js` | WebGL2 buffers, shaders, camera, visibility culling and adaptive render scale |
+| `client/mesh.worker.js` | Background meshing of chunk snapshots with transferables |
 | `client/input.js` | Keyboard, pointer lock, touch input |
 | `client/game.js` | Main integration and fixed timestep orchestration |
 
@@ -63,12 +64,20 @@ Touch users: left side drag to walk, right side drag to look; the buttons offer 
 
 ## Deliberate limitations / next work
 
-This is an engine playground, **not a full Minecraft recreation**. It has no crafting or network multiplayer, greedy meshing, cross-chunk pathfinding, volumetric lighting, true liquid-level conservation, animated textures, or survival item drops. A standalone `Projectile` class is present but not tied to a bow input or its renderer. The `Inventory` and `BehaviorRegistry` are core extension APIs, not yet connected to the creative-hotbar UI. Mob AI is elementary pursuit and wandering rather than A*. Keyboard and WebGL2 are implemented, but automated tests cover only the renderer-independent code and mesh construction, not visual or browser driver execution.
+This is an engine playground, **not a full Minecraft recreation**. It has no crafting or network multiplayer, cross-chunk pathfinding, volumetric lighting, true liquid-level conservation, animated textures, or survival item drops. A standalone `Projectile` class is present but not tied to a bow input or its renderer. The `Inventory` and `BehaviorRegistry` are core extension APIs, not yet connected to the creative-hotbar UI. Mob AI is elementary pursuit and wandering rather than A*. Keyboard and WebGL2 are implemented, but automated tests cover only the renderer-independent code and mesh construction, not visual or browser driver execution.
 
 ## Notes
 
 - Fixed simulation: 60 ticks/s, with accumulator cap to prevent runaway catch-up.
-- Chunk mesh rebuild budget: 5 dirty chunks per rendered frame.
+- Greedy meshing combines adjacent identical block faces into quads, reducing GPU vertices.
+- One chunk mesh submission per frame; at most two worker jobs running and one GPU upload per frame. Fallback to main-thread meshing if Web Workers are unavailable.
+- Canvas resolution adapts downward on sustained slow frames; WebGL antialiasing is off to avoid extra GPU cost.
+- Render chunk range is 88 blocks and chunks behind the camera are conservatively skipped.
+- Revisions guard against publishing stale worker results when blocks or neighbor chunks change.
 - Block-face culling handles missing neighboring chunks and marks adjacent meshes dirty when newly loaded.
 - Day/night time and player health reset on game load; edited block data persists on Save / page close.
 - Saved worlds are scoped by world name, seed and generator mode; ensure `localStorage` is available.
+
+## Optimization verification
+
+`npm test` validates chunk streaming, camera projection, merged geometry, worker snapshots, physics and world travel. Baseline 9-chunk scene: 20,772 drawn quads / 3.49 MB geometry; v0.2: 4,653 quads / 0.78 MB geometry on the same generated seed and chunk coordinates (Node benchmark, not FPS). Browser real-world FPS must be assessed on the target device.
