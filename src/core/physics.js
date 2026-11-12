@@ -1,10 +1,10 @@
-import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.js';
+import {block,BLOCK as B} from './blocks.js?v=0.8.0';import {clamp} from '../util/math.js';
 export const GRAVITY=24;
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
 function climbStep(world,e,width,height){
  for(let rise=STEP_GRANULARITY;rise<=AUTO_STEP_HEIGHT+1e-8;rise+=STEP_GRANULARITY){
-  if(!collides(world,e.x,e.y+rise,e.z,width,height)){e.y+=rise;return true}
+  if(!collides(world,e.x,e.y+rise,e.z,width,height)){e.y+=rise;e.onStep?.(rise);return true}
  }
  return false;
 }

@@ -1,7 +1,8 @@
-import {moveBody,collides,inWater} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
+import {moveBody,collides,inWater} from '../core/physics.js?v=0.8.0';import {dist2,hash} from '../util/math.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
-export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=.62;this.height=1.9;this.eye=1.70;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.fly=false;this.sprint=false;this.creative=true;this.cooldown=0;this.jumps=0}
+export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=.62;this.height=1.9;this.eye=1.70;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.fly=false;this.sprint=false;this.creative=true;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
+ onStep(rise){this.visualStepOffset=Math.max(-1,Math.min(0,this.visualStepOffset-rise))}
  update(w,dt,input){const speed=this.fly?10:input.sprint?8:5,forward=(input.forward?1:0)-(input.backward?1:0),side=(input.right?1:0)-(input.left?1:0),len=Math.hypot(forward,side)||1;const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;
  if(this.fly){this.y+=(Number(input.jump)-Number(input.crouch))*speed*dt;this.vy=0}else if(input.jump&&(this.grounded||this.water)){this.vy=this.water?5:8.3;this.grounded=false}
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}

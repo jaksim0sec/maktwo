@@ -6,7 +6,7 @@ import {LIGHTBAR,block} from '../src/core/blocks.js';
 const read=name=>readFileSync(new URL(`../${name}`,import.meta.url),'utf8');
 test('light profiles use restrained, distinctly amber illumination',()=>{
  for(const id of LIGHTBAR){const {radius,intensity,color}=block(id).light;
-  assert.ok(radius>=15&&radius<=18,'each fixture should have a restrained local radius');
+  assert.ok(radius>=9&&radius<=11,'fixtures should have warm but tightly bounded local reach');
   assert.ok(intensity>=.9&&intensity<=1.15,'warm centers should not overwhelm the frame');
   const red=parseInt(color.slice(1,3),16),green=parseInt(color.slice(3,5),16),blue=parseInt(color.slice(5,7),16);
   assert.ok(red>green*1.3&&green>blue*1.35,'fixture should have visible orange warmth');

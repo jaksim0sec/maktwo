@@ -1,5 +1,6 @@
 import {meshChunk,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
+import {cameraEyeY,dampStepOffset} from './camera.js?v=0.8.0';
 const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
@@ -21,10 +22,8 @@ void main(){
  bool inside=all(greaterThanEqual(cell,ivec3(0)))&&all(lessThan(cell,ivec3(uLightSize)));
  vec3 emission=inside?texelFetch(uLightVolume,cell,0).rgb:vec3(0.);
  vec3 ambient=vec3(.65,.72,.93)*uBrightness;
- // Desaturate strongly lit albedo, otherwise grass turns fluorescent lime green.
- float gray=dot(vColor,vec3(.24,.68,.08));
- vec3 warmReflectance=mix(vColor,vec3(gray),.74);
- vec3 c=vEmission>.5?min(vColor,vec3(1.)):vColor*ambient+warmReflectance*emission*1.38;
+ // Keep authored block colors unchanged; light range is controlled by each source.
+ vec3 c=vEmission>.5?min(vColor,vec3(1.)):vColor*(ambient+emission*1.38);
  c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);
@@ -59,7 +58,7 @@ function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(g
 export class Renderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.lightTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);this.lightOrigin=[0,0,0];this.lightAppliedKey='';this.lightRequestedKey='';this.lightBusy=false;this.lightSerial=0;this.lightWorker=null;this.lightLastRequest=0;this.hologram=null;this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,1.2);
  try{if(typeof Worker==='function'){
-  this.worker=new Worker(new URL('./mesh.worker.js',import.meta.url),{type:'module'});
+  this.worker=new Worker(new URL('./mesh.worker.js?v=0.8.0',import.meta.url),{type:'module'});
   this.worker.onmessage=({data})=>{const task=this.inflight.get(data.key);if(!task||task.token!==data.token)return;this.inflight.delete(data.key);if(data.error){console.error('Mesher worker:',data.error);task.chunk.dirty=true;this.disableWorker();return}this.completed.push({task,data})};
   this.worker.onerror=(event)=>{console.warn('Worker unavailable, using fallback mesher',event.message);this.disableWorker()};
  }}catch(error){console.warn('Worker unavailable',error)}
@@ -141,14 +140,14 @@ export class Renderer{
  dynamicData(entities,effects,time){const arr=[];for(const e of entities){const walk=Math.sin(time*7+e.id)*.12;const zombie=e.type==='zombie',c=zombie?rgb('#728c72'):rgb('#d9d5cb'),head=zombie?rgb('#8aa089'):rgb('#c7b9a7');const x=e.x,y=e.y,z=e.z;cube(arr,x-.27,y+.52,z-.17,.54,zombie?.78:.56,.34,c);cube(arr,x-.25,y+(zombie?1.34:.95),z-.25,.5,.45,.5,head);if(zombie){cube(arr,x-.42,y+.58,z-.11,.15,.64,.2,c);cube(arr,x+.27,y+.58,z-.11,.15,.64,.2,c)}for(const s of [-1,1])cube(arr,x+s*.13-.12,y+.05+(s===1?Math.max(0,walk):Math.max(0,-walk)),z-.13,.24,.46,.26,zombie?rgb('#4c6081'):rgb('#6e6a65'));
   if(e.flash>0)cube(arr,x-.3,y+.4,z-.28,.6,.2,.56,rgb('#ff8787'))}
  for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);return new Float32Array(arr)}
- frame(world,player,entities,effects){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*this.renderScale,width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
+ frame(world,player,entities,effects,dt=1/60){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*this.renderScale,width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
   const fog=[.067,.067,.075];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   gl.uniform1f(this.skyHorizon,Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32)));
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
-  const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.35);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
+  const camY=cameraEyeY(player),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.35);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   this.updateLightVolume(world,player);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);
@@ -158,5 +157,6 @@ export class Renderer{
   const data=this.dynamicData(entities,effects,performance.now()*.001);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
   this.hologram?.render(vp,performance.now()*.001);
+  player.visualStepOffset=dampStepOffset(player.visualStepOffset,dt);
  }
 }
