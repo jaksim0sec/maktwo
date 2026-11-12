@@ -49,6 +49,9 @@ export function materialFor(id,face){
   case 74:return 38;
   case 75:return 39;
   case 76:return 40;
+  case 77:case 78:return 23;
+  case 79:case 80:return 25;
+  case 81:case 82:return 28;
   default:return 0;
  }
 }

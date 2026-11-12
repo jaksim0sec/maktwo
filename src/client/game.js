@@ -257,7 +257,7 @@ class Game{
      }else this.status('문은 위로 두 칸의 공간이 필요해요');
     }else{
      if(this.world.set(x,y,z,id)){
-      if([B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR].includes(id)){const facing=((Math.round(p.yaw/(Math.PI/2))%4)+4)%4;const upper=[B.STONE_SLAB,B.WOOD_SLAB].includes(id)&&t.normal.y===-1;this.world.setShapeState(x,y,z,{facing,upper})}
+      if([B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CONCRETE_STAIRS,B.CONCRETE_SLAB,B.CHAIR].includes(id)){const facing=((Math.round(p.yaw/(Math.PI/2))%4)+4)%4;const upper=[B.STONE_SLAB,B.WOOD_SLAB,B.CONCRETE_SLAB].includes(id)&&t.normal.y===-1;this.world.setShapeState(x,y,z,{facing,upper})}
       if(collides(this.world,p.x,p.y,p.z,p.width,p.height))this.world.set(x,y,z,old);
       else{this.inventory.remove(id);this.refreshInventoryUI();this.effects.burst(x+.5,y+.5,z+.5,block(id).color,5)}
      }

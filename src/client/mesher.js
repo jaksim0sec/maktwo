@@ -18,7 +18,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','chair','flower-pot'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -80,9 +80,9 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.CONCRETE_SLAB,B.CONCRETE_STAIRS,B.THIN_WALL_NS,B.THIN_WALL_EW,B.WINDOW_NS,B.WINDOW_EW].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
-  if(isStairs(id)||isSlab(id)||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
+  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
@@ -188,10 +188,13 @@ export function flowerMesh(dest,x,y,z,seed=0,id=B.FLOWER){
 export function shapeMesh(dest,id,x,y,z,state){
  const boxes=shapeBoxes(id,x,y,z,state)||[];
  const c=rgb(BLOCKS[id].color);
- for(const b of boxes){const dx=b.x-x,dy=b.y-y,dz=b.z-z;
-  for(let f=0;f<FACES.length;f++){
-   const face=FACES[f],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);
-   quad(dest,verts,c,face.shade+4*materialFor(id,f));
+ for(let index=0;index<boxes.length;index++){
+  const b=boxes[index],dx=b.x-x,dy=b.y-y,dz=b.z-z;
+  const glass=(id===B.WINDOW_NS||id===B.WINDOW_EW)&&index===0;
+  const paint=glass?rgb('#25343b'):c,mat=glass?materialFor(B.DIRTY_GLASS,0):materialFor(id,0);
+  for(let fi=0;fi<FACES.length;fi++){
+   const face=FACES[fi],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);
+   quad(dest,verts,paint,face.shade+4*(glass?mat:materialFor(id,fi)));
   }
  }
  if(id===B.FLOWER_POT){
