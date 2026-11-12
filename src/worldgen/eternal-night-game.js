@@ -91,7 +91,7 @@ function furnishRoom(room,x,z,kit,seed) {
   return null;
 }
 
-function stampBuilding(v,detail,x,z,seed,put,empty) {
+function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
   const xi=Math.floor(x),zi=Math.floor(z),{stairs,landing,access,kits}=detail;
   const step=stairs.findIndex(t=>containsRect(t,x,z));
   const onLanding=landing&&containsRect(landing,x,z);
@@ -112,7 +112,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
     const kit=kits[f.level],floor=Math.round(f.y),ceiling=Math.round(f.top)-1;
     if(!shape) {
       // Recessed upper floors expose the roof of the previous mass as a terrace.
-      if(lastShape&&lastShape.edge>=0&&columnHash>.54) {
+      if(lastShape&&lastShape.edge>=0&&columnHash>.54&&!reservedPassage(floor)) {
         const previous=v.floors[f.level-1].outline;
         put(floor,cityPart('balcony',2),lineTurn(previous[lastShape.edge],previous[(lastShape.edge+1)%previous.length]),true);
       }
@@ -200,7 +200,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
     const atrium=f.holes.find(h=>h.kind==='atrium');
     if(atrium&&!hole&&edge<0) {
       const outward=[[1,0],[-1,0],[0,1],[0,-1]].find(([dx,dz])=>containsRect(atrium,x+dx,z+dz));
-      if(outward&&empty(floor))put(floor,cityPart('balcony',2),outwardTurn(...outward));
+      if(outward&&empty(floor)&&!reservedPassage(floor))put(floor,cityPart('balcony',2),outwardTurn(...outward));
     }
   }
 }
@@ -281,7 +281,21 @@ export function stampCityChunk(chunk,seed) {
       put(0,B.BEDROCK);
       put(CITY_BASE_Y-1,plan.lanes?.[index]?(mod(Math.floor(x)+Math.floor(z),6)===0?B.WET_TILE:B.FLOOR_TILE):B.CONCRETE);
     }
-    for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty);
+    // Walkway ports reserve traversable volume BEFORE buildings stamp their
+    // decorative balcony rails. This prevents roof/atrium rails obstructing
+    // the actual deck when a district or shop footprint changes.
+    const reservedLevels=new Map();
+    const reservedPassage=y=>{
+      if(reservedLevels.has(y))return reservedLevels.get(y);
+      const blocked=plan.pathColumns[index].some(({part})=>{
+        if(!inside(part.outline,x,z))return false;
+        const level=Math.round(part.y??segmentY(part,x,z));
+        return Math.abs(level-y)<=1;
+      });
+      reservedLevels.set(y,blocked);
+      return blocked;
+    };
+    for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage);
     for(const {link,part} of plan.pathColumns[index])stampWalkway(link,part,x,z,put,empty);
   }
   return chunk;

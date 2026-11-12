@@ -81,3 +81,9 @@ test('seed 9999 rasterizes solid service walls and a true two-cell door while re
  assert.ok(plan.volumes.some(v=>v.floors.length>=70&&v.floors.length<=80),'core landmark is preserved');
  assert.ok(plan.links.length>100,'multilevel connections remain generated');
 });
+
+test('recessed tower balcony cannot occupy an annex skybridge pedestrian deck',()=>{
+ const chunk=new Chunk(Math.floor(-66.5/16),Math.floor(271.5/16),768);
+ stampCityChunk(chunk,9999);
+ assert.equal(chunk.get((Math.floor(-66.5)%16+16)%16,134,(Math.floor(271.5)%16+16)%16),B.AIR);
+});
