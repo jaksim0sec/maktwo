@@ -62,6 +62,12 @@ export class Input{
    if(e.pointerType==='touch'||e.pointerType==='pen')this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),true);
   });
  }
+ canvasCursor(){
+  const p=this.lastMouse;if(!p||this.uiMode)return null;
+  const r=this.canvas.getBoundingClientRect();
+  if(p.x<r.left||p.x>r.right||p.y<r.top||p.y>r.bottom)return null;
+  return{x:p.x-r.left,y:p.y-r.top};
+ }
  clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset()}
  setUiMode(open){this.uiMode=Boolean(open);this.clear()}
  read(){
