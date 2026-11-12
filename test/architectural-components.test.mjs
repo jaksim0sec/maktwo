@@ -4,8 +4,8 @@ import {PART_FAMILIES,componentPlan,occupies,stairStep,partAt} from '../src/worl
 import {World} from '../src/core/world.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 
-test('eleven modular part families offer five variants each',()=>{
- assert.equal(Object.keys(PART_FAMILIES).length,11);
+test('twelve modular part families offer five variants each',()=>{
+ assert.equal(Object.keys(PART_FAMILIES).length,12);
  for(const entries of Object.values(PART_FAMILIES))assert.equal(entries.length,5);
 });
 test('three independently irregular storeys preserve circulation and ascending stairs',()=>{

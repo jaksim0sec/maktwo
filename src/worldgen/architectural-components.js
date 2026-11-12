@@ -6,6 +6,7 @@ export const PART_FAMILIES=Object.freeze({
  passage:['enclosed','open-gallery','arcade','service','roofless-bridge'],
  entrance:['recessed','shopfront','corner','side','throughway'],
  stairEntrance:['landing','vestibule','service-entry','two-way','open-core'],
+ balcony:['recessed','projecting','covered','glazed','metal-gallery'],
  wall:['plaster','tile','brick','concrete','stone'],
  column:['concrete','tile','black-granite','steel','stone'],
  window:['sliding','vent','tripartite','transom','hopper'],
@@ -66,6 +67,8 @@ export function partAt(p,x,y,z){
  if(stair)return stair;
  const edge=[!occupies(p,level,u,v-1),!occupies(p,level,u,v+1),!occupies(p,level,u-1,v),!occupies(p,level,u+1,v)];
  const boundary=edge.some(Boolean),front=edge[0],axis=edge[0]||edge[1]?'NS':'EW';
+ const balconyStyle=partVariant(p,'balcony',level);
+ const balcony=level>0&&front&&u>=11&&u<p.width-4&&balconyStyle!==3;
  if(dy===0)return {id:B.CONCRETE};
  if(dy===1)return {id:floors[partVariant(p,'staircase',level,u+v)]};
  if(u>=2&&u<=3&&v>=2&&v<=13)return {id:B.AIR};
@@ -73,8 +76,13 @@ export function partAt(p,x,y,z){
   const entrance=partVariant(p,'stairEntrance',level);
   return ((v===3+entrance%2||v===13-entrance%2)&&dy<=3)?{id:B.AIR}:{id:walls[(level+p.variant+1)%5]};
  }
- if(dy===5)return {id:level===p.floors-1?B.ARCH_CONCRETE_SMOOTH_PLASTER:B.CEILING_FINISH};
+ if(dy===5){
+  const passage=partVariant(p,'passage',level);
+  if((level===p.floors-1&&passage===4&&u===5)||(balcony&&balconyStyle===1))return {id:B.AIR};
+  return {id:level===p.floors-1?B.ARCH_CONCRETE_SMOOTH_PLASTER:B.CEILING_FINISH};
+ }
  if(boundary){
+  if(balcony&&dy>=2)return dy===2?{id:B.FENCE,style:6}:{id:B.AIR};
   if(level===0&&v===0&&u===5){
    if(dy===2)return {id:B.DOOR,style:1+partVariant(p,'door',level)};
    if(dy===3)return {id:B.DOOR_TOP};
@@ -83,8 +91,14 @@ export function partAt(p,x,y,z){
   const entrance=partVariant(p,'entrance',level);
   if(level===0&&front&&u>=9&&u<=11+entrance%2&&dy<=4)
    return {id:dy===4?B.ARCH_METAL_BLACK_PAINT:B.AIR};
-  if(level===0&&front&&u>=12&&u<=17&&dy===4){
-   return {id:[B.SHOP_SIGN,B.ARCH_METAL_GALVANIZED,B.FLUORESCENT,B.SHOP_AWNING,B.WARNING_STRIPE][partVariant(p,'sign',level,u>>1)]};
+  if(level===0&&front&&u>=12&&u<=18&&(dy===3||dy===4)){
+   const sign=partVariant(p,'sign',0),base=[B.SHOP_SIGN,B.ARCH_METAL_GALVANIZED,
+    B.SHOP_SIGN,B.SHOP_AWNING,B.WARNING_STRIPE][sign];
+   // A sign is an assembly of backing, supports and optional lighting.
+   if(dy===4&&u>=13&&u<=17)return {id:sign===2&&u===15?B.FLUORESCENT:base};
+   if(dy===3&&((sign===1&&(u===14||u===15))||
+     (sign===3&&(u===13||u===17))||(sign===4&&(u===13||u===16))))
+    return {id:sign===1?B.ARCH_METAL_BLACK_PAINT:sign===3?B.SHOP_AWNING:B.SHOP_SIGN};
   }
   if(dy>=2&&edge.filter(Boolean).length>=2&&(u+v+level)%3===0)
    return {id:columns[partVariant(p,'column',level,u+v)]};
