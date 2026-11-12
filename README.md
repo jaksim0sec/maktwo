@@ -1,4 +1,4 @@
-# MakTwo · Endless Night v0.4
+# MakTwo · Endless Night v0.5.1
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -34,8 +34,10 @@ npm test
 | Shift+G | Spawn a zombie for debugging |
 | B | Make a small block explosion at target |
 | P | Save edited blocks |
-| E | Open controls / free the mouse; press again to return to the game |
-| Escape | Release mouse pointer and open controls |
+| E or I | Open the floating building bag, releasing the pointer; choose an item to return directly |
+| M | Open/close settings (separate from the building bag) |
+| H | Open/close help |
+| Escape | Release the pointer; E reopens the bag or M opens settings |
 
 Touch users: left side drag to walk, right side drag to look; the buttons offer jumping, placing and breaking blocks.
 
@@ -106,3 +108,10 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - The HUD shows the essential controls, including the menu shortcut, without relying on an initial tutorial screen.
 - All three light fixture meshes are generated, not only torches. Nearby light lookup searches only relevant chunk indices so more distant light placements do not raise frame-wide scan costs.
 - This artistic lighting is still non-occluding: walls do not cast shadows. Visual appearance and FPS on real hardware require browser testing.
+
+## Spatial inventory & softer night atmosphere v0.5.1
+
+- The creative building bag is an in-game CSS 3D layer over the live world, opened by **E / I** or the bottom-left **Bag** button. It uses no extra WebGL scene and blocks movement/placement while open. Clicking an item selects it and returns to gameplay in one step. **M** opens the settings separately.
+- Warm fixtures now have a **larger, softer radius** and less intense orange centers, using a smooth distance-squared attenuation that does not introduce per-pixel square roots.
+- Night is **not pitch black**: moderate dim ambient light preserves terrain silhouettes. A lightweight sky gradient moves with the camera pitch, transitioning from charcoal overhead to a muted horizon instead of a flat navy fill.
+- This is artistic lighting, not occlusion or shadow casting. Rendering and pointer-lock behavior still need visual verification in a real browser; Node tests do not measure FPS or prove GPU shader compilation.

@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.world=this.manager.add('Overworld',17331,'normal');this.manager.add('Flatlands',9901,'flat');this.manager.add('Islands',45716,'islands');this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=0;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.hasLockedOnce=false;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.status('영원한 밤 · L 조명 도구 · WASD 이동');requestAnimationFrame(t=>this.frame(t))}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.world=this.manager.add('Overworld',17331,'normal');this.manager.add('Flatlands',9901,'flat');this.manager.add('Islands',45716,'islands');this.player=new Player(...Object.values(this.world.spawn()));this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=0;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.world.events.on('block-change',e=>{});this.status('영원한 밤 · L 조명 도구 · WASD 이동');requestAnimationFrame(t=>this.frame(t))}
  get paletteItems(){return this.palette==='lights'?LIGHTBAR:HOTBAR}
  renderHotbar(){const bar=$('hotbar');bar.replaceChildren();for(let i=0;i<this.paletteItems.length;i++){
   const id=this.paletteItems[i],el=document.createElement('button');el.className='slot';
@@ -13,44 +13,81 @@ class Game{
  }this.select(Math.min(this.selected,this.paletteItems.length-1));
  const paletteToggle=$('palette-toggle');if(paletteToggle){paletteToggle.textContent=this.palette==='lights'?'▦ 블록':'✦ 조명';paletteToggle.title='블록/조명 도구 전환 · L'}
  }
- togglePalette(){this.palette=this.palette==='lights'?'blocks':'lights';this.selected=0;this.renderHotbar();this.status(this.palette==='lights'?'조명 도구 · 1 횃불  2 랜턴  3 모닥불':'건축 블록')}
- // UI mode releases pointer lock once and keeps it released while controls are in use.
- setMenu(open){
-  this.menuOpen=Boolean(open);$('toolbar').classList.toggle('hidden',!this.menuOpen);
-  $('menu-btn').setAttribute('aria-expanded',String(this.menuOpen));
-  this.input.setUiMode(this.menuOpen||this.helpOpen);
-  if(this.menuOpen&&document.pointerLockElement===this.canvas)document.exitPointerLock?.();
-  this.updateControlHint();
- }
- setHelp(open){
-  this.helpOpen=Boolean(open);
-  if(this.helpOpen)this.setMenu(false);
-  $('help').classList.toggle('hidden',!this.helpOpen);
-  this.input.setUiMode(this.menuOpen||this.helpOpen);
-  if(this.helpOpen&&document.pointerLockElement===this.canvas)document.exitPointerLock?.();
+ // The inventory is a lightweight composited 3D DOM layer, not another WebGL scene.
+ // Pointer lock is intentionally released once when opening a panel, and restored
+ // directly from E/I or a resume click (both browser user gestures).
+ get uiOpen(){return Boolean(this.panel)}
+ setPanel(name){
+  this.panel=name||null;this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
+  $('toolbar')?.classList.toggle('hidden',!this.menuOpen);
+  $('help')?.classList.toggle('hidden',!this.helpOpen);
+  const layer=$('spatial-layer');layer?.classList.toggle('hidden',this.panel!=='inventory');
+  layer?.setAttribute('aria-hidden',String(this.panel!=='inventory'));
+  $('menu-btn')?.setAttribute('aria-expanded',String(this.menuOpen));
+  $('bag-btn')?.setAttribute('aria-expanded',String(this.panel==='inventory'));
+  document.body.classList.toggle('ui-open',this.uiOpen);
+  this.input.setUiMode(this.uiOpen);
+  if(this.uiOpen&&document.pointerLockElement===this.canvas)document.exitPointerLock?.();
+  if(this.panel==='inventory')this.renderInventory();
   this.updateControlHint();
  }
  requestGameFocus(){
-  this.setHelp(false);this.setMenu(false);
-  try{this.canvas.requestPointerLock?.()?.catch?.(()=>this.updateControlHint())}catch{}
+  this.setPanel(null);
+  if(!matchMedia?.('(pointer:coarse)').matches){
+   try{this.canvas.requestPointerLock?.()?.catch?.(()=>this.updateControlHint())}catch{}
+  }
   this.updateControlHint();
  }
- toggleMenu(){if(this.helpOpen){this.setHelp(false);this.setMenu(true);return}
-  if(this.menuOpen)this.requestGameFocus();else this.setMenu(true)}
+ togglePanel(name){if(this.panel===name)this.requestGameFocus();else this.setPanel(name)}
+ toggleMenu(){this.togglePanel('settings')}
+ togglePalette(){
+  this.palette=this.palette==='lights'?'blocks':'lights';this.selected=0;
+  this.renderHotbar();if(this.panel==='inventory')this.renderInventory();
+  this.status(this.palette==='lights'?'조명 도구 · 1 횃불  2 랜턴  3 모닥불':'건축 블록');
+ }
+ renderInventory(){
+  const list=$('inventory-list');if(!list)return;
+  list.replaceChildren();
+  for(const [i,id] of this.paletteItems.entries()){
+   const item=block(id),btn=document.createElement('button');btn.type='button';btn.className='inventory-item';
+   btn.classList.toggle('is-selected',i===this.selected);
+   btn.setAttribute('aria-label',`${item.name} 선택 후 게임 복귀`);
+   btn.setAttribute('aria-pressed',String(i===this.selected));
+   const specimen=document.createElement('span');specimen.className='inventory-specimen';specimen.style.setProperty('--tile',item.color);
+   const label=document.createElement('span');label.className='inventory-label';label.textContent=item.name;
+   btn.append(specimen,label);
+   btn.addEventListener('click',()=>{this.selected=i;this.renderHotbar();this.requestGameFocus()});
+   list.append(btn);
+  }
+  for(const b of document.querySelectorAll('[data-inventory-tab]')){
+   const active=b.dataset.inventoryTab===this.palette;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));
+  }
+  this.syncInventoryPreview();
+ }
+ syncInventoryPreview(){
+  const id=this.paletteItems[this.selected],data=block(id),name=$('preview-name'),swatch=$('preview-specimen');
+  if(name)name.textContent=data.name;
+  if(swatch)swatch.style.setProperty('--tile',data.color);
+  const note=$('preview-note');if(note)note.textContent=data.light?'따뜻한 빛으로 밤을 밝히는 장식':'공간을 천천히 만들어 가는 건축 재료';
+ }
  updateControlHint(){
   const el=$('control-hint');if(!el)return;
-  const ui=this.menuOpen||this.helpOpen;
-  el.classList.toggle('ui-active',ui);
-  el.textContent=ui?'블록을 골라보세요 · 게임 복귀는 E 또는 버튼':
-   document.pointerLockElement===this.canvas?'좌클릭 파괴 · 우클릭 / R 설치 · 1–0 블록 · L 조명 · E 메뉴':
-   '화면 클릭해서 시작 · 좌클릭 파괴 · 우클릭 / R 설치 · E 메뉴';
+  el.classList.toggle('ui-active',this.uiOpen);
+  el.textContent=this.panel==='inventory'?'원하는 블록 선택 · E 닫기 · 선택하면 바로 게임 복귀':
+   this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 계속하기로 복귀':
+   document.pointerLockElement===this.canvas?'좌클릭 파괴 · 우클릭 / R 설치 · E 가방 · M 설정 · L 조명':
+   '화면 클릭해서 조작 · E 가방 · 우클릭 / R 설치';
  }
  bindUI(){
   this.renderHotbar();this.updateControlHint();
   bindClick('palette-toggle',()=>this.togglePalette());
   bindClick('menu-btn',()=>this.toggleMenu());
+  bindClick('bag-btn',()=>this.togglePanel('inventory'));
+  bindClick('inventory-close',()=>this.requestGameFocus());
+  bindClick('inventory-resume',()=>this.requestGameFocus());
+  for(const tab of document.querySelectorAll('[data-inventory-tab]'))tab.addEventListener('click',()=>{this.palette=tab.dataset.inventoryTab;this.selected=0;this.renderHotbar();this.renderInventory()});
   bindClick('resume',()=>this.requestGameFocus());
-  bindClick('help-btn',()=>this.setHelp(true));
+  bindClick('help-btn',()=>this.togglePanel('help'));
   bindClick('close-help',()=>this.requestGameFocus());
   bindClick('save',()=>{this.world.save();this.status('월드 저장 완료')});
   bindClick('mode',()=>{this.player.fly=!this.player.fly;this.player.vy=0;this.status(this.player.fly?'비행 모드':'걷기 모드')});
@@ -63,40 +100,37 @@ class Game{
    for(const n of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(n,()=>this.input.held[action]=false);
   }
   // Clicking the world closes menus and captures the mouse in one gesture.
-  this.canvas.addEventListener('mousedown',()=>{if(this.menuOpen||this.helpOpen)this.requestGameFocus()});
+  this.canvas.addEventListener('mousedown',()=>{if(this.uiOpen)this.requestGameFocus()});
   document.addEventListener('pointerlockchange',()=>{
-   const locked=document.pointerLockElement===this.canvas;
-   if(locked)this.hasLockedOnce=true;
-   else if(this.hasLockedOnce&&!this.menuOpen&&!this.helpOpen)this.setMenu(true);
+   // Esc may release pointer lock. Do not automatically spawn a menu over the scene.
    this.updateControlHint();
   });
   this.canvas.addEventListener('wheel',e=>{
-   e.preventDefault();if(this.menuOpen||this.helpOpen)return;
+   e.preventDefault();if(this.uiOpen)return;
    this.select((this.selected+(e.deltaY>0?1:-1)+this.paletteItems.length)%this.paletteItems.length);
   },{passive:false});
   document.addEventListener('keydown',e=>{
-   if(e.repeat)return;
-   if(e.code==='KeyE'&& !e.target?.matches?.('input,textarea,select,[contenteditable]')){
-    e.preventDefault();this.toggleMenu();return;
-   }
+   if(e.repeat||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
+   if(e.code==='KeyE'||e.code==='KeyI'){e.preventDefault();this.togglePanel('inventory');return}
+   if(e.code==='KeyM'){e.preventDefault();this.togglePanel('settings');return}
+   if(e.code==='KeyH'){e.preventDefault();this.togglePanel('help');return}
    if(e.code==='Escape'){
-    if(this.helpOpen){e.preventDefault();this.setHelp(false);this.setMenu(true)}
-    else if(this.menuOpen){e.preventDefault();this.setMenu(false)}
+    if(this.uiOpen){e.preventDefault();this.setPanel(null)}
+    // Browser owns Escape while pointer-locked. No extra UI is opened.
     return;
    }
-   if(this.menuOpen||this.helpOpen||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
+   if(this.uiOpen)return;
    const i=+e.key;
    if(e.code.startsWith('Digit')&&i>=0&&i<=9){const index=i===0?9:i-1;if(index<this.paletteItems.length)this.select(index)}
    if(e.code==='KeyL')this.togglePalette();
-   if(e.code==='KeyF')$('mode').click();
-   if(e.code==='KeyH')this.setHelp(true);
+   if(e.code==='KeyF')$('mode')?.click();
    if(e.code==='KeyG')this.spawnMob(e.shiftKey?'zombie':'sheep');
    if(e.code==='KeyB')this.blast();
    if(e.code==='KeyP')this.world.save();
   });
   window.addEventListener('beforeunload',()=>this.world.save());
  }
- select(i){this.selected=i;document.querySelectorAll('.slot').forEach((el,j)=>{el.classList.toggle('active',j===i);el.setAttribute('aria-pressed',String(j===i))});$('block-name').textContent=block(this.paletteItems[i]).name}
+ select(i){this.selected=i;document.querySelectorAll('.slot').forEach((el,j)=>{el.classList.toggle('active',j===i);el.setAttribute('aria-pressed',String(j===i))});$('block-name').textContent=block(this.paletteItems[i]).name;this.syncInventoryPreview()}
  status(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2100)}
  travel(name){this.manager.active.save();this.world=this.manager.travel(name);this.entities=new EntityManager(this.world);this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0});this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('Entered '+name)}
  blast(){const p=this.player,d=p.direction(),hit=raycast(this.world,{x:p.x,y:p.y+p.eye,z:p.z},d,7);if(hit){const x=hit.x+.5,y=hit.y+.5,z=hit.z+.5;explode(this.world,this.entities.entities,this.effects,x,y,z,3);this.status('Blast!')}}
