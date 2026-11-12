@@ -38,3 +38,6 @@ body.submerged #underwater-filter{opacity:1;backdrop-filter:blur(1.15px);-webkit
 
 /* Scene-first HUD: controls and block names are available in settings, not persistent overlays. */
 #control-hint,#block-name,#target,#flight{display:none!important}
+
+/* A depleted quick-slot must vanish without leaving a reserved gutter. */
+#hotbar:empty{display:none}
