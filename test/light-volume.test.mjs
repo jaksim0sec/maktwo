@@ -29,7 +29,7 @@ test('one lamp produces an amber local gradient with no overbright additive clip
  const a=small(blocks,[lamp],width,height,depth),b=small(blocks,[lamp,lamp,lamp],width,height,depth);
  const p=(((8*height+4)*width+8)*4),q=(((8*height+4)*width+13)*4);
  assert.ok(a[p]>a[q]);assert.ok(a[p]>a[p+1]*1.2&&a[p+1]>a[p+2]);
- assert.ok(b[p]<=255&&b[p] > a[p] && b[p] < a[p]*2,'multiple lamps compress instead of blowing out colors');
+ assert.deepEqual(b,a,'duplicating a light should not change scene brightness anywhere');
 });
 test('occlusion snapshot reads loaded chunks without generating new chunks',()=>{
  const world=new World({mode:'flat'});world.set(4,30,4,B.STONE);world.set(5,30,4,B.TORCH);

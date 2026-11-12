@@ -2,9 +2,17 @@ import {moveBody,collides,inWater} from '../core/physics.js';import {dist2,hash}
 import {toVoxels} from '../core/scale.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
-export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
+export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
  onStep(rise){this.visualStepOffset=Math.max(-1,Math.min(0,this.visualStepOffset-rise))}
- update(w,dt,input){const speed=toVoxels(this.fly?10:input.sprint?8:5),forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;
+ update(w,dt,input){
+  // Sneaking reduces actual physical height. Don't stand up inside low ceilings.
+  const wantsCrouch=Boolean(input.crouch)&&!this.fly;
+  this.crouching=wantsCrouch||(!this.fly&&collides(w,this.x,this.y,this.z,this.width,this.standingHeight));
+  this.height=this.crouching?this.crouchedHeight:this.standingHeight;
+  this.eye+=((this.crouching?this.crouchedEye:this.standingEye)-this.eye)*Math.min(1,dt*13);
+  // Never let the camera enter a ceiling while the capsule is crouched.
+  this.eye=Math.min(this.eye,this.height-.11);
+  const speed=toVoxels(this.fly?10:this.crouching?3:input.sprint?8:5),forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;
  if(this.fly){this.y+=(Number(input.jump)-Number(input.crouch))*speed*dt;this.vy=0}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
  direction(){return{x:-Math.sin(this.yaw)*Math.cos(this.pitch),y:Math.sin(this.pitch),z:-Math.cos(this.yaw)*Math.cos(this.pitch)}}}

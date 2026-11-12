@@ -71,8 +71,8 @@ export function meshChunk(world,chunk){
      return p;
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
-    const color=COLORS[id],variation=.95+hash(xyz[0],xyz[1],xyz[2],world.seed)*.06;
-    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],shade+4*materialFor(id,faceIndex));
+    const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],world.seed)*.06;
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex));
     k+=width;
    }
   }

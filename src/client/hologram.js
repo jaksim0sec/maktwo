@@ -23,6 +23,8 @@ void main(){vec4 c=texture(uAtlas,vUV);if(c.a<.015)discard;
  else if(vCard==uSelected){c.rgb=mix(c.rgb,vec3(.83,.75,.62),.10);}
  outColor=vec4(c.rgb,c.a*uOpacity);}`;
 const ATLAS_W=1024,ATLAS_H=1024,CELL_W=192,CELL_H=230;
+// World-rendered spatial panel attached to the viewer. No fixed object remains inside a house.
+export const PANEL_DISTANCE=1.95, PANEL_SCALE=.86;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const add=(a,b,k)=>a.map((v,i)=>v+b[i]*k);
@@ -54,7 +56,7 @@ export function createAnchor(player,compact=false){
  const yaw=player.yaw;
  const forward=[-Math.sin(yaw),0,-Math.cos(yaw)],right=[Math.cos(yaw),0,-Math.sin(yaw)],up=[0,1,0];
  const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
- const center=add(add(eye,forward,compact?2.55:2.65),up,-.16);
+ const center=add(add(eye,forward,PANEL_DISTANCE),up,-.12);
  return{center,forward,right,up};
 }
 // Keep the 3D card positions, but billboard their front faces toward the viewer.
@@ -72,18 +74,29 @@ export function faceAnchor(anchor,viewer){
  if(rotated){anchor.forward=forward;anchor.right=right;anchor.up=up}
  return rotated;
 }
+// The frame follows the head while open; actual card vertices still live in the WebGL scene.
+// Use camera-up to keep its plane perpendicular to the current view rather than lying flat.
+export function followAnchor(anchor,player){
+ if(!anchor)return false;
+ const yaw=player.yaw,pitch=player.pitch,sy=Math.sin(yaw),cy=Math.cos(yaw),sp=Math.sin(pitch),cp=Math.cos(pitch);
+ const forward=[-sy*cp,sp,-cy*cp],right=[cy,0,-sy],up=[sy*sp,cp,cy*sp];
+ const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
+ const center=add(add(eye,forward,PANEL_DISTANCE),up,-.12);
+ anchor.center=center;anchor.forward=forward;anchor.right=right;anchor.up=up;
+ return true;
+}
 export function spatialHit(anchor,cards,camera,ray){
  if(!anchor||!cards?.length)return null;
  const origin=[camera.x,camera.y+camera.eye+(camera.visualStepOffset||0),camera.z];
  let best=Infinity,result=null;
  for(let i=0;i<cards.length;i++){
-  const card=cards[i],center=point(anchor.center,anchor.right,anchor.up,card.x,card.y,card.depth,anchor.forward);
+  const card=cards[i],center=point(anchor.center,anchor.right,anchor.up,card.x*PANEL_SCALE,card.y*PANEL_SCALE,card.depth*PANEL_SCALE,anchor.forward);
   const denominator=dot(ray,anchor.forward);
   if(denominator<=1e-5)continue;
   const distance=dot(sub(center,origin),anchor.forward)/denominator;
   if(distance<=.05||distance>6||distance>=best)continue;
   const hit=sub(add(origin,ray,distance),center);
-  if(Math.abs(dot(hit,anchor.right))<=card.w*.5&&Math.abs(dot(hit,anchor.up))<=card.h*.5){best=distance;result={id:card.id,index:i,distance}}
+  if(Math.abs(dot(hit,anchor.right))<=card.w*PANEL_SCALE*.5&&Math.abs(dot(hit,anchor.up))<=card.h*PANEL_SCALE*.5){best=distance;result={id:card.id,index:i,distance}}
  }
  return result;
 }
@@ -104,14 +117,15 @@ export class Hologram{
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
  open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
- facePlayer(player){if(this.opened&&faceAnchor(this.anchor,player))this.buildGeometry()}
+ followPlayer(player){if(this.opened&&followAnchor(this.anchor,player))this.buildGeometry()}
+ facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null}
  setInventory(palette,items,selected){this.palette=palette;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
    const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;
    const v0=1-((row+1)*CELL_H-3)/ATLAS_H,v1=1-(row*CELL_H+3)/ATLAS_H;
-   const halfW=card.w*.5,halfH=card.h*.5,c=point(a.center,a.right,a.up,card.x,card.y,card.depth,a.forward);
+   const halfW=card.w*PANEL_SCALE*.5,halfH=card.h*PANEL_SCALE*.5,c=point(a.center,a.right,a.up,card.x*PANEL_SCALE,card.y*PANEL_SCALE,card.depth*PANEL_SCALE,a.forward);
    const quad=[[ -halfW,halfH,u0,v1],[halfW,halfH,u1,v1],[halfW,-halfH,u1,v0],[-halfW,halfH,u0,v1],[halfW,-halfH,u1,v0],[-halfW,-halfH,u0,v0]];
    for(const [x,y,u,v] of quad)vertices.push(...point(c,a.right,a.up,x,y,0,a.forward),u,v,i);
   });
@@ -125,7 +139,7 @@ export class Hologram{
   if(!this.opened)return null;
   if(center){this.pointer=null}
   else this.point(clientX,clientY,rect);
-  this.facePlayer(player);return this.aim(player);
+  this.followPlayer(player);return this.aim(player);
  }
  click(){return this.hover?.id||null}
  drawAtlas(){const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
@@ -143,10 +157,9 @@ export class Hologram{
   gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.selected<0?2:this.selected+6);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
-  // A subdued silhouette stays visible when nearby terrain would otherwise
-  // hide every card. The actual in-world surfaces still obey the depth buffer.
-  gl.depthFunc(gl.GREATER);gl.uniform1f(this.u.opacity,.32);gl.drawArrays(gl.TRIANGLES,0,this.count);
-  gl.depthFunc(gl.LEQUAL);gl.uniform1f(this.u.opacity,1);gl.drawArrays(gl.TRIANGLES,0,this.count);
-  gl.depthFunc(gl.LESS);gl.depthMask(true);gl.enable(gl.CULL_FACE);gl.disable(gl.BLEND);
+  // Spatial head-attached UI is not world geometry: keep full 3D perspective
+  // but don't let opaque world polygons cut holes through selectable cards.
+  gl.disable(gl.DEPTH_TEST);gl.uniform1f(this.u.opacity,1);gl.drawArrays(gl.TRIANGLES,0,this.count);
+  gl.depthFunc(gl.LESS);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.disable(gl.BLEND);
  }
 }

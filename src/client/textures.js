@@ -109,11 +109,8 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
    if(seam===1)f*=1.09;
    if((px%29<2)&&row%2===0&&seam>1)f*=.90;
    r=1;g=.95;b=.88;
-  }else if(m===10){ // Glass: subtle ledge and tiny corner highlight.
-   f=.94+.045*patch;
-   if(px<2||py<2||px>29||py>29)f*=.78;
-   if((px-py+32)%19===0)f*=1.055;
-   r=.91;g=.97;b=1;
+  }else if(m===10){ // Seamless glass: no painted frame on any tile edge.
+   f=.98;r=.97;g=.995;b=1;
   }else if(m===11){ // Ore: a modest vein, not glittering random pixels.
    f=.83+.18*patch;
    if(Math.abs(py-(18+Math.sin(px*.35)*5))<2.5&&n>.35){f*=1.15;r=.9;g=.96;b=1}

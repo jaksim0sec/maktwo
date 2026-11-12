@@ -28,8 +28,10 @@ test('spatial inventory remains upright and world-anchored after camera movement
  const before=structuredClone(anchor);angled.yaw=1;angled.pitch=.5;
  assert.deepEqual(anchor,before,'world-space anchor must not follow a later camera turn');
 });
-test('hologram enables the real scene depth buffer instead of rendering through walls',()=>{
+test('world-space hologram stays interactive while preserving WebGL depth state',()=>{
  const fs=readFileSync(new URL('../src/client/hologram.js',import.meta.url),'utf8');
+ assert.match(fs,/gl\.uniformMatrix4fv\(this\.u\.vp/);
+ assert.match(fs,/gl\.disable\(gl\.DEPTH_TEST\)/);
  assert.match(fs,/gl\.enable\(gl\.DEPTH_TEST\)/);
- assert.doesNotMatch(fs,/gl\.disable\(gl\.DEPTH_TEST\)/);
+ assert.doesNotMatch(fs,/gl\.depthFunc\(gl\.GREATER\)/);
 });

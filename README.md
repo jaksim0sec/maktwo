@@ -186,3 +186,10 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for boundaries, world-generation limitations and planned vertical sections.
 
 The Highland terrain is an **early, heightfield-based prototype**, not hydraulic erosion or a full rewrite of the world renderer. Real-device WebGL/PWA verification is still required.
+
+
+## v1.7 input / lighting corrections
+- The WebGL spatial inventory tracks the camera and cannot remain inside buildings. E/Esc or the visible ✕ closes it. Movement and camera drag continue while open.
+- Glass is seamless across touching tiles. A block's material color stays intact.
+- Mobile on-screen actions are icon-only: ↑ jump and ⇣ hold to crouch. Shift crouches on desktop.
+- Light intensity at any voxel is bounded by its brightest source; overlapping lights extend area rather than overexposing terrain. Door surfaces use a general face-to-exterior sample without bypassing solid door occlusion.

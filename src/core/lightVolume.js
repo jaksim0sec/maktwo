@@ -36,7 +36,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
    const x=index%width,y=Math.floor(index/width)%height,z=Math.floor(index/plane);
    const k=index*3;
    const fraction=cost/radius,fade=(1-fraction*fraction)**2, power=energy*fade;
-   colors[k]+=tint[0]*power;colors[k+1]+=tint[1]*power;colors[k+2]+=tint[2]*power;
+   colors[k]=Math.max(colors[k],tint[0]*power);colors[k+1]=Math.max(colors[k+1],tint[1]*power);colors[k+2]=Math.max(colors[k+2],tint[2]*power);
    for(const step of STEPS){
     const xx=x+step.dx,yy=y+step.dy,zz=z+step.dz,dd=cost+step.cost;
     if(dd>radius||!inside(xx,yy,zz))continue;
@@ -52,7 +52,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
    }
   }
  }
- // Smooth highlight compression: overlapping lights do not bleach bright tiles.
+ // Brightness is the MAXIMUM nearby emitter, not a sum. Adding lamps extends coverage, not peak intensity.
  for(let i=0;i<total;i++){
   for(let k=0;k<3;k++)output[i*4+k]=Math.round(255*(1-Math.exp(-1.18*colors[i*3+k])));
   output[i*4+3]=255;

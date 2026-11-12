@@ -20,7 +20,15 @@ void main(){
  // The lighting volume contains ONLY reachable open-air cells. A wall cannot
  // illuminate its far side. Sample the air just outside the fragment's face.
  vec3 normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
- ivec3 cell=ivec3(floor(vPos+normal*.045-uLightOrigin));
+ // Find air directly outside the actual mesh face, not the block cell that
+ // contains a thin door/rail or a low path slab. This prevents black doors.
+ vec3 absN=abs(normal);
+ vec3 f=fract(vPos);
+ float coord=dot(absN,f);
+ float side=dot(absN,step(vec3(0.),normal));
+ float toBoundary=side>.5?1.-coord:coord;
+ if(toBoundary<.015||toBoundary>.985)toBoundary=0.;
+ ivec3 cell=ivec3(floor(vPos+normal*(toBoundary+.055)-uLightOrigin));
  bool inside=all(greaterThanEqual(cell,ivec3(0)))&&all(lessThan(cell,ivec3(uLightSize)));
  vec3 emission=inside?texelFetch(uLightVolume,cell,0).rgb:vec3(0.);
  vec3 ambient=vec3(.65,.72,.93)*uBrightness;
