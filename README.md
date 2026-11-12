@@ -1,3 +1,7 @@
+## v1.13: five blueprint-derived ruin types
+
+The `EternalNightR3` preset generates original floor plans using five spatial types adapted from real Korean neighborhood buildings. Fixed building-wide facade palettes, partial-depth windows, two-sided storey finishes and detailed half-height stair treads replace repetitive exterior strata. Stair cores sit toward the side rather than at the middle. A main building and an adjoining wing may combine two programs while sharing the same exterior treatment. Earlier ruins are selectable in the world menu.
+
 ## v1.12 · Architectural ruins / clear-sky altitude
 
 - Default world `EternalNightR2` uses modular, navigable interior floors with genuine concrete stairs, partial-depth walls, window frames and multiple room connections.

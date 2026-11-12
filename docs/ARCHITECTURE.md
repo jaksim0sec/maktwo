@@ -55,3 +55,16 @@ Reference ideas (not dependencies or copied source): FastNoiseLite's domain warp
 - V2 architecture uses stable x/z positions for the common 2-block-wide stair core; a side landing path connects storeys. Solid concrete frames, recessed half panels, thin partitions, window meshes and concrete stair collision all match the partial box renderer.
 - Exterior walls no longer receive a bright ceiling tile on every storey boundary. A central circulation corridor links side rooms and service landings; façade bays use windows, piers, sills and variable shutters.
 - Sky clarity is a pure smoothstep driven by world voxel altitude starting at Y=210 and reaching full clear daylight at Y=470; high-altitude stars fade away. The current 64-high chunk layout still prevents ordinary survival players reaching those elevations. An eventual vertical section refactor is required before high sky is directly explorable.
+
+## Ruined city architecture v5: plan-informed composition
+
+Architectural floor-plan references (structural organization only, no copyrighted drawings or facade copies):
+1. **Shop-house**: [former rice-store narrow house in Seoul](https://www.imwood.co.kr/news/articleView.html?idxno=22839), shop and entry alongside a separated stair core
+2. **Office / neighborhood facility**: [Bangbae Geunsaeng](https://www.archdaily.com/1185199/bangbae-geunsaeng-neighbourhood-facility-aoa-architects), rentable rectangular spaces separated from the vertical circulation and service zones
+3. **Walk-up residential**: [OBBA Beyond the Screen](https://www.domusweb.it/en/architecture/2013/08/01/obba_beyond_the_screen.html), clustered housing masses using a shared semi-exterior staircase
+4. **Arcade / external circulation**: [NOXON Neighborhood Shop](https://www.archdaily.com/992542/noxon-neighborhood-shop-on-architects), stairway placed around the outside of the room volume rather than buried in its centre
+5. **Service / mixed neighborhood spaces**: [Darak-Darak](https://www.domusweb.it/en/architecture/2017/03/08/darak_darak_the_system_lab.html), compact utility/service core and flexible adjacent floors
+
+These are precedents for **circulation and spatial planning**, not copied architectural plans. `src/worldgen/architecture-v3.js` contains five original procedural archetypes `shop-house`, `office`, `walkup`, `arcade`, `service`. A shared circulation module and stairwell are placed near one side, with a back landing and longitudinal connecting corridor. The optional L / notched wing borrows another archetype's room program but always inherits the parent building's facade material. Elevations have consistent bay/window rhythm instead of per-level material stripes.
+
+The system uses 6-block storeys and 12 half-block steps to rise between landings. Floor structure, lower half-block floor finish, and upper half-block ceiling lining are separate. Metal window frames use thin partial-depth geometry. `EternalNightR3` is a new version-5 world; v3/v4 saved worlds retain their existing generation. This **does not** add hundreds of vertical voxels. The altitude-responsive shader already allows the unnaturally clear sky gradient to be evaluated above 200 voxels, but gameplay cannot physically reach that height until vertical streaming is implemented.

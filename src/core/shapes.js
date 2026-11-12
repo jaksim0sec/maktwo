@@ -6,7 +6,7 @@ export function shapeBoxes(id,x,y,z,state={}){
  const facing=((state.facing||0)%4+4)%4;
  if(id===B.UPPER_STAIR_TREAD)return [
    {x,y:y+.5,z,w:1,h:.5,d:1},
-   {x:x+.04,y:y+.95,z:z-.035,w:.92,h:.045,d:.09}
+   {x:x+.04,y:y+.95,z:z+.002,w:.92,h:.045,d:.09}
   ];
  if(id===B.FLOOR_FINISH)return [{x,y,z,w:1,h:.5,d:1}];
  if(id===B.CEILING_FINISH)return [{x,y:y+.5,z,w:1,h:.5,d:1}];

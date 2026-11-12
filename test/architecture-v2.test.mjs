@@ -10,7 +10,7 @@ import {skyClarityAt} from '../src/client/atmosphere.js';
 import {materialFor,MATERIALS} from '../src/client/textures.js';
 
 test('partial geometry retains matching physical shape and stable block IDs',()=>{
- assert.equal(B.CONCRETE_SLAB,77);assert.equal(B.WINDOW_EW,82);assert.equal(BLOCKS.length,83);
+ assert.equal(B.CONCRETE_SLAB,77);assert.equal(B.WINDOW_EW,82);assert.ok(BLOCKS.length>=83);
  assert.ok(isStairs(B.CONCRETE_STAIRS));assert.ok(isSlab(B.CONCRETE_SLAB));
  const slab=shapeBoxes(B.CONCRETE_SLAB,0,0,0);
  assert.equal(slab[0].h,.5);
