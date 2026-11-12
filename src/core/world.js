@@ -161,7 +161,10 @@ export class World{
  snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,time:this.time,edits,states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
  stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.lights.unloadChunk(k);this.lightRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
- spawn(){let x=0,z=0;for(let r=0;r<32;r++){x=r*3;z=r*2;
+ spawn(){
+  if(this.mode==='materials')return {x:18.5,y:25,z:38.5};
+  if(this.mode.startsWith('building:'))return {x:9.5,y:25,z:-2.5};
+  let x=0,z=0;for(let r=0;r<32;r++){x=r*3;z=r*2;
   const y=surfaceAt(x,z,this.seed,this.mode);if(y<SEA+1)continue;
   if(this.mode==='ruins'&&(this.get(x,y+1,z)!==B.AIR||this.get(x,y+2,z)!==B.AIR))continue;
   return{x:x+.5,y:y+2,z:z+.5};

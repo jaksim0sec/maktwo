@@ -63,7 +63,7 @@ test('floor and ceiling are separate slab layers with different surface material
  assert.equal(floor[0].h,.5);assert.equal(floor[0].y,0);
  assert.equal(ceiling[0].h,.5);assert.equal(ceiling[0].y,.5);
  assert.notEqual(materialFor(B.FLOOR_FINISH,0),materialFor(B.CEILING_FINISH,0));
- assert.equal(BLOCKS.length,86);
+ assert.equal(BLOCKS.length,116);
  for(let id=83;id<=85;id++)assert.ok(materialFor(id,0)<=MATERIALS.length);
 });
 test('cross-chunk generation order has no effect on v5 ruined buildings',()=>{

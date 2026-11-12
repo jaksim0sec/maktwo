@@ -1,9 +1,12 @@
 // Deterministic, small 32x32 tile layers. One texture-array sampling unit for
 // all opaque blocks, retaining the existing seven-float greedy mesh format.
 // Each pixel modulates the block's authored RGB color, not replacing its palette.
+import {ARCH_MATERIALS,ARCH_MATERIAL_START} from '../core/architectural-materials.js';
+import {sampleArchitectureTexture} from './architecture-texture-sampler.js';
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시'];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label)];
 export function materialFor(id,face){
+ if(id>=ARCH_MATERIAL_START&&id<ARCH_MATERIAL_START+ARCH_MATERIALS.length)return 41+id-ARCH_MATERIAL_START;
  switch(id){
   case 1:return face===2?1:face===3?3:2;
   case 2:return 3;
@@ -96,6 +99,12 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
   const n=rand(x,y,m),fine=rand(x>>1,y>>1,m+31),patch=rand(x>>2,y>>2,m+71);
   let f=.89+.13*patch+.055*(fine-.5),r=1,g=1,b=1;
   const px=x*32/size,py=y*32/size;
+  if(m>=40){
+   const [shade,red,green,blue]=sampleArchitectureTexture(m-40,x,y,size),a=(m*size*size+y*size+x)*4;
+   out[a]=Math.min(255,Math.round(255*shade*red));out[a+1]=Math.min(255,Math.round(255*shade*green));
+   out[a+2]=Math.min(255,Math.round(255*shade*blue));out[a+3]=255;
+   continue;
+  }
   if(m===0){ // Mossy grass: short leaves and small shadow clusters.
    f=.89+.13*patch+.045*(n-.5);
    if(fine>.78&&((y+x*3)%7<2))f*=1.10;

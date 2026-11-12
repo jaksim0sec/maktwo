@@ -3,14 +3,12 @@ import {RECIPES} from './crafting.js';
 // One canonical registry for user-visible categories and world definitions.
 // Stable world names are storage keys: NEVER rename an existing entry.
 export const WORLD_PRESETS=Object.freeze([
- {name:'Overworld',seed:17331,mode:'normal',label:'영원한 밤'},
- {name:'Flatlands',seed:9901,mode:'flat',label:'평지'},
- {name:'Islands',seed:45716,mode:'islands',label:'섬'},
- {name:'Highlands',seed:62031,mode:'highlands',label:'고지대 월드',legacy:true},
- {name:'Everwild',seed:82417,mode:'normal',label:'새로운 세계 · 통합 지형'},
- {name:'EternalNight',seed:52771,mode:'ruins',label:'폐허 · 이전 저장',legacy:true},
- {name:'EternalNightR2',seed:52771,mode:'ruins',label:'폐허 · 두 번째 저장',legacy:true},
- {name:'EternalNightR3',seed:52771,mode:'ruins',label:'영원한 밤 · 폐허'},
+ {name:'TextureGallery',seed:9999,mode:'materials',label:'텍스처 전시장'},
+ {name:'BuildingShopHouse',seed:52771,mode:'building:shop-house',label:'건물 · 상가주택'},
+ {name:'BuildingOffice',seed:52771,mode:'building:office',label:'건물 · 근린 업무시설'},
+ {name:'BuildingWalkup',seed:52771,mode:'building:walkup',label:'건물 · 다세대 주택'},
+ {name:'BuildingArcade',seed:52771,mode:'building:arcade',label:'건물 · 보행 아케이드'},
+ {name:'BuildingService',seed:52771,mode:'building:service',label:'건물 · 설비·복합시설'},
 ]);
 const placeables=new Set([
  ...LIGHTBAR,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.FLOWER_POT,

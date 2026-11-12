@@ -1,11 +1,13 @@
 import {SIZE,HEIGHT} from '../core/chunk.js';
 import {integratedTerrain} from './integrated.js';
-import {stampArchitectureV3} from './architecture-v3.js';
+import {stampArchitectureV3,stampShowcaseBuilding} from './architecture-v3.js';
+import {stampMaterialGallery} from './material-gallery.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17, GENERATION_VERSION=5;
 export const BIOMES={plains:{tree:.012},forest:{tree:.075},desert:{tree:0},mountains:{tree:.008},marsh:{tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
+const isStudioMode=mode=>mode==='materials'||mode.startsWith('building:');
 function terrainAt(x,z,seed,mode){
- if(mode==='flat')return {height:22,biome:'plains'};
+ if(mode==='flat'||isStudioMode(mode))return {height:22,biome:'plains'};
  const profile=integratedTerrain(x,z,seed);
  if(mode==='islands'){
   const envelope=clamp((180-Math.hypot(x,z))/65,0,1);
@@ -24,9 +26,9 @@ export function generateChunk(chunk,seed,mode='normal'){
   profiles[z*SIZE+x]=profile;
   const {height:h,biome:b}=profile;
   for(let y=0;y<HEIGHT;y++){
-   let id=B.AIR;if(y===0)id=B.BEDROCK;else if(y<h-4)id=B.STONE;else if(y<h)id=b==='desert'?B.SAND:B.DIRT;else if(y===h)id=b==='desert'?B.SAND:B.GRASS;else if(y<=SEA)id=B.WATER;
-   if(mode!=='flat'&&y>5&&y<h-4&&y<36&&fbm(wx*.085+y*.017,wz*.085-y*.01,seed+y*31,2)>.48)id=B.AIR;
-   if(mode!=='flat'&&id!==B.BEDROCK&&id!==B.AIR&&id!==B.WATER){
+   let id=B.AIR;if(y===0)id=B.BEDROCK;else if(y<h-4)id=B.STONE;else if(y<h)id=b==='desert'?B.SAND:B.DIRT;else if(y===h)id=isStudioMode(mode)?B.CONCRETE:b==='desert'?B.SAND:B.GRASS;else if(y<=SEA)id=B.WATER;
+   if(mode!=='flat'&&!isStudioMode(mode)&&y>5&&y<h-4&&y<36&&fbm(wx*.085+y*.017,wz*.085-y*.01,seed+y*31,2)>.48)id=B.AIR;
+   if(mode!=='flat'&&!isStudioMode(mode)&&id!==B.BEDROCK&&id!==B.AIR&&id!==B.WATER){
     const geology=hash(Math.floor(wx/6),Math.floor(y/5),Math.floor(wz/6),seed+850);
     const r=hash(wx,y,wz,seed+862);
     if(y<h-4){
@@ -49,7 +51,7 @@ export function generateChunk(chunk,seed,mode='normal'){
    chunk.data[(y*SIZE+z)*SIZE+x]=id;
   }
  }
- if(mode!=='flat'&&mode!=='ruins'){
+ if(mode!=='flat'&&mode!=='ruins'&&!isStudioMode(mode)){
   // Search an expanded region so neighboring chunks receive identical feature pieces.
   for(let wz=oz-5;wz<oz+SIZE+5;wz++)for(let wx=ox-5;wx<ox+SIZE+5;wx++){
    const roll=hash(wx,0,wz,seed+401);
@@ -80,6 +82,8 @@ export function generateChunk(chunk,seed,mode='normal'){
   }
  }
  if(mode==='ruins')stampArchitectureV3(chunk,seed);
+ else if(mode==='materials')stampMaterialGallery(chunk);
+ else if(mode.startsWith('building:'))stampShowcaseBuilding(chunk,seed,mode.slice('building:'.length));
  chunk.dirty=true;return chunk;
 }
-export const GENERATORS={normal:'Integrated ridges, canyons, marsh and biomes',flat:'Flat builder world',islands:'Scattered ocean islands',highlands:'Warped ridges, winding canyons and mountains',ruins:'Procedural stacked abandoned buildings'};
+export const GENERATORS={materials:'Architectural material gallery',normal:'Integrated ridges, canyons, marsh and biomes',flat:'Flat builder world',islands:'Scattered ocean islands',highlands:'Warped ridges, winding canyons and mountains',ruins:'Procedural stacked abandoned buildings'};

@@ -9,8 +9,8 @@ import {surfaceAt,generateChunk} from '../src/worldgen/generators.js';
 import {meshChunk,gardenMesh} from '../src/client/mesher.js';
 import {collides,raycast} from '../src/core/physics.js';
 
-test('legacy world IDs and presets remain stable when new content is added',()=>{
- assert.deepEqual(WORLD_PRESETS.slice(0,3).map(x=>x.name),['Overworld','Flatlands','Islands']);
+test('legacy block IDs remain stable and only studio presets are visible',()=>{
+ assert.deepEqual(WORLD_PRESETS.map(x=>x.name),['TextureGallery','BuildingShopHouse','BuildingOffice','BuildingWalkup','BuildingArcade','BuildingService']);
  assert.equal(B.DOOR,18);assert.equal(B.DOOR_TOP,19);
  assert.deepEqual([B.PATH,B.GLOW_MUSHROOM,B.FENCE],[20,21,22]);
  assert.deepEqual(PALETTE_KEYS,['blocks','items','craft']);

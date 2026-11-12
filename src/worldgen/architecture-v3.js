@@ -153,6 +153,21 @@ function stamp(chunk,p,seed){
   for(let y=p.base+2;y<=p.base+4;y++)set(chunk,x,y,z,B.AIR);
  }
 }
+// Reuse the existing five architectural programs without generating a city grid.
+export function showcaseBlueprint(type,seed){
+ if(!ARCHETYPES.includes(type))throw new RangeError('Unknown studio building: '+type);
+ const p=blueprintFor(0,0,seed);
+ const facade={'shop-house':B.ARCH_BRICK_RED,'office':B.ARCH_STONE_GREY_GRANITE,
+  'walkup':B.ARCH_CONCRETE_PEBBLE_PAINT,'arcade':B.ARCH_TILE_VERTICAL_WHITE,
+  'service':B.ARCH_CONCRETE_FORMWORK}[type];
+ return {...p,type,base:22,floors:3,facade,mirror:false,annexType:null,
+  form:type==='arcade'?'L':type==='service'?'notched':'rectangle',
+  modules:['side-stair','corridor',type]};
+}
+export function stampShowcaseBuilding(chunk,seed,type){
+ stamp(chunk,showcaseBlueprint(type,seed),seed);
+ chunk.dirty=true;return chunk;
+}
 export function stampArchitectureV3(chunk,seed){
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
  for(let rz=Math.floor((oz-29)/GRID);rz<=Math.floor((oz+SIZE)/GRID);rz++)

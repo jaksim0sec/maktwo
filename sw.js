@@ -1,18 +1,18 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.14.3';
+const CACHE_NAME='maktwo-shell-v1.14.4';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
  './src/client/game.js','./src/client/input.js','./src/client/gestures.js','./src/client/item-icons.js',
- './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
+ './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/architecture-texture-sampler.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
  './src/client/renderer.js','./src/client/mesher.js','./src/client/mesh.worker.js',
  './src/client/light.worker.js','./src/core/blocks.js','./src/core/chunk.js',
  './src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/inventory.js','./src/core/crafting.js','./src/core/physics.js',
- './src/core/scale.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
+ './src/core/scale.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
- './src/worldgen/generators.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js'
+ './src/worldgen/generators.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js'
 ];
 // Install a complete and versioned app snapshot. NEVER mutate it at runtime.
 // A slow connection cannot partially overwrite code in a previously working build.
