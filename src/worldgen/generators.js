@@ -3,6 +3,7 @@ import {highlandAt,highlandBiome} from './landforms.js';
 import {integratedTerrain} from './integrated.js';
 import {stampRuins} from './buildings.js';
 import {stampArchitectureV2} from './architecture-v2.js';
+import {stampArchitectureV3} from './architecture-v3.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17;
 export const BIOMES={plains:{base:22,relief:7,tree:.012},forest:{base:24,relief:9,tree:.075},desert:{base:20,relief:8,tree:0},mountains:{base:30,relief:23,tree:.008},marsh:{base:18,relief:4,tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
@@ -80,7 +81,8 @@ export function generateChunk(chunk,seed,mode='normal',version=1){
   }
  }
  if(mode==='ruins'){
-  if(version>=4)stampArchitectureV2(chunk,seed);
+  if(version>=5)stampArchitectureV3(chunk,seed);
+  else if(version>=4)stampArchitectureV2(chunk,seed);
   else stampRuins(chunk,seed);
  }
  chunk.dirty=true;return chunk;
