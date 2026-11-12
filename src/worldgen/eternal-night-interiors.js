@@ -8,9 +8,11 @@ export function floorFinish(f,shape,x,z,base) {
  const corridor=shape?.corridor;
  if(corridor&&f.program!=='workshops') {
   const edge=Math.min(x-corridor.x0,corridor.x1-x,z-corridor.z0,corridor.z1-z);
-  // Historic school/arcade floors: a light central walking field separated
-  // from plastered walls by one darker red-brown tile band.
-  return edge<1.05?B.TERRACOTTA:B.ARCH_TILE_LARGE_PORCELAIN;
+  // Thin border only where the corridor has enough width. A school-like
+  // 2.7 m hall must not turn entirely red-brown on the voxel grid.
+  const width=Math.min(corridor.x1-corridor.x0,corridor.z1-corridor.z0);
+  const band=Math.min(.8,Math.max(0,(width-2)/2));
+  return edge<band?B.TERRACOTTA:B.ARCH_TILE_LARGE_PORCELAIN;
  }
  if(shape?.room?.kind==='room'&&f.program==='housing')return B.ARCH_FLOOR_WOOD;
  if(shape?.room?.kind==='shop')return B.ARCH_FLOOR_LINOLEUM;
