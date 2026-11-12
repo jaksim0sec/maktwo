@@ -33,8 +33,8 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <div class="layout">
 <section class="scan">
 <div class="toolbar">
-<label>평면 <select id="view-mode"><option value="city">현재 높이</option><option value="district">섹션 범위</option><option value="luxury">상위 호화도</option><option value="noise">상위 노이즈</option></select></label>
-<label for="height-scan">Y</label><input id="height-scan" type="range" min="0" max="539" step="1" value="24"><output id="scan-height">24</output>
+<label>평면 <select id="view-mode"><option value="city">현재 높이</option><option value="building">선택 건물 도면</option><option value="district">섹션 범위</option><option value="luxury">상위 호화도</option><option value="noise">상위 노이즈</option></select></label>
+<label for="height-scan">Y</label><input id="height-scan" type="range" min="0" max="539" step="any" value="4"><output id="scan-height">4</output>
 </div>
 <figure class="figure"><figcaption>XZ · 수평 단면</figcaption><canvas id="map" width="512" height="512" aria-label="위치를 선택하는 수평 단면"></canvas></figure>
 <figure class="figure profile"><figcaption>선택 좌표 · Y별 호화도</figcaption><canvas id="profile" width="150" height="512" aria-label="높이를 선택하는 호화도 단면 그래프"></canvas></figure>
@@ -49,6 +49,8 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
 <label><span>가로폭 <output id="width-value">1024</output></span><input id="width" type="range" min="512" max="4096" step="64" value="1024"></label>
 <label><span>층고 <output id="height-value">540</output></span><input id="height" type="range" min="180" max="900" step="6" value="540"></label>
+<label><span>건물 밀도 <output id="density-value">67</output></span><input id="density" type="range" min="0" max="100" step="1" value="67"></label>
+<label><span>건축 기준 단위 <output id="unit-value">1</output></span><input id="unit" type="range" min="0.5" max="2" step="0.05" value="1"></label>
 <div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
 <div id="error" role="status"></div>
@@ -59,7 +61,9 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <script type="module">
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, verticalSpansAt, zoneAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
-import { BUILDING_TYPES, createDistrictPlan, districtColumn, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
+import { BUILDING_TYPES, createDistrictPlan, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
+import { buildingAt, cutPolygon, storeyAt } from "../../src/worldgen/eternal-night-buildings.js";
+import { segmentY } from "../../src/worldgen/eternal-night-walkways.js";
 
 const noiseOptions = [
   ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "물길의 폭과 분포 면적"],
@@ -125,6 +129,7 @@ const zoneNames = ["허공","공용 구조","중앙 통로","공중정원","미�
 const worldSpan = new Float64Array(3);
 let layout, plan, queued = false;
 let x = null, y = Number(scanHeight.value), z = null;
+let focus = null;
 
 for (const {label,color} of BUILDING_TYPES) {
   const swatch = document.createElement("span");
@@ -147,17 +152,19 @@ function regenerate() {
       width:Number(get("width").value), floorHeight:Number(get("height").value), seed:Number(get("seed").value),
       ...Object.fromEntries(Object.entries(noiseInputs).map(([key,input])=>[key,input.valueAsNumber])), ratios,
     });
-    const city = createDistrictPlan(next);
+    const city = createDistrictPlan(next,128,{unit:get("unit").valueAsNumber,buildingDensity:get("density").valueAsNumber/100});
     if (layout && x !== null) {
       x = next.centerX + (x-layout.centerX)*next.width/layout.width;
       z = next.centerZ + (z-layout.centerZ)*next.width/layout.width;
     }
     layout = next;
     plan = city;
+    focus = null;
     if (x === null) {
-      const first = plan.volumes.reduce((best,v)=>v.type!==6&&v.y0<=y&&y<v.y1&&(!best||v.y1>best.y1)?v:best,null);
-      x = first ? (first.x0+first.x1)/2 : layout.centerX;
-      z = first ? (first.z0+first.z1)/2 : layout.centerZ;
+      const first = city.walkways.find(link=>link.kind==="core")?.ports[0];
+      x = first ? first.x-first.dx*.1 : layout.centerX;
+      z = first ? first.z-first.dz*.1 : layout.centerZ;
+      if(first)y=first.y;
     }
     scanHeight.min = layout.slabBottom;
     scanHeight.max = layout.floorTop - 1;
@@ -189,8 +196,88 @@ function crosshair(ctx,w,h,cx,cy) {
   ctx.strokeRect(cx-3,cy-3,6,6);
 }
 
+function polygon(ctx,outline,px,pz) {
+  outline.forEach(([a,b],i)=>i?ctx.lineTo(px(a),pz(b)):ctx.moveTo(px(a),pz(b)));
+  ctx.closePath();
+}
+const rectOutline = r => [[r.x0,r.z0],[r.x1,r.z0],[r.x1,r.z1],[r.x0,r.z1]];
+const pathColor = {core:"#e9c68a",tower:"#e9c68a",bridge:"#b8a4df",roof:"#92c4a9"};
+const pathName = {core:"중앙타워 주 통로",tower:"중앙타워 접속층",bridge:"건물 연결교",roof:"옥상 연결부"};
+function pathOutlineAt(part,y) {
+  const low=part.y??Math.min(part.from[1],part.to[1]),high=part.y??Math.max(part.from[1],part.to[1]);
+  const lower=y-plan.unit*2.25,upper=y+plan.unit*.25;
+  if(high<=lower||low>upper)return null;
+  if(high===low)return part.outline;
+  const [a,b,c,d]=part.outline, ascending=part.from[1]<part.to[1];
+  const at=(p,q,t)=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t];
+  function boundary(level) {
+    if(level<=low)return ascending?0:1;
+    if(level>=high)return ascending?1:0;
+    let l=0,r=1;
+    for(let n=0;n<14;n++) {
+      const t=(l+r)/2;
+      const x=part.from[0]+(part.to[0]-part.from[0])*t,z=part.from[2]+(part.to[2]-part.from[2])*t;
+      if((segmentY(part,x,z)<level)===ascending)l=t;else r=t;
+    }
+    return (l+r)/2;
+  }
+  const t0=boundary(ascending?lower:upper),t1=boundary(ascending?upper:lower);
+  return [at(a,d,t0),at(b,c,t0),at(b,c,t1),at(a,d,t1)];
+}
+function bounds() {
+  if(mode.value!=="building"||!focus)return {left:plan.left,top:plan.top,span:layout.width,bottom:layout.slabBottom,ceiling:layout.floorTop};
+  const span=Math.max(focus.x1-focus.x0,focus.z1-focus.z0)+6*plan.unit;
+  return {left:(focus.x0+focus.x1-span)/2,top:(focus.z0+focus.z1-span)/2,span,
+    bottom:focus.y0-2*plan.unit,ceiling:focus.y1+2*plan.unit};
+}
+function floorPlan(ctx,v,f,px,pz,detail) {
+  ctx.beginPath();polygon(ctx,f.outline,px,pz);
+  for(const hole of f.holes)polygon(ctx,rectOutline(hole),px,pz);
+  ctx.fillStyle=shade(v,f.y);ctx.fill("evenodd");
+  if(detail) {
+    ctx.save();ctx.clip("evenodd");
+    for(const r of [...f.corridors,...f.rooms]) {
+      ctx.fillStyle=r.kind.endsWith("corridor")?"#e4e7cb40":r.kind==="shop"?"#e7ad6038":"#9dd3de30";
+      ctx.fillRect(px(r.x0),pz(r.z0),px(r.x1)-px(r.x0),pz(r.z1)-pz(r.z0));
+    }
+    ctx.restore();
+    ctx.strokeStyle="#212b33";
+    for(const {a,b} of f.partitions) {
+      ctx.beginPath();ctx.moveTo(px(a[0]),pz(a[1]));ctx.lineTo(px(b[0]),pz(b[1]));ctx.stroke();
+    }
+    const stair=v.stairs[f.level];
+    ctx.fillStyle="#9aa6ad";
+    for(const t of [stair.landing,...stair.treads]) {
+      ctx.fillRect(px(t.x0),pz(t.z0),px(t.x1)-px(t.x0),pz(t.z1)-pz(t.z0));
+      ctx.strokeRect(px(t.x0),pz(t.z0),px(t.x1)-px(t.x0),pz(t.z1)-pz(t.z0));
+    }
+    ctx.strokeStyle="#d1dce4";
+    for(const {from,to} of stair.rails) {
+      ctx.beginPath();ctx.moveTo(px(from[0]),pz(from[2]));ctx.lineTo(px(to[0]),pz(to[2]));ctx.stroke();
+    }
+  }
+  ctx.strokeStyle="#0e131b";
+  ctx.lineWidth=detail?2:1;
+  for(let i=0;i<f.outline.length;i++) {
+    const a=f.outline[i],b=f.outline[(i+1)%f.outline.length];
+    const door=f.doors.find(p=>p.edge===i);
+    ctx.beginPath();ctx.moveTo(px(a[0]),pz(a[1]));
+    if(door) {
+      const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const dx=(b[0]-a[0])*door.width/(2*length),dz=(b[1]-a[1])*door.width/(2*length);
+      ctx.lineTo(px(door.x-dx),pz(door.z-dz));ctx.moveTo(px(door.x+dx),pz(door.z+dz));
+    }
+    ctx.lineTo(px(b[0]),pz(b[1]));ctx.stroke();
+  }
+  ctx.lineWidth=1;
+}
+
 function mapView() {
   const ctx = contexts.get(canvas), w = canvas.width, cell = w/plan.size;
+  const frame=bounds(), detail=mode.value==="building"&&focus!==null;
+  const px=a=>(a-frame.left)*w/frame.span,pz=b=>(b-frame.top)*w/frame.span;
+  ctx.fillStyle="#111419";ctx.fillRect(0,0,w,w);
+  if(!detail) {
   for (let i=0; i<plan.zones.length; i++) {
     const zone = plan.zones[i], label = plan.labels[i];
     let color = zoneColors[zone];
@@ -200,35 +287,52 @@ function mapView() {
       if (mode.value === "district") color = `hsl(${(label*137.508)%360} 34% ${20+30*weight}%)`;
       else if (mode.value === "luxury") color = `hsl(153 31% ${14+62*weight}%)`;
       else if (mode.value === "noise") color = `hsl(185 50% ${12+62*n}%)`;
-      else {
-        const volume = plan.columns[i].find(v=>v.y0<=y&&y<v.y1);
-        color = volume ? shade(volume,y) : "#192128";
-      }
+      else color = "#192128";
     }
     ctx.fillStyle = color;
     ctx.fillRect((i%plan.size)*cell,Math.floor(i/plan.size)*cell,cell,cell);
   }
-  if (mode.value === "city") {
-    ctx.strokeStyle = "#101419b0";
-    for (const v of plan.volumes) if (v.y0<=y&&y<v.y1) {
-      ctx.strokeRect((v.x0-plan.left)*w/layout.width,(v.z0-plan.top)*w/layout.width,
-        (v.x1-v.x0)*w/layout.width,(v.z1-v.z0)*w/layout.width);
+  }
+  if (mode.value === "city" || mode.value === "building") {
+    for (const v of detail?[focus]:plan.volumes) {
+      const f=storeyAt(v,y);
+      if(f)floorPlan(ctx,v,f,px,pz,detail);
+      else if(detail){ctx.beginPath();polygon(ctx,v.floors[0].outline,px,pz);ctx.strokeStyle="#55616e";ctx.stroke();}
+    }
+    for(const link of plan.walkways) {
+      ctx.fillStyle=pathColor[link.kind];
+      for(const part of [...link.segments,...link.landings]) {
+        const outline=pathOutlineAt(part,y);
+        if(!outline)continue;
+        ctx.beginPath();polygon(ctx,outline,px,pz);ctx.fill();
+      }
     }
   }
-  crosshair(ctx,w,w,(x-plan.left)*w/layout.width,(z-plan.top)*w/layout.width);
+  crosshair(ctx,w,w,px(x),pz(z));
 }
 
-const heightRatio = h => (layout.floorTop-h)/(layout.floorTop-layout.slabBottom);
+const heightRatio = (h,frame=bounds()) => (frame.ceiling-h)/(frame.ceiling-frame.bottom);
 function sliceView(target, axis) {
   const ctx = contexts.get(target), w = target.width, h = target.height;
   const alongX = axis === "x";
-  const left = alongX ? plan.left : plan.top, fixed = alongX ? z : x;
-  const px = v => (v-left)*w/layout.width;
-  const py = v => heightRatio(v)*h;
+  const frame=bounds(), detail=mode.value==="building"&&focus!==null;
+  const left = alongX ? frame.left : frame.top, fixed = alongX ? z : x;
+  const px = v => (v-left)*w/frame.span;
+  const py = v => heightRatio(v,frame)*h;
+  const fill = (l,r,low,high,minHeight=0) => ctx.fillRect(px(l),py(high),px(r)-px(l),Math.max(minHeight,py(low)-py(high)));
+  const rectCut = r => alongX ? fixed>=r.z0&&fixed<r.z1?[r.x0,r.x1]:null : fixed>=r.x0&&fixed<r.x1?[r.z0,r.z1]:null;
+  const slab = (cut,holes,level) => {
+    let start=cut[0];
+    for(const [l,r] of holes.map(rectCut).filter(Boolean).sort((a,b)=>a[0]-b[0])) {
+      if(l>start)fill(start,Math.min(l,cut[1]),level-plan.unit*.22,level,.8);
+      start=Math.max(start,r);
+    }
+    if(start<cut[1])fill(start,cut[1],level-plan.unit*.22,level,.8);
+  };
   ctx.fillStyle = "#111419";
   ctx.fillRect(0,0,w,h);
   for (let i=0; i<w; i++) {
-    const along = left+(i+.5)*layout.width/w;
+    const along = left+(i+.5)*frame.span/w;
     const count = verticalSpansAt(layout,alongX?along:fixed,alongX?fixed:along,worldSpan);
     if (!count) continue;
     const type = worldSpan[2];
@@ -236,26 +340,67 @@ function sliceView(target, axis) {
       type===CORE_STRUCTURE.MAIN_SHAFT ? "#783f4d" : "#385a84";
     ctx.fillRect(i,py(worldSpan[1]),1,py(worldSpan[0])-py(worldSpan[1]));
   }
-  for (const v of plan.volumes) {
+  for (const v of detail?[focus]:plan.volumes) {
     if (alongX ? fixed<v.z0||fixed>=v.z1 : fixed<v.x0||fixed>=v.x1) continue;
-    const l=px(alongX?v.x0:v.z0), r=px(alongX?v.x1:v.z1);
-    for (let low=v.y0; low<v.y1; low+=6) {
-      const high = Math.min(v.y1,low+6);
-      ctx.fillStyle=shade(v,low);
-      ctx.fillRect(l,py(high),r-l,py(low)-py(high));
+    for(const f of v.floors) {
+      const cut=cutPolygon(f.outline,axis,fixed);
+      if(!cut)continue;
+      ctx.fillStyle=shade(v,f.y);
+      ctx.globalAlpha=.37;
+      fill(...cut,f.y,f.top);
+      for(const hole of f.holes.filter(h=>h.kind==="atrium")) {
+        const voidCut=rectCut(hole);
+        if(voidCut){ctx.globalAlpha=1;ctx.fillStyle="#111419";fill(...voidCut,f.y,f.top);}
+      }
+      ctx.globalAlpha=1;
+      ctx.fillStyle=shade(v,f.y);
+      slab(cut,f.holes,f.y);
+      if(detail) {
+        const lateral=alongX?1:0, longitudinal=1-lateral;
+        for(const {a,b} of f.partitions) {
+          if(fixed<Math.min(a[lateral],b[lateral])||fixed>=Math.max(a[lateral],b[lateral]))continue;
+          ctx.fillRect(px(a[longitudinal])-.6,py(f.top),1.2,py(f.y)-py(f.top));
+        }
+        const stair=v.stairs[f.level];
+        if(rectCut(stair.landing)||rectCut(f.holes.find(h=>h.kind==="stair")??v.roof.holes[0])) {
+          ctx.fillStyle="#a2adb7";
+          for(const t of [stair.landing,...stair.treads]) {
+            const tread=rectCut(t);
+            if(tread)fill(...tread,t.y-(t.rise??plan.unit*.22),t.y,1);
+          }
+        }
+      }
     }
-    ctx.strokeStyle = "#0e131bd0";
-    ctx.strokeRect(l,py(v.y1),r-l,py(v.y0)-py(v.y1));
+    const roof=cutPolygon(v.roof.outline,axis,fixed);
+    if(roof)slab(roof,v.roof.holes,v.roof.y);
+  }
+  for(const link of plan.walkways) {
+    ctx.fillStyle=pathColor[link.kind];
+    for(const part of [...link.segments,...link.landings]) {
+      const cut=cutPolygon(part.outline,axis,fixed);
+      if(!cut)continue;
+      if(part.y!==undefined||part.kind==="deck") {
+        const level=part.y??part.from[1];
+        fill(...cut,level-plan.unit*.25,level,1);
+        continue;
+      }
+      const low=Math.max(0,Math.floor(px(cut[0]))), high=Math.min(w,Math.ceil(px(cut[1])));
+      for(let i=low;i<high;i++) {
+        const a=left+(i+.5)*frame.span/w;
+        const level=segmentY(part,alongX?a:fixed,alongX?fixed:a);
+        ctx.fillRect(i,py(level),1,Math.max(1,py(level-plan.unit*.25)-py(level)));
+      }
+    }
   }
   ctx.font = "10px system-ui";
   ctx.fillStyle = "#b4c0cc";
-  const interval = layout.floorHeight > 400 ? 120 : 60;
-  for (let level=layout.floorY; level<layout.floorTop; level+=interval) {
+  const interval = detail?focus.storeyHeight*(focus.floors.length>20?4:1):layout.floorHeight > 400 ? 120 : 60;
+  for (let level=detail?focus.y0:layout.floorY; level<frame.ceiling; level+=interval) {
     const line = py(level);
     ctx.fillStyle = "#a6bbc42b";
     ctx.fillRect(0,line,w,1);
     ctx.fillStyle = "#c0cdd5";
-    ctx.fillText(level,4,line-3);
+    ctx.fillText(Number(level.toFixed(2)),4,line-3);
   }
   crosshair(ctx,w,h,px(alongX?x:z),py(y));
 }
@@ -273,8 +418,9 @@ function profileView(column) {
     ctx.fillStyle = "#aebdca";ctx.fillText(label,px-5,h-6);
   }
   for (const v of column?.volumes ?? []) {
-    for (let low=v.y0; low<v.y1; low+=6) {
-      const high=Math.min(v.y1,low+6), bar=chart*volumeLuxury(plan,v,low);
+    for (const {y:low,top:high} of v.floors) {
+      if(!buildingAt(v,x,low,z))continue;
+      const bar=chart*volumeLuxury(plan,v,low);
       const top=heightRatio(high)*h, bottom=heightRatio(low)*h;
       ctx.fillStyle = shade(v,low);
       ctx.fillRect(origin,top,bar,Math.max(1,bottom-top-.5));
@@ -286,15 +432,17 @@ function profileView(column) {
 
 function draw() {
   if (!plan) return;
-  const {column,volume,luxury} = districtSample(plan,x,y,z);
+  const {column,volume,path,luxury} = districtSample(plan,x,y,z);
+  if(mode.value==="building"&&!focus)focus=volume??column?.volumes[0]??null;
   const zone = zoneAt(layout,x,z);
   const value = v => Number(v).toFixed(3);
-  const location = `X ${x.toFixed(1)} · Y ${y} · Z ${z.toFixed(1)}`;
-  const info = volume ? `${BUILDING_TYPES[volume.type].label} #${volume.id+1} · 호화도 ${value(luxury)}` :
+  const location = `X ${x.toFixed(1)} · Y ${Number(y.toFixed(2))} · Z ${z.toFixed(1)}`;
+  const info = volume ? `${volume.typology} #${volume.id+1} · ${storeyAt(volume,y).level+1}/${volume.floors.length}층 · 호화도 ${value(luxury)}` :
+    path ? pathName[path.kind] :
     zone===CORE_ZONE.DISTRICT&&y>=layout.floorY ? "빈 공간 · 호화도 없음" : zoneNames[zone];
   const sectionName = column?.section>=0 ? `섹션 ${column.section+1} · 상위 호화도 ${value(column.luxury)} · 노이즈 ${value(column.noise)}` : "";
   get("readout").replaceChildren(location+"  /  "+info,document.createElement("br"),sectionName);
-  get("scan-height").textContent = y;
+  get("scan-height").textContent = Number(y.toFixed(2));
   get("xy-label").textContent = `XY · Z ${z.toFixed(1)}`;
   get("yz-label").textContent = `ZY · X ${x.toFixed(1)}`;
   mapView(); sliceView(section,"x"); sliceView(side,"z"); profileView(column);
@@ -306,21 +454,24 @@ function point(event, target) {
   return [clampRatio((event.clientX-bounds.left)/bounds.width),clampRatio((event.clientY-bounds.top)/bounds.height)];
 }
 function setHeight(fraction) {
-  const next = Math.floor(layout.floorTop-fraction*(layout.floorTop-layout.slabBottom));
+  const frame=bounds();
+  const next = frame.ceiling-fraction*(frame.ceiling-frame.bottom);
   scanHeight.value = Math.max(layout.slabBottom,Math.min(layout.floorTop-1,next));
   y = scanHeight.valueAsNumber;
 }
 canvas.addEventListener("click",event=>{
   if (!plan) return;
   const [u,v] = point(event,canvas);
-  x=plan.left+u*layout.width;z=plan.top+v*layout.width;draw();
+  const frame=bounds();
+  x=frame.left+u*frame.span;z=frame.top+v*frame.span;draw();
 });
 for (const [target,axis] of [[section,"x"],[side,"z"]]) {
   target.addEventListener("click",event=>{
     if (!plan) return;
     const [u,v] = point(event,target);
-    if (axis==="x") x=plan.left+u*layout.width;
-    else z=plan.top+u*layout.width;
+    const frame=bounds();
+    if (axis==="x") x=frame.left+u*frame.span;
+    else z=frame.top+u*frame.span;
     setHeight(v);draw();
   });
 }
@@ -329,9 +480,10 @@ profile.addEventListener("click",event=>{
   setHeight(point(event,profile)[1]);draw();
 });
 scanHeight.addEventListener("input",()=>{y=scanHeight.valueAsNumber;draw();});
-mode.addEventListener("change",draw);
+mode.addEventListener("change",()=>{focus=null;draw();});
 function queue() {
-  if (!queued) {queued = true;requestAnimationFrame(regenerate);}
+  clearTimeout(queued);
+  queued=setTimeout(regenerate,110);
 }
 document.querySelectorAll("aside input").forEach(input=>input.addEventListener("input",()=>{
   const output = get(input.id+"-value");

@@ -1,16 +1,109 @@
 import {CORE_ZONE, districtIdAt, sampleFloorRect} from './eternal-night-core-floor.js';
+import {BUILDING_DEFAULTS, buildingAt, cutPolygon, designBuilding, stairRisers} from './eternal-night-buildings.js';
+import {designRoofWalkway, designWalkways, segmentY} from './eternal-night-walkways.js';
+function populate(layout, grid, partitioned, {unit,buildingDensity}) {
+  const {size, step, left, top, luxury, noise, buildable} = grid;
+  const {labels, sections, tangentX, tangentZ} = partitioned;
+  const occupied = new Uint8Array(labels.length), volumes=[], roofLinks=[];
+  const make = (x,z,w,d,y0,type,section,support,weight) => ({
+    id:volumes.length, x0:left+x*step, x1:left+(x+w)*step, z0:top+z*step, z1:top+(z+d)*step,
+    y0,type,section,support,luxury:weight,gx:x,gz:z,gw:w,gd:d,
+  });
+  const height = (v,desired) => {
+    const risers=stairRisers(v,unit);
+    if (!risers) return false;
+    const pitch=risers*unit/4;
+    const floors=Math.min(desired,Math.floor((layout.floorTop-v.y0)/pitch)-1);
+    if(floors<1)return false;
+    v.y1=v.y0+floors*pitch;
+    return true;
+  };
+  const cap=buildingDensity*.84;
+  const minCells=Math.max(2,Math.ceil(6.4*unit/step));
+  const minLength=Math.ceil(7.2*unit/step);
+  for (const section of sections) {
+    if (!cap || section.cells.length < minCells**2) continue;
+    const score = i => .52 * luxury[i] + .22 * noise[i] + .26 * fract(layout.noiseSeed,i,4);
+    const ranked = section.cells.slice().sort((a,b)=>score(b)-score(a)||a-b);
+    let coverage = 0;
+    for (const i of ranked) {
+      if (coverage >= cap*ranked.length) break;
+      const x=i%size,z=Math.floor(i/size);
+      if (occupied[i] || !buildable[i]) continue;
+      const l=.62*luxury[i]+.38*section.luxury;
+      const tier=clamp(l/layout.districtLuxuryMax,0,1);
+      const coordinate=Math.imul(Math.floor(left+(x+.5)*step),0x27d4eb2d)^Math.imul(Math.floor(top+(z+.5)*step),0x165667b1);
+      const random = salt => fract(layout.noiseSeed,coordinate,salt);
+      const roll=random(2), commercial=.05+.28*tier+.11*noise[i], arcade=commercial+.18;
+      const type=roll<commercial?2:roll<arcade?3:roll<arcade+.12?4:roll<arcade+.35?0:1;
+      const preset=BUILDING_TYPES[type];
+      const range=Math.max(1,preset.width-1);
+      let w=minCells+Math.floor(random(7)*range);
+      let d=minCells+Math.floor(random(8)*range);
+      if ((w>d)!==(Math.abs(tangentX[i])>=Math.abs(tangentZ[i]))) [w,d]=[d,w];
+      let root=null;
+      while(w>=minCells && d>=minCells && Math.max(w,d)>=minLength) {
+        const bx=x-Math.floor(w/2),bz=z-Math.floor(d/2);
+        if (bx>=0 && bz>=0 && bx+w<=size && bz+d<=size) {
+          let valid=true;
+          for(let dz=-1;dz<=d&&valid;dz++)for(let dx=-1;dx<=w;dx++) {
+            const tx=bx+dx,tz=bz+dz;
+            if(tx<0||tz<0||tx>=size||tz>=size)continue;
+            const j=tz*size+tx;
+            if(occupied[j] || (dx>=0&&dx<w&&dz>=0&&dz<d&&(labels[j]!==section.id||!buildable[j]))) {
+              valid=false;
+              break;
+            }
+          }
+          if(valid) {
+            const candidate=make(bx,bz,w,d,layout.floorY,type,section.id,null,l);
+            const floors=2+Math.floor(preset.floors*(.55+1.15*tier+.5*noise[i])*random(9)**1.4);
+            if(height(candidate,floors) && designBuilding(candidate,unit,random))root=candidate;
+            break;
+          }
+        }
+        if(w>=d)w--;else d--;
+      }
+      if(!root)continue;
+      volumes.push(root);
+      for(let dz=0;dz<root.gd;dz++)for(let dx=0;dx<root.gw;dx++)occupied[(root.gz+dz)*size+root.gx+dx]=1;
+      coverage+=root.gw*root.gd;
 
+      // Roof additions are accepted only if the occupied slab and the stairs can support and serve them.
+      if(random(20)>=.38+.30*noise[i])continue;
+      const roofX=root.roof.outline.map(p=>p[0]),roofZ=root.roof.outline.map(p=>p[1]);
+      const x0=Math.min(...roofX)+2*unit,x1=Math.max(...roofX)-2*unit;
+      const z0=Math.min(...roofZ)+2*unit,z1=Math.max(...roofZ)-2*unit;
+      const shaft=root.roof.holes[0],clear=2*unit;
+      const strips=[[x0,z0,shaft.x0-clear,z1],[shaft.x1+clear,z0,x1,z1],
+        [x0,z0,x1,shaft.z0-clear],[x0,shaft.z1+clear,x1,z1]];
+      const start=Math.floor(random(32)*strips.length);
+      for(let n=0;n<strips.length;n++) {
+        const [a,b,c,d]=strips[(start+n)%strips.length];
+        const w=Math.min(c-a,unit*(8+14*random(24+n))),h=Math.min(d-b,unit*(8+14*random(28+n)));
+        if(Math.min(w,h)<6.4*unit || Math.max(w,h)<7.2*unit)continue;
+        const x=a+(c-a-w)*random(33+n),z=b+(d-b-h)*random(37+n);
+        const child=make((x-left)/step,(z-top)/step,w/step,h/step,root.y1,5,section.id,root.id,l);
+        const variant=salt=>fract(layout.noiseSeed,coordinate^Math.imul(n+1,0x9e3779b1),salt);
+        if(!height(child,2+Math.floor(variant(40)*(5+5*tier)))||!designBuilding(child,unit,variant))continue;
+        const link=designRoofWalkway(child,root,unit);
+        if(!link)continue;
+        roofLinks.push(link);volumes.push(child);
+        break;
+      }
+    }
+  }
+  return {volumes,occupied,roofLinks};
+}
 export const BUILDING_TYPES = [
   {label:'상가·주택', color:[196,140,96], width:4, floors:9},
   {label:'공동주택', color:[123,167,162], width:5, floors:13},
-  {label:'업무·상업', color:[149,155,216], width:8, floors:26},
+  {label:'대형 상업동', color:[149,155,216], width:8, floors:26},
   {label:'아케이드', color:[212,170,109], width:7, floors:9},
   {label:'설비·물류', color:[163,147,127], width:7, floors:8},
   {label:'상층 증축', color:[155,185,143], width:4, floors:7},
   {label:'연결교', color:[191,179,235]},
 ];
-const BRIDGE = 6;
-const STOREY = 6;
 const NEIGHBORS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const fract = (seed, index, salt = 0) => {
@@ -149,130 +242,12 @@ function partition(layout, grid) {
   return {labels, sections:centers, tangentX, tangentZ};
 }
 
-function populate(layout, grid, partitioned) {
-  const {size, step, left, top, luxury, noise, buildable} = grid;
-  const {labels, sections, tangentX, tangentZ} = partitioned;
-  const occupied = new Uint8Array(labels.length);
-  const volumes = [];
-  const add = (x,z,w,d,y0,y1,type,section,support,weight) => {
-    const volume = {id:volumes.length, x0:left+x*step, x1:left+(x+w)*step,
-      z0:top+z*step, z1:top+(z+d)*step, y0,y1,type,section,support,luxury:weight, gx:x,gz:z,gw:w,gd:d};
-    volumes.push(volume);
-    return volume;
-  };
-  const maxFloors = Math.floor(layout.floorHeight / STOREY) - 1;
-  if(maxFloors<1)return {volumes, links:[]};
-  const random = (i,salt) => fract(layout.noiseSeed, i, salt);
-  for (const section of sections) {
-    if (section.cells.length < 4) continue;
-    const ranked = section.cells.slice().sort((a,b) => {
-      const score = i => .52 * luxury[i] + .22 * noise[i] + .26 * random(i, 4);
-      return score(b) - score(a) || a - b;
-    });
-    let coverage = 0;
-    for (const i of ranked) {
-      if (coverage >= .56 * ranked.length) break;
-      const x = i % size, z = Math.floor(i / size);
-      if (occupied[i] || !buildable[i]) continue;
-      const l = .62 * luxury[i] + .38 * section.luxury;
-      const roll = random(i, 2);
-      const type = roll < .14 + .25*l ? 2 : roll < .32 + .26*l ? 3 :
-        roll < .46 + .23*l ? 4 : roll < .70 + .16*l ? 0 : 1;
-      const preset = BUILDING_TYPES[type];
-      let w = 2 + Math.floor(random(i, 7) * (preset.width - 1));
-      let d = 2 + Math.floor(random(i, 8) * (preset.width - 1));
-      if ((w > d) !== (Math.abs(tangentX[i]) >= Math.abs(tangentZ[i]))) [w,d] = [d,w];
-      let bounds;
-      while (w >= 2 && d >= 2) {
-        const bx = x - Math.floor(w / 2), bz = z - Math.floor(d / 2);
-        if (bx >= 0 && bz >= 0 && bx+w <= size && bz+d <= size) {
-          let valid = true;
-          for (let dz = -1; dz <= d && valid; dz++) for (let dx = -1; dx <= w; dx++) {
-            const tx = bx+dx, tz = bz+dz;
-            if (tx < 0 || tz < 0 || tx >= size || tz >= size) continue;
-            const j = tz*size + tx;
-            if (occupied[j] || (dx >= 0 && dx < w && dz >= 0 && dz < d && (labels[j] !== section.id || !buildable[j]))) {
-              valid = false;
-              break;
-            }
-          }
-          if (valid) {bounds = [bx,bz,w,d]; break;}
-        }
-        if (w >= d) w--; else d--;
-      }
-      if (!bounds) continue;
-      const [bx,bz,bw,bd] = bounds;
-      for (let dz=0; dz<bd; dz++) for (let dx=0; dx<bw; dx++) occupied[(bz+dz)*size+bx+dx] = 1;
-      coverage += bw*bd;
-      const heightScale = .55 + 1.15*l + .5*noise[i];
-      const floors = clamp(2 + Math.floor(preset.floors * heightScale * random(i, 9)**1.4), 1, maxFloors);
-      const root = add(bx,bz,bw,bd,layout.floorY,layout.floorY+floors*STOREY,type,section.id,null,l);
 
-      // A supported addition shares only part of its parent's footprint. Independent
-      // widths, setbacks and heights create an upper city with its own entrances.
-      let parent = root;
-      for (let level=0; level<3 && random(i, 20+level) < .42 + .30*noise[i]; level++) {
-        if (parent.y1 + 2*STOREY > layout.floorTop) break;
-        const cw = Math.max(1, parent.gw - Math.floor(random(i, 24+level)*parent.gw*.6));
-        const cd = Math.max(1, parent.gd - Math.floor(random(i, 28+level)*parent.gd*.6));
-        const cx = parent.gx + Math.floor(random(i, 32+level)*(parent.gw-cw+1));
-        const cz = parent.gz + Math.floor(random(i, 36+level)*(parent.gd-cd+1));
-        const layers = 2 + Math.floor(random(i, 40+level)*(6+12*l));
-        const cap = layout.floorY + maxFloors*STOREY;
-        if (parent.y1 >= cap) break;
-        parent = add(cx,cz,cw,cd,parent.y1,Math.min(cap,parent.y1+layers*STOREY),5,section.id,parent.id,l);
-      }
-    }
-  }
-
-  const candidates = [];
-  for (let i=0; i<volumes.length; i++) for (let j=i+1; j<volumes.length; j++) {
-    const a=volumes[i], b=volumes[j];
-    if (a.support===b.id || b.support===a.id) continue;
-    const bottom=Math.max(a.y0,b.y0);
-    const floors=Math.floor((Math.min(a.y1,b.y1)-bottom)/STOREY);
-    if (floors<1) continue;
-    let x,z,w,d;
-    const lowX = a.gx < b.gx ? a : b, highX = lowX === a ? b : a;
-    const lowZ = a.gz < b.gz ? a : b, highZ = lowZ === a ? b : a;
-    const gapX = highX.gx - lowX.gx - lowX.gw, gapZ = highZ.gz - lowZ.gz - lowZ.gd;
-    const overlapX = Math.min(a.gx+a.gw,b.gx+b.gw) - Math.max(a.gx,b.gx);
-    const overlapZ = Math.min(a.gz+a.gd,b.gz+b.gd) - Math.max(a.gz,b.gz);
-    if (gapX > 0 && gapX <= 4 && overlapZ > 0) {
-      x=lowX.gx+lowX.gw; z=Math.max(a.gz,b.gz)+Math.floor((overlapZ-1)/2); w=gapX; d=1;
-    } else if (gapZ > 0 && gapZ <= 4 && overlapX > 0) {
-      x=Math.max(a.gx,b.gx)+Math.floor((overlapX-1)/2); z=lowZ.gz+lowZ.gd; w=1; d=gapZ;
-    } else continue;
-    let clear = true;
-    for (let dz=0; dz<d && clear; dz++) for (let dx=0; dx<w; dx++) {
-      const index = (z+dz)*size+x+dx;
-      if (occupied[index] || !buildable[index]) {clear=false; break;}
-    }
-    if (!clear || bottom===layout.floorY&&floors<2) continue;
-    const pair=i*131071+j;
-    const level=clamp(Math.floor(floors*(.24+.55*random(pair,50))),bottom===layout.floorY?1:0,floors-1);
-    const height=bottom+level*STOREY;
-    candidates.push({a,b,x,z,w,d,height,score:w+d-.75*random(pair,53)-.4*(height-layout.floorY)/layout.floorHeight});
-  }
-  const degree = new Uint8Array(volumes.length);
-  const links = [];
-  const overlaps = (p,q) => p.x0<q.x1&&p.x1>q.x0&&p.y0<q.y1&&p.y1>q.y0&&p.z0<q.z1&&p.z1>q.z0;
-  candidates.sort((a,b)=>a.score-b.score||a.a.id-b.a.id||a.b.id-b.b.id);
-  for (const {a,b,x,z,w,d,height} of candidates) {
-    if (degree[a.id]>=2 || degree[b.id]>=2) continue;
-    const span = {x0:left+x*step,x1:left+(x+w)*step,z0:top+z*step,z1:top+(z+d)*step,y0:height,y1:height+3};
-    if (links.some(link=>overlaps(link,span))) continue;
-    const link = add(x,z,w,d,height,height+3,BRIDGE,a.section,a.id,(a.luxury+b.luxury)/2);
-    link.ends = [a.id,b.id];
-    links.push(link);
-    degree[a.id]++;
-    degree[b.id]++;
-  }
-  return {volumes, links};
-}
-
-export function createDistrictPlan(layout, resolution = 128) {
+export function createDistrictPlan(layout, resolution = 128, options = {}) {
   if (!Number.isInteger(resolution) || resolution<16 || resolution>192) throw new RangeError('Invalid district resolution');
+  const {unit=BUILDING_DEFAULTS.unit,buildingDensity=BUILDING_DEFAULTS.buildingDensity}=options;
+  if (!Number.isFinite(unit)||unit<=0)throw new RangeError('Invalid building unit');
+  if (!(buildingDensity>=0&&buildingDensity<=1))throw new RangeError('Invalid building density');
   const size = resolution, cells = size*size, step = layout.width/size;
   const left=layout.centerX-layout.halfWidth, top=layout.centerZ-layout.halfWidth;
   const zones=new Uint8Array(cells), luxury=new Float32Array(cells), noise=new Float32Array(cells), ids=new Int8Array(cells).fill(-1);
@@ -293,23 +268,40 @@ export function createDistrictPlan(layout, resolution = 128) {
   }
   const grid={size,step,left,top,zones,luxury,noise,ids,buildable};
   const partitioned=partition(layout,grid);
-  const {volumes,links}=populate(layout,grid,partitioned);
+  const {volumes,occupied,roofLinks}=populate(layout,grid,partitioned,{unit,buildingDensity});
+  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit);
+  for(const link of roofLinks){link.id=walkways.length;walkways.push(link);}
   const columns=Array.from({length:cells},()=>[]);
-  for (const v of volumes) for (let z=v.gz; z<v.gz+v.gd; z++) for (let x=v.gx; x<v.gx+v.gw; x++) columns[z*size+x].push(v);
-  for (const column of columns) column.sort((a,b)=>a.y0-b.y0);
-  return {...grid,...partitioned,volumes,links,columns,layout};
+  const pathColumns=Array.from({length:cells},()=>[]);
+  for (const v of volumes) for (let z=Math.floor(v.gz); z<Math.ceil(v.gz+v.gd); z++) {
+    for (let x=Math.floor(v.gx); x<Math.ceil(v.gx+v.gw); x++)columns[z*size+x].push(v);
+  }
+  const indexPart=(link,part)=>{
+    const xs=part.outline.map(p=>p[0]),zs=part.outline.map(p=>p[1]);
+    const x0=Math.max(0,Math.floor((Math.min(...xs)-left)/step));
+    const x1=Math.min(size-1,Math.floor((Math.max(...xs)-left)/step));
+    const z0=Math.max(0,Math.floor((Math.min(...zs)-top)/step));
+    const z1=Math.min(size-1,Math.floor((Math.max(...zs)-top)/step));
+    const item={link,part};
+    for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)pathColumns[z*size+x].push(item);
+  };
+  for(const link of walkways) {
+    for(const part of link.segments)indexPart(link,part);
+    for(const part of link.landings)indexPart(link,part);
+  }
+  return {...grid,...partitioned,volumes,links,walkways,columns,pathColumns,layout,unit,buildingDensity};
 }
 
 export function districtColumn(plan,x,z) {
   const gx=Math.floor((x-plan.left)/plan.step), gz=Math.floor((z-plan.top)/plan.step);
   if (gx<0||gx>=plan.size||gz<0||gz>=plan.size) return null;
   const index=gz*plan.size+gx;
-  return {zone:plan.zones[index], section:plan.labels[index], luxury:plan.luxury[index], noise:plan.noise[index], volumes:plan.columns[index]};
+  return {zone:plan.zones[index], section:plan.labels[index], luxury:plan.luxury[index], noise:plan.noise[index], volumes:plan.columns[index],paths:plan.pathColumns[index]};
 }
 
 export function volumeLuxury(plan,volume,y) {
-  const level=Math.floor(Math.max(0,y-volume.y0)/STOREY);
-  const centerY=volume.y0+(level+.5)*STOREY;
+  const level=Math.floor(Math.max(0,y-volume.y0)/volume.storeyHeight);
+  const centerY=volume.y0+(level+.5)*volume.storeyHeight;
   const relative=clamp((centerY-plan.layout.floorY)/plan.layout.floorHeight,0,1);
   const typeBias=[.01,-.055,.09,.065,-.07,-.025,0][volume.type];
   // Middle and upper levels gain access premium, while the last upper additions
@@ -319,6 +311,12 @@ export function volumeLuxury(plan,volume,y) {
 
 export function districtSample(plan,x,y,z) {
   const column=districtColumn(plan,x,z);
-  const volume=column?.volumes.find(v=>v.y0<=y&&y<v.y1)??null;
-  return {column,volume,luxury:volume?volumeLuxury(plan,volume,y):null};
+  const volume=column?.volumes.find(v=>buildingAt(v,x,y,z))??null;
+  const path=column?.paths.find(({part})=>{
+    const cut=cutPolygon(part.outline,'x',z);
+    if(!cut||x<cut[0]||x>=cut[1])return false;
+    const height=part.y??segmentY(part,x,z);
+    return y>=height-plan.unit*.25&&y<height+plan.unit*2.25;
+  })?.link??null;
+  return {column,volume,path,luxury:volume?volumeLuxury(plan,volume,y):null};
 }
