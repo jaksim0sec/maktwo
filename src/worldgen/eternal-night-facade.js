@@ -14,3 +14,9 @@ export function facadeBay({program,level,entryLevel,edge,bay,frontEdge=0,stride=
  else if(retail&&!street&&front&&bay===2&&level%2===0)opening='window';
  return {opening,vent:service&&!front&&bay===3&&level%4===2,sign:street&&bay===3,front,street};
 }
+
+/** A connecting corridor is a passage, not a row of glass-front offices. */
+export function enclosedPassageBay(bay){
+ const window=bay===2||bay===3;
+ return {window,wall:!window,vent:bay===5,sign:false};
+}

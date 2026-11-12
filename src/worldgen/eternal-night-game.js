@@ -5,7 +5,7 @@ import {containsRect,insidePolygon} from './eternal-night-buildings.js';
 import {CORE_ZONE,createFloorLayout,zoneAt} from './eternal-night-core-floor.js';
 import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
-import {facadeBay} from './eternal-night-facade.js';
+import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
 
 export const CITY_MODE='eternal-city-lab';
@@ -243,9 +243,10 @@ function stampWalkway(link,part,x,z,put,empty) {
   }
   if(edge&&!storefront&&empty(level)) {
     if(style==='enclosed'){
+      const face=enclosedPassageBay(bay);
       put(level,cityPart('wall',1),turn,true);
-      if(empty(level+1))put(level+1,cityPart('window',3),turn,true);
-      if(empty(level+2))put(level+2,cityPart('window',3),turn,true);
+      if(empty(level+1))put(level+1,cityPart(face.window?'window':'wall',face.window?3:1),turn,true);
+      if(empty(level+2))put(level+2,cityPart(face.vent?'ventilation':'wall',1),turn,true);
     } else {
       put(level,cityPart('passage',style==='arcade'&&bay===0?2:4),turn,true);
       if(bay===0&&(style==='arcade'||style==='hung')){
@@ -254,7 +255,7 @@ function stampWalkway(link,part,x,z,put,empty) {
     }
   }
   if(!edge&&bay===2&&style!=='open'&&empty(level+2))put(level+2,B.FLUORESCENT,axisTurn(dx,dz));
-  if(edge&&bay===4&&style==='enclosed'&&empty(level+3))put(level+3,cityPart('sign',3),turn,true);
+  // The skybridge has no independent shop signage unless an actual annex bay exists.
 }
 
 /** Rasterize floors and parts into ordinary chunk data shared by the renderer and physics. */
