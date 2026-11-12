@@ -124,48 +124,57 @@ export class Renderer{
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
  resetWorld(world){for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;glClearLight(this.gl,this.lightTexture)}
- queueMesh(world,key,chunk){
+ queueMesh(world,key,chunk,yMin,yMax,detailY){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
-  const task={world,key,chunk,revision,token};
+  const task={world,key,chunk,revision,token,yMin,yMax,detailY};
   const neighbors=[];
   for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
    const c=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
    if(c)neighbors.push([dx,dz,c.data,c.forms,c.styles]);
   }
   const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return x>=chunk.cx*SIZE-1&&x<=(chunk.cx+1)*SIZE&&z>=chunk.cz*SIZE-1&&z<=(chunk.cz+1)*SIZE});
-  if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
+  if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed,yMin,yMax,detailY});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
   const buffers=[];
-  const copy=(a)=>{const data=new Uint8Array(a);buffers.push(data.buffer);return data.buffer};
+  const offset=Math.max(0,(yMin??0)-1)*SIZE*SIZE,end=Math.min(chunk.height,(yMax??chunk.height)+1)*SIZE*SIZE;
+  const copy=(a)=>{const data=new Uint8Array(a.subarray(offset,end));buffers.push(data.buffer);return data.buffer};
   this.inflight.set(key,task);
-  this.worker.postMessage({key,revision,token,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighbors.map(([dx,dz,data,forms,styles])=>[dx,dz,copy(data),forms&&copy(forms),styles&&copy(styles)]),doorStates:states},buffers);
+  this.worker.postMessage({key,revision,token,yMin,yMax,detailY,offset,height:chunk.height,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighbors.map(([dx,dz,data,forms,styles])=>[dx,dz,copy(data),forms&&copy(forms),styles&&copy(styles)]),doorStates:states},buffers);
  }
  sync(world,player){
   if(this.world!==world)this.resetWorld(world);
+  const height=world.height??64, tall=height>64;
+  const band=Math.max(0,Math.min(height-1,Math.floor(player.y/64)*64));
+  const yMin=tall?Math.max(0,band-160):0,yMax=Math.min(height,band+208);
+  const px=Math.floor(player.x/SIZE),pz=Math.floor(player.z/SIZE);
+  const detailFor=c=>!tall?undefined:Math.max(Math.abs(c.cx-px),Math.abs(c.cz-pz))<=1?Math.floor(player.y/8)*8:null;
   for(const [key,mesh] of this.meshes)if(!world.chunks.has(key)){this.dispose(mesh.opaque);this.dispose(mesh.transparent);this.meshes.delete(key)}
   // Keep GPU uploads bounded. The heavy CPU mesh work runs off the UI thread.
   if(this.completed.length){const {task,data}=this.completed.shift();const current=world.chunks.get(task.key);
    if(task.world===world&&current===task.chunk){
-    if(current.revision===task.revision){const old=this.meshes.get(task.key);this.meshes.set(task.key,{opaque:this.replace(old?.opaque,data.opaque),transparent:this.replace(old?.transparent,data.transparent)})}
+    if(current.revision===task.revision&&task.yMin===yMin&&task.yMax===yMax&&task.detailY===detailFor(current)){
+     const old=this.meshes.get(task.key);this.meshes.set(task.key,{yMin,yMax,detailY:task.detailY,opaque:this.replace(old?.opaque,data.opaque),transparent:this.replace(old?.transparent,data.transparent)})
+    }
     else current.dirty=true;
    }
   }
   if(this.inflight.size>=2||this.completed.length>=2)return;
-  const px=Math.floor(player.x/SIZE),pz=Math.floor(player.z/SIZE);
   let best=null,bestDist=Infinity;
   for(const [key,chunk] of world.chunks){
-   if(this.inflight.has(key)||(!chunk.dirty&&this.meshes.has(key)))continue;
+   const mesh=this.meshes.get(key);
+   if(this.inflight.has(key)||(!chunk.dirty&&mesh?.yMin===yMin&&mesh?.yMax===yMax&&mesh.detailY===detailFor(chunk)))continue;
    const d=(chunk.cx-px)**2+(chunk.cz-pz)**2;
    if(d<bestDist){bestDist=d;best=[key,chunk]}
   }
-  if(best)this.queueMesh(world,best[0],best[1]);
+  if(best)this.queueMesh(world,best[0],best[1],yMin,yMax,detailFor(best[1]));
  }
  updateLightVolume(world,player){
   const ox=Math.floor(player.x/16)*16-32,oz=Math.floor(player.z/16)*16-32;
-  const origin=[ox,0,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${ox}:${oz}`;
+  const oy=world.height>LIGHT_HEIGHT?Math.max(0,Math.min(world.height-LIGHT_HEIGHT,Math.floor(player.y/16)*16-16)):0;
+  const origin=[ox,oy,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${ox}:${oy}:${oz}`;
   if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
   const blocks=makeOccluderSnapshot(world,origin);
-  const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:0,maxY:LIGHT_HEIGHT,limit:80}).map(l=>({...l,rgb:rgb(l.color)}));
+  const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:oy,maxY:oy+LIGHT_HEIGHT,limit:80}).map(l=>({...l,rgb:rgb(l.color)}));
   const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;this.lightRequestWorld=world;this.lightRequestRevision=world.lightRevision;
   if(this.lightWorker){this.lightWorker.postMessage({token,origin,blocks:blocks.buffer,sources},[blocks.buffer]);return}
   const result=buildLightVolume(blocks,sources,{origin});const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texSubImage3D(gl.TEXTURE_3D,0,0,0,0,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,gl.RGBA,gl.UNSIGNED_BYTE,result);

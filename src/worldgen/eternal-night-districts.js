@@ -1,13 +1,14 @@
 import {CORE_ZONE, districtIdAt, sampleFloorRect} from './eternal-night-core-floor.js';
 import {BUILDING_DEFAULTS, buildingAt, cutPolygon, designBuilding, stairRisers} from './eternal-night-buildings.js';
 import {designRoofWalkway, designWalkways, segmentY} from './eternal-night-walkways.js';
-function populate(layout, grid, partitioned, {unit,buildingDensity}) {
+function populate(layout, grid, partitioned, {unit,buildingDensity,highRise}) {
   const {size, step, left, top, luxury, noise, buildable} = grid;
   const {labels, sections, tangentX, tangentZ} = partitioned;
   const occupied = new Uint8Array(labels.length), volumes=[], roofLinks=[];
+  const landmarks=new Set();
   const make = (x,z,w,d,y0,type,section,support,weight) => ({
     id:volumes.length, x0:left+x*step, x1:left+(x+w)*step, z0:top+z*step, z1:top+(z+d)*step,
-    y0,type,section,support,luxury:weight,gx:x,gz:z,gw:w,gd:d,
+    y0,type,section,support,luxury:weight,gx:x,gz:z,gw:w,gd:d,highRise,
   });
   const height = (v,desired) => {
     const risers=stairRisers(v,unit);
@@ -57,8 +58,13 @@ function populate(layout, grid, partitioned, {unit,buildingDensity}) {
           }
           if(valid) {
             const candidate=make(bx,bz,w,d,layout.floorY,type,section.id,null,l);
-            const floors=2+Math.floor(preset.floors*(.55+1.15*tier+.5*noise[i])*random(9)**1.4);
-            if(height(candidate,floors) && designBuilding(candidate,unit,random))root=candidate;
+            const landmark=highRise&&!landmarks.has(section.district)&&Math.min(w,d)>=3;
+            const base=2+Math.floor(preset.floors*(.55+1.15*tier+.5*noise[i])*random(9)**1.4);
+            const floors=landmark?70+Math.floor(random(17)*11):highRise?Math.min(69,base+Math.floor((7+44*tier)*random(16)**2)):base;
+            if(height(candidate,floors) && designBuilding(candidate,unit,random)){
+              root=candidate;
+              if(landmark&&root.floors.length>=70)landmarks.add(section.district);
+            }
             break;
           }
         }
@@ -245,7 +251,7 @@ function partition(layout, grid) {
 
 export function createDistrictPlan(layout, resolution = 128, options = {}) {
   if (!Number.isInteger(resolution) || resolution<16 || resolution>192) throw new RangeError('Invalid district resolution');
-  const {unit=BUILDING_DEFAULTS.unit,buildingDensity=BUILDING_DEFAULTS.buildingDensity}=options;
+  const {unit=BUILDING_DEFAULTS.unit,buildingDensity=BUILDING_DEFAULTS.buildingDensity,highRise=false}=options;
   if (!Number.isFinite(unit)||unit<=0)throw new RangeError('Invalid building unit');
   if (!(buildingDensity>=0&&buildingDensity<=1))throw new RangeError('Invalid building density');
   const size = resolution, cells = size*size, step = layout.width/size;
@@ -268,8 +274,8 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   }
   const grid={size,step,left,top,zones,luxury,noise,ids,buildable};
   const partitioned=partition(layout,grid);
-  const {volumes,occupied,roofLinks}=populate(layout,grid,partitioned,{unit,buildingDensity});
-  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit);
+  const {volumes,occupied,roofLinks}=populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
+  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise);
   for(const link of roofLinks){link.id=walkways.length;walkways.push(link);}
   const columns=Array.from({length:cells},()=>[]);
   const pathColumns=Array.from({length:cells},()=>[]);

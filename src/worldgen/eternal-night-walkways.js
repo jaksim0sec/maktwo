@@ -84,12 +84,12 @@ export function segmentY(segment,x,z) {
   return from[1]+Math.sign(to[1]-from[1])*count*rise;
 }
 
-export function designWalkways(layout,grid,buildings,occupied,unit) {
+export function designWalkways(layout,grid,buildings,occupied,unit,highRise=false) {
   const roots=buildings.filter(b=>b.support===null);
   const {left,top,step,size}=grid;
   const bridges=[],walkways=[];
   if(!roots.length)return {walkways,links:bridges};
-  const width=unit*1.4, margin=width/2;
+  const width=unit*(highRise?2.35:1.4), margin=width/2;
   const holes=[...layout.gardenCenters.map(([x,z])=>[x,z,layout.gardenRadius]),
     ...layout.miniShaftCenters.map(([x,z])=>[x,z,layout.miniShaftRadius])];
   const clearHoles=(a,b,pad=margin)=>holes.every(([x,z,r])=>distanceToSegment(a,b,x,z)>=r+pad);
@@ -127,6 +127,11 @@ export function designWalkways(layout,grid,buildings,occupied,unit) {
   const add=link=>{
     for(const p of link.ports)openPort(p,buildings);
     link.id=walkways.length;
+    if(highRise) {
+      const a=link.ports[0],b=link.ports[1];
+      const mix=Math.imul(a?.building??0,31)^Math.imul(b?.building??0,131)^Math.round(a?.y??0)^layout.noiseSeed;
+      link.architecture=link.kind==='core'?'arcade':link.kind==='tower'?'open':['enclosed','arcade','open','hung'][mix&3];
+    }
     walkways.push(link);
     for(const {from,to} of link.segments)insert(deckBuckets,{...spanBox(from,to),low:Math.min(from[1],to[1]),high:Math.max(from[1],to[1])});
     if(link.kind==='bridge')bridges.push(link);
@@ -229,29 +234,32 @@ export function designWalkways(layout,grid,buildings,occupied,unit) {
   }
 
   // Only inspect ports in nearby buckets. Route an initial flat landing out of both doors.
-  const limit=Math.max(step*3,unit*12), buckets=new Map();
+  const limit=Math.max(step*(highRise?4.2:3),unit*12), buckets=new Map();
   const bucket=(x,z)=>`${Math.floor(x/limit)},${Math.floor(z/limit)}`;
-  for(const p of publicPorts) {
+  const bridgePorts=highRise?roots.flatMap(b=>b.ports.filter(p=>p.level>0&&p.y+4<layout.floorTop)):publicPorts;
+  for(const p of bridgePorts) {
     const key=bucket(p.x,p.z);
     if(!buckets.has(key))buckets.set(key,[]);
     buckets.get(key).push(p);
   }
   const pairs=[];
-  for(const a of publicPorts)for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++) {
+  for(const a of bridgePorts)for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++) {
     for(const b of buckets.get(bucket(a.x+dx*limit,a.z+dz*limit))??[]) {
       if(a.building>=b.building)continue;
+      if(highRise&&Math.abs(a.y-b.y)>unit*6)continue;
       const length=distance(portPoint(a),portPoint(b));
       if(length>limit || length<3*unit)continue;
       const x=b.x-a.x,z=b.z-a.z;
       if(x*a.dx+z*a.dz<=0 || x*b.dx+z*b.dz>=0)continue;
-      pairs.push([length,a,b]);
+      pairs.push([length+(highRise?Math.abs(a.y-b.y)*.7:0),a,b]);
     }
   }
-  const connected=new Set(),degrees=new Uint8Array(buildings.length);
+  const connected=new Set(),degrees=new Map();
   for(const [,a,b] of pairs.sort((p,q)=>p[0]-q[0])) {
-    const pair=a.building*buildings.length+b.building;
-    if(used.has(a)||used.has(b)||connected.has(pair)||degrees[a.building]>=2||degrees[b.building]>=2)continue;
-    const start=portPoint(a),end=portPoint(b),s=stub(a,unit*1.1),t=stub(b,unit*1.1);
+    const key=p=>`${p.building}:${highRise?p.level:0}`;
+    const aKey=key(a),bKey=key(b),pair=`${aKey}/${bKey}`;
+    if(used.has(a)||used.has(b)||connected.has(pair)||(degrees.get(aKey)||0)>=2||(degrees.get(bKey)||0)>=2)continue;
+    const start=portPoint(a),end=portPoint(b),s=stub(a,Math.max(unit*1.1,margin+.1)),t=stub(b,Math.max(unit*1.1,margin+.1));
     if(!clearDeck(start,s,a.building)||!clearDeck(t,end,b.building))continue;
     for(const path of octilinear(s,t)) {
       if(path.length<2)continue;
@@ -263,7 +271,8 @@ export function designWalkways(layout,grid,buildings,occupied,unit) {
         (i>0&&i<points.length-2&&!clearDeck(points[i],p))))continue;
       const link=makeWalkway('bridge',[a,b],points,width,unit);
       if(!link)continue;
-      add(link);connected.add(pair);used.add(a);used.add(b);degrees[a.building]++;degrees[b.building]++;
+      add(link);connected.add(pair);used.add(a);used.add(b);
+      degrees.set(aKey,(degrees.get(aKey)||0)+1);degrees.set(bKey,(degrees.get(bKey)||0)+1);
       break;
     }
   }

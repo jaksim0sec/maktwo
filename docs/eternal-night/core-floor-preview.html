@@ -46,11 +46,11 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <div class="legend" id="legend"></div>
 </section>
 <aside class="controls">
-<label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
-<label><span>가로폭 <output id="width-value">1024</output></span><input id="width" type="range" min="512" max="4096" step="64" value="1024"></label>
-<label><span>층고 <output id="height-value">540</output></span><input id="height" type="range" min="180" max="900" step="6" value="540"></label>
-<label><span>건물 밀도 <output id="density-value">67</output></span><input id="density" type="range" min="0" max="100" step="1" value="67"></label>
-<label><span>건축 기준 단위 <output id="unit-value">1</output></span><input id="unit" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+<label><span>시드 <output id="seed-value">9999</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="9999"></label>
+<label><span>가로폭 <output id="width-value">960</output></span><input id="width" type="range" min="512" max="4096" step="32" value="960"></label>
+<label><span>코어 높이 <output id="height-value">759</output></span><input id="height" type="range" min="180" max="900" step="1" value="759"></label>
+<label><span>건물 밀도 <output id="density-value">88</output></span><input id="density" type="range" min="0" max="100" step="1" value="88"></label>
+<label><span>건축 기준 단위 <output id="unit-value">1.5</output></span><input id="unit" type="range" min="0.5" max="2" step="0.05" value="1.5"></label>
 <div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
 <div id="error" role="status"></div>
@@ -149,10 +149,10 @@ function regenerate() {
   const ratios = Object.fromEntries([...controlHost.querySelectorAll("input")].map(input=>[input.dataset.ratio,Number(input.value)]));
   try {
     const next = createFloorLayout({
-      width:Number(get("width").value), floorHeight:Number(get("height").value), seed:Number(get("seed").value),
+      width:Number(get("width").value), floorY:8, floorHeight:Number(get("height").value), seed:Number(get("seed").value),
       ...Object.fromEntries(Object.entries(noiseInputs).map(([key,input])=>[key,input.valueAsNumber])), ratios,
     });
-    const city = createDistrictPlan(next,128,{unit:get("unit").valueAsNumber,buildingDensity:get("density").valueAsNumber/100});
+    const city = createDistrictPlan(next,120,{unit:get("unit").valueAsNumber,buildingDensity:get("density").valueAsNumber/100,highRise:true});
     if (layout && x !== null) {
       x = next.centerX + (x-layout.centerX)*next.width/layout.width;
       z = next.centerZ + (z-layout.centerZ)*next.width/layout.width;

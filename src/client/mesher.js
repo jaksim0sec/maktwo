@@ -1,4 +1,4 @@
-import {SIZE, HEIGHT} from '../core/chunk.js';
+import {SIZE, TURN_STYLE, EXTERIOR_STYLE} from '../core/chunk.js';
 import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
@@ -7,7 +7,7 @@ import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
-import {partPrisms,prismFaces,prismNormal,stairConnections} from '../core/part-prisms.js';
+import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise} from '../core/part-prisms.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -18,12 +18,33 @@ const FACES = [
   {d:[0,0,1],  n:2, u:1, v:0, corners:[[1,0,1],[1,1,1],[0,1,1],[0,0,1]],shade:.88},
   {d:[0,0,-1], n:2, u:1, v:0, corners:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]],shade:.82}
 ];
-const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
 const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
+const partTemplates=new Map();
+
+function partTemplate(id,facing,connected,simple,stairRise){
+ const key=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)|(simple?1<<13:0)|((stairRise===undefined?0:stairRise+1)<<14);
+ if(partTemplates.has(key))return partTemplates.get(key);
+ const opaque=[],transparent=[];
+ for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise})||[]){
+  const color=COLORS[piece.material],target=piece.alpha?transparent:opaque;
+  for(const face of prismFaces(piece,true)){
+   const n=prismNormal(face);if(!n)continue;
+   const shade=(.74+.26*Math.abs(n[1]))+4*materialFor(piece.material,0);
+   for(let j=1;j<face.length-1;j++)for(const i of [0,j,j+1])target.push(...face[i],...color,shade);
+  }
+ }
+ if(!simple&&partById(id)?.family==='ventilation')fanRotorMesh(opaque,0,0,0,id,facing);
+ const template=[new Float32Array(opaque),new Float32Array(transparent)];
+ partTemplates.set(key,template);return template;
+}
+
+function emitPart(target,vertices,x,y,z){
+ for(let i=0;i<vertices.length;i+=7)target.push(x+vertices[i],y+vertices[i+1],z+vertices[i+2],vertices[i+3],vertices[i+4],vertices[i+5],vertices[i+6]);
+}
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
 export function quad(arr,v,color,shade){for(const i of [0,1,2,0,2,3])arr.push(...v[i],...color,shade)}
@@ -31,7 +52,8 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 
 // Six directional masks; every rectangular run of the same block becomes ONE quad.
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
-export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}={}){
+export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,yMin=0,yMax=chunk.data.length/(SIZE*SIZE),detailY}={}){
+ const height=chunk.data.length/(SIZE*SIZE),dims=[SIZE,yMax-yMin,SIZE];
  const adjacent=new Map(neighbors.map(([dx,dz,data,forms,styles])=>[`${dx},${dz}`,{data,forms,styles}]));
  const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,forms=chunk.forms;
@@ -41,22 +63,22 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
  for(const [pos,state] of states){
   if(!state.facing)continue;
   const [wx,y,wz]=pos.split(',').map(Number),x=wx-ox,z=wz-oz;
-  if(x<0||x>=SIZE||z<0||z>=SIZE||y<0||y>=HEIGHT)continue;
+  if(x<0||x>=SIZE||z<0||z>=SIZE||y<yMin||y>=yMax)continue;
   const idx=(y*SIZE+z)*SIZE+x;
   if(CROSS[chunk.data[idx]]||forms?.[idx])continue;
   cubeTurns??=new Uint8Array(chunk.data.length);
   cubeTurns[idx]=state.facing&3;
  }
  for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
-  const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=DIMS[u],nv=DIMS[v],sign=d[n];
+  const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=dims[u],nv=dims[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
   const edgeData=n===0?adjacent.get(`${sign},0`):n===2?adjacent.get(`0,${sign}`):null;
   const data=chunk.data;
-  for(let layer=0;layer<DIMS[n];layer++){
+  for(let layer=0;layer<dims[n];layer++){
    let i=0;
    for(let j=0;j<nv;j++)for(let k=0;k<nu;k++,i++){
     const x=n===0?layer:n===1?k:j;
-    const y=n===1?layer:k;
+    const y=yMin+(n===1?layer:k);
     const z=n===2?layer:j;
     const idx=(y*SIZE+z)*SIZE+x,id=data[idx];
     if(id===B.AIR||CROSS[id]||forms?.[idx]){mask[i]=0;continue}
@@ -68,7 +90,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     }else if(n===1){
      const next=y+sign;
      if(next<0)other=B.BEDROCK;
-     else if(next<HEIGHT){neighborIdx=idx+sign*SIZE*SIZE;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
+     else if(next<height){neighborIdx=idx+sign*SIZE*SIZE;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
     }else{
      const next=z+sign;
      if(next>=0&&next<SIZE){neighborIdx=idx+sign*SIZE;other=data[neighborIdx];otherForm=forms?.[neighborIdx]}
@@ -86,7 +108,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
     for(let jj=0;jj<height;jj++)mask.fill(0,(j+jj)*nu+k,(j+jj)*nu+k+width);
     const id=mat&255,dest=TRANSPARENT[id]?transparent:opaque;
     const c=[0,0,0];c[n]=layer;c[u]=k;c[v]=j;
-    const xyz=[ox+c[0],c[1],oz+c[2]],water=id===B.WATER;
+    const xyz=[ox+c[0],yMin+c[1],oz+c[2]],water=id===B.WATER;
     const verts=corners.map(q=>{
      const p=[...xyz];p[n]+=q[n];p[u]+=q[u]*width;p[v]+=q[v]*height;
      if(water&&q[1]===1)p[1]-=.13;
@@ -100,7 +122,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
   }
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
- for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
+ for(let y=yMin;y<yMax;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const idx=(y*SIZE+z)*SIZE+x,id=chunk.data[idx],form=FORMED[forms?.[idx]];
   if(form){
    for(const face of form.faces){
@@ -122,31 +144,28 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
   const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
-  const variant=chunk.styles?.[idx]||0,state=variant?{variant,...authored}:authored;
+  const style=chunk.styles?.[idx]||0,variant=style&TURN_STYLE?0:style;
+  const state=style&TURN_STYLE?{facing:style&7,...authored}:variant?{variant,...authored}:authored;
   if(BLOCKS[id].render==='part'){
+   const simple=detailY!==undefined&&(detailY===null||y<detailY-4||y>=detailY+12);
+   if(simple&&!(style&EXTERIOR_STYLE)&&!authored)continue;
    const orientation=state?.facing||0;
-   let connected=null;
-   if(partById(id)?.family==='staircase'){
-    connected=stairConnections(id,orientation,(dx,dz)=>{
+   let connected=null,stairRise;
+   if(!simple&&partById(id)?.family==='staircase'){
+    const neighbor=(dx,dz,dy=0)=>{
      const nx=x+dx,nz=z+dz,offX=nx<0?-1:nx>=SIZE?1:0,offZ=nz<0?-1:nz>=SIZE?1:0;
      const other=(offX||offZ)?adjacent.get(`${offX},${offZ}`):chunk;
      if(!other)return {id:B.AIR,facing:0};
-     const a=((nx+SIZE)%SIZE),b=((nz+SIZE)%SIZE),k=(y*SIZE+b)*SIZE+a;
+     const a=((nx+SIZE)%SIZE),b=((nz+SIZE)%SIZE),k=((y+dy)*SIZE+b)*SIZE+a;
      const fx=wx+dx,fz=wz+dz;
-     return {id:other.data?.[k]||B.AIR,facing:stateAt(fx,y,fz)?.facing||0};
-    });
+     const generated=other.styles?.[k]||0;
+     return {id:other.data?.[k]||B.AIR,facing:stateAt(fx,y+dy,fz)?.facing??(generated&TURN_STYLE?generated&7:0)};
+    };
+    connected=stairConnections(id,orientation,neighbor);
+    if(style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor);
    }
-   const pieces=partPrisms(id,wx,y,wz,{...state,connected});
-   for(const piece of pieces||[]){
-    const color=COLORS[piece.material],target=piece.alpha?transparent:opaque;
-    for(const face of prismFaces(piece,true)){
-     const n=prismNormal(face);if(!n)continue;
-     const shade=(.74+.26*Math.abs(n[1]))+4*materialFor(piece.material,0);
-     for(let j=1;j<face.length-1;j++)for(const i of [0,j,j+1])
-      target.push(...face[i],...color,shade);
-    }
-   }
-   if(partById(id)?.family==='ventilation')fanRotorMesh(opaque,wx,y,wz,id,orientation);
+   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise);
+   emitPart(opaque,solid,wx,y,wz);emitPart(transparent,glass,wx,y,wz);
    continue;
   }
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state,transparent);continue}
@@ -157,7 +176,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
    metalRailing(opaque,wx,y,wz,(nextY)=>{
     const next=alongX?x+1:z+1,edge=next>=SIZE;
     const other=edge?adjacent.get(alongX?'1,0':'0,1'):chunk;
-    if(!other?.data||!other?.styles||nextY<0||nextY>=HEIGHT)return false;
+    if(!other?.data||!other?.styles||nextY<0||nextY>=height)return false;
     const k=alongX?(nextY*SIZE+z)*SIZE+(next%SIZE):(nextY*SIZE+(next%SIZE))*SIZE+x;
     return other.data[k]===B.FENCE&&other.styles[k]===variant;
    },alongX?'x':'z');
@@ -173,6 +192,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0}
 
  }
  for(const mount of chunk.mounts?.values()||[]){
+  if(mount.y<yMin||mount.y>=yMax)continue;
   for(const [u,v,d,w,h,t,color,lit] of MOUNT_PARTS[mount.id]){
    const paint=rgb(color);
    for(const face of FACES){

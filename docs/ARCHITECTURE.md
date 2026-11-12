@@ -34,8 +34,10 @@ no effect on world generation. The main-thread fallback and `mesh.worker.js` use
 this same input contract. `renderer.js` uploads the resulting geometry and does
 not evaluate terrain or building rules. The older `meshChunk(world, chunk)` entry
 point adapts already-loaded world data for existing callers without generating
-neighboring chunks. A new generator should produce the same chunk data contract;
-no mesher, worker, or renderer change is needed.
+neighboring chunks. The city experiment uses the same voxel index, with taller
+columns only in that world. Mesh jobs select a vertical band with a one-voxel
+halo. The renderer simplifies distant authored facade parts and keeps detailed
+interiors near the camera. Lighting follows the player vertically.
 
 ## Terrain research and limits
 
@@ -54,7 +56,7 @@ Reference ideas (not dependencies or copied source): FastNoiseLite's domain warp
 
 ## Next substantial milestones
 
-- **Vertical chunk sections + distant LOD**, then genuine wide mountain ranges beyond 64 voxels.
+- **Sparse vertical chunk storage + distant terrain LOD**, then genuine wide mountain ranges beyond 64 voxels.
 - **Region-based terrain caches**, optionally computed in a Worker for hydraulic erosion and river drainage.
 - **Prop/component registry**, for openable storage, gardening growth and furniture, with persistent state outside block IDs.
 - **Device tests**, especially mobile touch, WebGL shaders, PWA update lifecycle, and memory on low-end hardware.

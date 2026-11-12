@@ -42,13 +42,33 @@ export function stairConnections(id,facing,neighborAt){
  };
  return {left:same(left),right:same([-left[0],-left[1]])};
 }
+export function stairRailRise(facing,neighborAt){
+ if(facing&1)return undefined;
+ const [dx,dz]=[[0,1],[-1,0],[0,-1],[1,0]][(facing>>1)&3];
+ for(const rise of [0,1]){
+  const next=neighborAt(dx,dz,rise);
+  if(partById(next?.id)?.family==='staircase'&&next.facing===facing)return rise;
+ }
+}
 export function partPrisms(id,x,y,z,state={}){
  if(!partById(id))return null;
  const angle=(((state.facing||0)%8)+8)%8*Math.PI/4;
  const joined=state.connected||{};
  const pieces=[];
- for(const piece of partGeometry(id)){
+ let geometry=partGeometry(id);
+ if(state.simple){
+  const family=partById(id).family;
+  if(family==='window')geometry=[
+   {x:0,y:0,z:.46,w:1,h:.085,d:.085,material:106,solid:true},
+   {x:0,y:.085,z:.49,w:1,h:.915,d:.024,material:88,alpha:true,solid:true},
+  ];
+  else if(family==='passage'||family==='balcony')geometry=geometry.filter(p=>p.w>.72).slice(0,3);
+  else if(family==='entrance'||family==='ventilation')geometry=geometry.slice(0,4);
+  else geometry=geometry.slice(0,1);
+ }
+ for(let piece of geometry){
   if(piece.railSide&&joined[piece.railSide])continue;
+  if(piece.slopeY&&state.stairRise!==undefined)piece={...piece,z:0,d:1,slopeY:state.stairRise};
   const points=footprint(piece,angle);
   if(points.length<3)continue;
   const verts=points.map(([a,b,sourceZ])=>{

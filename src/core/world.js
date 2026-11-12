@@ -1,29 +1,39 @@
-import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
+import {Chunk,SIZE,HEIGHT,TURN_STYLE} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
-import {CITY_MODE,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
+import {CITY_MODE,CITY_HEIGHT,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
-import {stairConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
+import {stairConnections,stairRailRise} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0}const forms=this.forms.get(k);
+ constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':high-rise':name;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
  c.dirty=true;this.lights.loadChunk(c);this.lightRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
+ partFacing(x,y,z){
+  const authored=this.blockStates.get(this.stateKey(x,y,z));
+  if(authored)return authored.facing||0;
+  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),chunk=this.getChunk(cx,cz,false);
+  const style=chunk?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,Math.floor(y),Math.floor(z)-cz*SIZE)]||0;
+  return style&TURN_STYLE?style&7:0;
+ }
  getShapeState(x,y,z){
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
-  const y0=Math.floor(y),variant=y0>=0&&y0<HEIGHT?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
-  const state={facing:0,upper:false,variant,...this.blockStates.get(this.stateKey(x,y,z))};
-  if(partById(this.get(x,y,z,false))?.family==='staircase'){
-   state.connected=stairConnections(this.get(x,y,z,false),state.facing,(dx,dz)=>{
-    const nx=Math.floor(x)+dx,nz=Math.floor(z)+dz,other=this.get(nx,y,nz,false);
-    return {id:other,facing:this.blockStates.get(this.stateKey(nx,y,nz))?.facing||0};
-   });
+  const y0=Math.floor(y),variant=y0>=0&&y0<this.height?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
+  const state={facing:variant&TURN_STYLE?variant&7:0,upper:false,variant:variant&TURN_STYLE?0:variant,...this.blockStates.get(this.stateKey(x,y,z))};
+  const id=this.get(x,y,z,false);
+  if(partById(id)?.family==='staircase'){
+   const neighbor=(dx,dz,dy=0)=>{
+    const nx=Math.floor(x)+dx,nz=Math.floor(z)+dz;
+    return {id:this.get(nx,y+dy,nz,false),facing:this.partFacing(nx,y+dy,nz)};
+   };
+   state.connected=stairConnections(id,state.facing,neighbor);
+   if(variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor);
   }
   return state;
  }
@@ -50,14 +60,14 @@ export class World{
   for(const body of occupants||[])if(body&&!body.dead&&doorIntersectsBody(bx,baseY,bz,next,body))return false;
   return this.setDoorState(bx,baseY,bz,next);
  }
- placeDoor(x,y,z,facing=0,occupants=[]){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<1||y+1>=HEIGHT||!block(this.get(x,y,z)).replaceable||!block(this.get(x,y+1,z)).replaceable)return false;const lower=this.get(x,y,z),upper=this.get(x,y+1,z);
+ placeDoor(x,y,z,facing=0,occupants=[]){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);if(y<1||y+1>=this.height||!block(this.get(x,y,z)).replaceable||!block(this.get(x,y+1,z)).replaceable)return false;const lower=this.get(x,y,z),upper=this.get(x,y+1,z);
   const state={facing,open:false};for(const actor of occupants)if(actor&&!actor.dead&&doorIntersectsBody(x,y,z,state,actor))return false;
   if(!this.set(x,y,z,B.DOOR))return false;if(!this.set(x,y+1,z,B.DOOR_TOP)){this.set(x,y,z,lower);return false}this.setDoorState(x,y,z,{facing,open:false});return true}
  removeDoor(x,y,z){x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);const id=this.get(x,y,z);if(!isDoor(id))return false;const baseY=id===B.DOOR_TOP?y-1:y;this.blockStates.delete(this.stateKey(x,baseY,z));if(this.get(x,baseY,z)===B.DOOR)this.set(x,baseY,z,B.AIR);if(this.get(x,baseY+1,z)===B.DOOR_TOP)this.set(x,baseY+1,z,B.AIR);return true}
  get(x,y,z,create=true,cell=null){
   if(cell){cell.form=0;cell.mount=null}
   x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);
-  if(y<0)return B.BEDROCK;if(y>=HEIGHT)return B.AIR;
+  if(y<0)return B.BEDROCK;if(y>=this.height)return B.AIR;
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,create);
   if(!c)return B.AIR;
   const i=Chunk.index(x-cx*SIZE,y,z-cz*SIZE);
@@ -78,7 +88,7 @@ export class World{
   const cell=mountCell(mount);
   if(!cell)return false;
   const [bx,by,bz]=cell;
-  if(by<1||by>=HEIGHT)return false;
+  if(by<1||by>=this.height)return false;
   const same=bx===mount.sx&&by===mount.sy&&bz===mount.sz;
   if(!same&&!block(this.get(bx,by,bz)).replaceable)return false;
   const cx=Math.floor(bx/SIZE),cz=Math.floor(bz/SIZE),k=key(cx,cz),chunk=this.getChunk(cx,cz);
@@ -113,7 +123,7 @@ export class World{
  }
  set(x,y,z,id,{simulate=true,record=true,form=0}={}){
   x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);
-  if(y<=0||y>=HEIGHT||!Number.isInteger(id)||id<0||id>=BLOCKS.length||!Number.isInteger(form)||form!==0&&(!FORMED[form]||!supportsForms(id)))return false;
+  if(y<=0||y>=this.height||!Number.isInteger(id)||id<0||id>=BLOCKS.length||!Number.isInteger(form)||form!==0&&(!FORMED[form]||!supportsForms(id)))return false;
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz),k=key(cx,cz);
   const lx=x-cx*SIZE,lz=z-cz*SIZE,idx=Chunk.index(lx,y,lz),oldId=c.data[idx],oldForm=c.forms?.[idx]||0;
   if(oldId===id&&oldForm===form)return false;
@@ -138,7 +148,7 @@ export class World{
   if(lx===0)this.markDirty(cx-1,cz);if(lx===15)this.markDirty(cx+1,cz);if(lz===0)this.markDirty(cx,cz-1);if(lz===15)this.markDirty(cx,cz+1);
   this.events.emit('block-change',{x,y,z,id});if(simulate){this.schedule(x,y,z);for(const [dx,dy,dz] of [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]])this.schedule(x+dx,y+dy,z+dz)}return true}
  markDirty(cx,cz){const c=this.chunks.get(key(cx,cz));if(c){c.dirty=true;c.revision++}}
- schedule(x,y,z){if(y<1||y>=HEIGHT)return;const k=`${x|0},${y|0},${z|0}`;if(!this.queued.has(k)){this.queued.add(k);this.queue.push([x|0,y|0,z|0,k])}}
+ schedule(x,y,z){if(y<1||y>=this.height)return;const k=`${x|0},${y|0},${z|0}`;if(!this.queued.has(k)){this.queued.add(k);this.queue.push([x|0,y|0,z|0,k])}}
  tick(){
   this.tickCount++; // The world has no sunrise; time stays in deep twilight.
   // A single batch splice avoids repeatedly shifting a potentially large queue.
@@ -168,11 +178,11 @@ export class World{
   }
   if(!selected.length)return 0;
   // Keep the entire current edit snapshot available before modifying anything.
-  if(this.storage)this.storage.setItem('mcweb:'+this.name+':before-water-cleanup',this.snapshot());
+  if(this.storage)this.storage.setItem('mcweb:'+this.saveKey+':before-water-cleanup',this.snapshot());
   const originals=new Map();
   for(const entry of selected){
    let base=originals.get(entry.k);
-   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz),this.seed,this.mode);originals.set(entry.k,base)}
+   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz,this.height),this.seed,this.mode);originals.set(entry.k,base)}
    const bx=entry.bx,by=entry.by,bz=entry.bz;
    const original=base.get(bx-entry.cx*SIZE,by,bz-entry.cz*SIZE);
    this.edits.get(entry.k)?.delete(entry.idx);
@@ -193,7 +203,7 @@ export class World{
    for(const pos of citySpawnCandidates(this.seed)){
     fallback??=pos;
     const {x,y,z}=pos;
-    if(this.get(x,y-1,z)===B.FLOOR_TILE&&this.get(x,y,z)===B.AIR&&this.get(x,y+1,z)===B.AIR)return pos;
+    if(block(this.get(x,y-1,z)).opaque&&this.get(x,y,z)===B.AIR&&this.get(x,y+1,z)===B.AIR)return pos;
    }
    if(fallback)return fallback;
   }
@@ -205,8 +215,8 @@ export class World{
   if(this.mode==='ruins'&&(this.get(x,y+1,z)!==B.AIR||this.get(x,y+2,z)!==B.AIR))continue;
   return{x:x+.5,y:y+2,z:z+.5};
  }return{x:.5,y:30,z:.5}}
- save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.name,this.snapshot());return true}
- loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.name)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){if(d.generationVersion!==GENERATION_VERSION){try{const backup='mcweb:'+this.name+':before-generator-unification';if(!this.storage.getItem(backup))this.storage.setItem(backup,JSON.stringify(d))}catch{}}this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state);
+ save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.saveKey,this.snapshot());return true}
+ loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.saveKey)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){if(d.generationVersion!==GENERATION_VERSION){try{const backup='mcweb:'+this.saveKey+':before-generator-unification';if(!this.storage.getItem(backup))this.storage.setItem(backup,JSON.stringify(d))}catch{}}this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state);
  for(const [k,arr] of d.forms||[])this.forms.set(k,new Map(arr.filter(([idx,form])=>FORMED[form]&&supportsForms(this.edits.get(k)?.get(idx)))));
  for(const [k,arr] of d.mounts||[])this.mounts.set(k,new Map(arr.filter(([,mount])=>isWallItem(mount?.id))));
  }}catch{}}

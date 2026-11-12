@@ -57,6 +57,8 @@ export function designBuilding(volume, unit, random) {
   const count=Math.round((volume.y1-volume.y0)/storeyHeight);
   const entryLevel=volume.support===null && count>=2 ? 1 : 0;
   const floors=[], stairs=[], ports=[];
+  const highRise=volume.highRise;
+  const skyLevels=new Set(highRise?[30,72,125,192,268,351,444,545].map(y=>Math.round(y/storeyHeight)).filter(i=>i<count):[]);
   const capX=Math.max(0,hw-Math.max(eu+unit,4*unit));
   const capZ=Math.max(0,Math.min(hd-near-2*unit,atrium?hd*.30:Infinity));
   const retreat=Math.min(capX,capZ,hw*(.09+.12*random(72)),3*unit);
@@ -64,14 +66,16 @@ export function designBuilding(volume, unit, random) {
 
   function geometry(band) {
     // Rear and side wings step inward at different rates while the stair core stays fixed.
-    const left=hw-band*retreat*.3, right=hw-band*retreat*.5, frontDepth=hd, backDepth=hd-band*retreat;
-    const c=chamfer, c2=chamfer*(.35+.55*random(73));
+    const left=hw-band*retreat*(highRise?.17+.2*random(74):.3), right=hw-band*retreat*(highRise?.35+.35*random(75):.5);
+    const frontDepth=hd-(highRise?band*retreat*.28:0), backDepth=hd-band*retreat;
+    const c=Math.min(left*.36,right*.36,backDepth*.36,chamfer*(highRise?1+.38*band*random(76):1));
+    const c2=chamfer*(.35+.55*random(73));
     const outline=[[-left+c,-frontDepth],[right-c2,-frontDepth],[right,-frontDepth+c2],[right,backDepth-c],
       [right-c,backDepth],[-left+c2,backDepth],[-left,backDepth-c2],[-left,-frontDepth+c]].map(([u,v])=>point(u,v));
     const front=-frontDepth+c+unit*.4, back=backDepth-c-unit*.4;
     const corridors=[rect(-passage,-frontDepth,passage,backDepth,'corridor'),rect(-left,front,eu,front+unit*1.6,'cross-corridor')];
     const rooms=[], partitions=[];
-    const shop=mall || volume.type===0 || volume.type===3;
+    const shop=(mall && (!highRise||band<1.6)) || volume.type===0 || volume.type===3;
     const roomLength=(mall ? 4 : volume.type===3 ? 2.8 : volume.type===4 ? 6 : 3.6)*unit;
     for (const side of [-1,1]) {
       if (side<0 && atrium) continue;
@@ -93,18 +97,20 @@ export function designBuilding(volume, unit, random) {
     return {outline,corridors,rooms,partitions,front,left,frontDepth,backDepth};
   }
 
-  const shapes=[geometry(0),geometry(1),geometry(2)];
+  const setbacks=highRise?[0,1.05+.25*random(77),.4+.18*random(78),1.55+.35*random(79),2]:[0,1,2];
+  const shapes=setbacks.map(geometry);
+  const cuts=[.10+.06*random(80),.30+.09*random(81),.56+.07*random(82),.80+.10*random(83)];
   for (let level=0; level<count; level++) {
-    const band=level<=entryLevel ? 0 : level/count>.76 ? 2 : level/count>.44 ? 1 : 0;
+    const band=level<=entryLevel?0:highRise?cuts.filter(c=>level/count>c).length:level/count>.76?2:level/count>.44?1:0;
     const shape=shapes[band], y=volume.y0+level*storeyHeight;
     const holes=[];
     if (level>0) holes.push(shaft);
     if (level>0 && atrium && level<=Math.min(count-1,4)) holes.push(atrium);
-    floors.push({...shape,level,y,top:y+storeyHeight,holes,doors:[]});
-    if (level!==entryLevel && level!==0) continue;
+    floors.push({...shape,band,level,y,top:y+storeyHeight,holes,doors:[]});
+    if (level!==entryLevel && level!==0 && !skyLevels.has(level)) continue;
     for (const [u,v,du,dv,edge] of [[0,-shape.frontDepth,0,-1,0],[0,shape.backDepth,0,1,4],[-shape.left,shape.front+unit*.8,-1,0,6]]) {
       const [x,z]=point(u,v), [dx,dz]=turn?[dv,-du]:[du,dv];
-      const port={x,y,z,dx,dz,edge,width:unit*1.4,building:volume.id,level,open:false};
+      const port={x,y,z,dx,dz,edge,width:unit*(highRise?2.35:1.4),building:volume.id,level,open:false};
       // Additions expose only the roof-facing doorway selected when they are joined.
       if (level===0 && volume.support===null && edge===0) {
         port.open=true;
@@ -137,7 +143,7 @@ export function designBuilding(volume, unit, random) {
   }
   const [roofX,roofZ]=point(su+stair.width*1.5,near+stair.landing*.6);
   const typology=mall?'백화점형 상업동':['상가·주택','공동주택','중층 상업동','상가 묶음','설비·물류','상층 증축'][volume.type];
-  Object.assign(volume,{floors,storeyHeight,stairs,ports,roof,entryLevel,typology,roofAccess:[roofX,volume.y1,roofZ]});
+  Object.assign(volume,{floors,storeyHeight,stairs,ports,roof,entryLevel,typology,stairFacing:turn?2:4,roofAccess:[roofX,volume.y1,roofZ]});
   return true;
 }
 
