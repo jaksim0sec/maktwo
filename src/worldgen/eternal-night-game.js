@@ -132,8 +132,9 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
       const stride=kit.wall===4?6:5;
       const bay=mod(Math.floor(Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1])?x-a[0]:z-a[1]),stride);
       const frontEdge=f.key==='shop'?(f.doors[0]?.edge??0):0;
+      const span=Math.hypot(b[0]-a[0],b[1]-a[1]);
       const facade=facadeBay({program:f.program,level:f.level,entryLevel:v.entryLevel,
-        edge,bay,stride,frontEdge});
+        edge,bay,stride,frontEdge,span});
       if(exit){
         // Preserve the physical 2-block exit, but give it an actual wall/lintel
         // above instead of an isolated floating 'entrance' voxel.
@@ -144,7 +145,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
           let id=kit.body;
           if(facade.opening==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)
             id=cityPart('window',y===floor+2?3:kit.window);
-          else if(facade.opening==='window'&&y===floor+2&&y<ceiling-1)
+          else if(facade.opening==='window'&&(y===floor+2||y===floor+3)&&y<ceiling-1)
             id=cityPart('window',f.program==='housing'?4:kit.window);
           else if(facade.vent&&y===floor+2&&y<ceiling-1)
             id=cityPart('ventilation',kit.ventilation);

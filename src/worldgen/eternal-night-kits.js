@@ -21,7 +21,15 @@ export function cityKits(building,seed,maxLuxury) {
   const choices=palettes.map((kit,index)=>({kit,score:Math.abs(index-tier)*.75+hash(building.id,index,building.type,seed)*1.8}));
   choices.sort((a,b)=>a.score-b.score);
   const main=choices[0].kit;
-  return [origin<.33?choices[1].kit:main,main,choices[1].kit,choices[2].kit,origin>.5?main:choices[3].kit];
+  // The darkest unfinished concrete belongs to workshops/industrial shells.
+  // Older Korean mixed-use and residential blocks keep coherent lighter
+  // masonry/plaster cladding across all their construction bands, rather
+  // than accidentally turning into featureless charcoal towers.
+  const cladding=building.program==='housing'?B.STAINED_PLASTER:
+    building.program==='shops'||building.program==='market'?B.SHOP_BRICK:B.LIMESTONE;
+  const normalize=kit=>building.program!=='workshops'&&kit.body===B.CRACKED_CONCRETE
+    ?{...kit,body:cladding}:kit;
+  return [origin<.33?choices[1].kit:main,main,choices[1].kit,choices[2].kit,origin>.5?main:choices[3].kit].map(normalize);
 }
 
 export function cityFloorKit(base,floor,limit) {
