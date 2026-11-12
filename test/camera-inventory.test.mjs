@@ -54,3 +54,15 @@ test('in-game inventory frame retains camera and physics while interaction is bl
  for(const id of ['screen','hotbar','palette-toggle','bag-btn','menu-btn','resume','help-btn','mode','water-repair'])assert.ok(html.includes(`id="${id}"`));
  assert.match(css,/#hotbar-dock/);assert.match(css,/#toolbar/);
 });
+test('mobile inventory keeps dual-finger movement and camera; tap is not world placement',()=>{
+ const h=harness();try{
+  const input=new Input(h.canvas);input.setInventoryMode(true);
+  const ev=(pointerId,x,y)=>({pointerId,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
+  h.canvas.emit('pointerdown',ev(10,100,400));h.canvas.emit('pointerdown',ev(11,810,400));
+  h.canvas.emit('pointermove',ev(10,155,410));h.canvas.emit('pointermove',ev(11,855,378));
+  const m=input.read();assert.ok(m.moveX>.08,'left drag still moves');assert.equal(m.use,false);assert.equal(m.mine,false);
+  assert.ok(input.consumeLook()[0]>0,'right drag still rotates camera');
+  h.canvas.emit('pointerup',ev(11,855,378));h.canvas.emit('pointerup',ev(10,155,410));
+  assert.equal(input.read().moveX,0);
+ }finally{h.restore()}
+});

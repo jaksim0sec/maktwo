@@ -103,10 +103,14 @@ class Game{
    if(event.pointerType==='mouse'&&!this.uiOpen){const pos=canvasPoint(event,this.canvas);for(const id of ['crosshair','target','mine-progress']){const el=$(id);if(el){el.style.left=pos.x+'px';if(id==='crosshair')el.style.top=pos.y+'px';else el.style.top=(pos.y+(id==='target'?18:27))+'px'}}}
    if(this.panel==='inventory'&&!this.input.locked){this.hologram.point(event.clientX,event.clientY,this.canvas.getBoundingClientRect());this.hologram.aim(this.player)}
   });
-  this.canvas.addEventListener('pointerdown',event=>{
-   if(this.panel==='inventory'&&event.pointerType==='touch'){
-    event.preventDefault();this.hologram.point(event.clientX,event.clientY,this.canvas.getBoundingClientRect());this.hologram.facePlayer(this.player);this.hologram.aim(this.player);this.inventoryClick();
-   }
+  // A right-side *tap* selects an inventory card. Dragging either zone keeps
+  // movement/camera working; selection must not happen on touch-down.
+  this.canvas.addEventListener('pointerup',event=>{
+   if(this.panel!=='inventory'||(event.pointerType!=='touch'&&event.pointerType!=='pen'))return;
+   const tap=this.input.gestures.consumeTapPoint();this.input.gestures.consumeTaps();
+   if(!tap)return;
+   event.preventDefault();this.hologram.point(tap.x,tap.y,this.canvas.getBoundingClientRect());
+   this.hologram.facePlayer(this.player);this.hologram.aim(this.player);this.inventoryClick();
   });
   this.canvas.addEventListener('wheel',e=>{
    e.preventDefault();if(this.panel==='inventory')return;if(this.uiOpen)return;

@@ -42,7 +42,7 @@ export class Input{
   // Pointer events support simultaneous movement/look and handle interruptions.
   canvas.addEventListener('pointerdown',e=>{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
-   if(this.uiMode||this.inventoryMode)return;
+   if(this.uiMode)return;
    e.preventDefault();const rect=canvas.getBoundingClientRect();
    if(this.gestures.down(e.pointerId,e.clientX,e.clientY,rect.left+rect.width/2,performance.now(),rect.width)){
     try{canvas.setPointerCapture(e.pointerId)}catch{}
@@ -84,7 +84,7 @@ export class Input{
   const rect=this.canvas.getBoundingClientRect();
   const canvasAim=p=>p?{x:p.x-rect.left,y:p.y-rect.top}:null;
   const fingerTap=canvasAim(this.gestures.consumeTapPoint());const picked=this.tapPoint||fingerTap;this.tapPoint=null;
-  const minePoint=this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:canvasAim(this.gestures.miningPoint(performance.now()));
+  const minePoint=this.inventoryMode?null:(this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:canvasAim(this.gestures.miningPoint(performance.now())));
   return{
    forward:k.has('KeyW')||k.has('ArrowUp'),backward:k.has('KeyS')||k.has('ArrowDown'),
    left:k.has('KeyA')||k.has('ArrowLeft'),right:k.has('KeyD')||k.has('ArrowRight'),
