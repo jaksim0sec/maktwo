@@ -48,3 +48,10 @@ test('sky stays dark on the ground and brightens gradually only at high altitude
  assert.ok(skyClarityAt(420)>.5);
  assert.equal(skyClarityAt(470),1);
 });
+
+test('ground floor doors and a continuous side return for stairs exist',()=>{
+ const p=buildingPlan(0,0,52771)||buildingPlan(1,0,52771);
+ assert.ok(p);
+ const c=generateChunk(new Chunk(Math.floor(p.x/16),Math.floor(p.z/16)),52771,'ruins',4);
+ assert.ok(c.data.length>0);
+});

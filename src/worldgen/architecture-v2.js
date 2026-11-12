@@ -38,9 +38,13 @@ function blockAt(plan,f,lx,lz,dy,seed){
  }
  if(edge){
   if(pier||along%5===0)return B.CONCRETE_BEAM;
+  if(front&&f.level===0){
+   const mid=wallNS?Math.floor(w/2):Math.floor(d/2);
+   if(Math.abs(along-mid)<=1&&dy<=2)return B.AIR; // doors on every building type
+   if(f.kind!=='shop'&&Math.abs(along-mid)<=1)return B.METAL_PANEL;
+  }
   if(front&&f.kind==='shop'){
    const mid=wallNS?Math.floor(w/2):Math.floor(d/2);
-   if(Math.abs(along-mid)<=1)return B.AIR; // usable two-high shop entrance
    if(dy===3)return along%5===1||along%5===2?B.SHOP_SIGN:B.SHOP_BRICK;
    if(along%5===3)return B.SHOP_SHUTTER;
    if(along%5===2)return window;
@@ -54,13 +58,13 @@ function blockAt(plan,f,lx,lz,dy,seed){
  }
  // Primary central corridor is 4 cells wide. Doorways are cut through
  // each thin partition and link rooms to the stair return path.
- const partLeft=f.split-2,partRight=f.split+3;
+ const partLeft=Math.max(6,f.split-1),partRight=f.split+3;
  if((lx===partLeft||lx===partRight)&&lz>1&&lz<d-2){
   if(lz===3||lz===f.mid||lz===d-5)return B.AIR;
   return lx===partLeft?B.THIN_WALL_EW:B.METAL_PANEL;
  }
  if(lz===f.mid&&(lx<partLeft||lx>partRight)&&lx>1&&lx<w-2){
-  if(lx===3||lx===w-4)return B.AIR;
+  if(lx===3||lx===5||lx===w-4)return B.AIR;
   return B.THIN_WALL_NS;
  }
  // Wall-mounted lights; no full-width white roof stripes.
@@ -88,6 +92,20 @@ export function stampArchitectureV2(chunk,seed){
      const y=floor.base+dy;if(y<=0||y>=HEIGHT)continue;
      chunk.data[(y*SIZE+z-oz)*SIZE+x-ox]=blockAt(plan,floor,lx,lz,dy,seed);
     }
+   }
+  }
+  // Walkable entry apron keeps doors connected to terrain rather than
+  // opening into a buried hillside. It is generated at global coordinates.
+  const frontMid=plan.front==='north'?Math.floor(plan.width/2):Math.floor(plan.depth/2);
+  for(let across=-2;across<=2;across++)for(let forward=1;forward<=3;forward++){
+   const wx=plan.front==='north'?plan.x+frontMid+across:plan.x-forward;
+   const wz=plan.front==='north'?plan.z-forward:plan.z+frontMid+across;
+   if(wx<ox||wx>=ox+SIZE||wz<oz||wz>=oz+SIZE)continue;
+   if(plan.base>0&&plan.base<HEIGHT)chunk.data[(plan.base*SIZE+wz-oz)*SIZE+wx-ox]=B.FLOOR_TILE;
+   for(let dy=1;dy<=3;dy++){
+    const y=plan.base+dy;if(y>=HEIGHT)break;
+    const id=dy===3&&forward===1&&Math.abs(across)<=1?B.CONCRETE_SLAB:B.AIR;
+    chunk.data[(y*SIZE+wz-oz)*SIZE+wx-ox]=id;
    }
   }
   // A little street-level collapse, bounded to the building parcel.
