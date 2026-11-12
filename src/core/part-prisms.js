@@ -60,22 +60,22 @@ export function partPrisms(id,x,y,z,state={}){
  }
  return pieces;
 }
-export function prismFaces(prism){
+export function prismFaces(prism,cullJoined=false){
  const v=prism.vertices,lo=v.map(p=>[p.x,p.lo,p.z]),hi=v.map(p=>[p.x,p.hi,p.z]);
  const faces=[lo,[...hi].reverse()];
+ const angle=prism.angle,ux=Math.cos(angle),uz=Math.sin(angle);
  for(let i=0;i<v.length;i++){
-  const j=(i+1)%v.length;
-  const edge=[lo[i],hi[i],hi[j],lo[j]];
-  // Joined stair parts share the outer x=0 or x=1 plane. Eliminate both
-  // concealed side faces along with the internal handrail primitives.
-  if(prism.structural&&prism.angle%Math.PI/2<EPS){
-   const cx=v[i].x,dx=v[j].x,cz=v[i].z,dz=v[j].z;
-   const axis=Math.round(prism.angle/(Math.PI/2))&3;
-   const isLeft=axis===0?Math.abs(cx-Math.floor(cx))<EPS&&Math.abs(dx-Math.floor(dx))<EPS:
-    axis===1?Math.abs(cz-Math.floor(cz))<EPS&&Math.abs(dz-Math.floor(dz))<EPS:
-    axis===2?Math.abs(cx-Math.ceil(cx))<EPS&&Math.abs(dx-Math.ceil(dx))<EPS:
-    Math.abs(cz-Math.ceil(cz))<EPS&&Math.abs(dz-Math.ceil(dz))<EPS;
-   if((prism.connected?.left&&isLeft)||(prism.connected?.right&&isLeft))continue;
+  const j=(i+1)%v.length,edge=[lo[i],hi[i],hi[j],lo[j]];
+  // Remove only the shared lateral face. All rails on the shared edge are
+  // suppressed by partPrisms, while front/top/back tread faces remain.
+  if(cullJoined&&prism.structural&&(prism.connected?.left||prism.connected?.right)){
+   const n=prismNormal(edge),p=v[i],q=v[j];
+   const atCellBoundary=(Math.abs(p.x-Math.round(p.x))<EPS&&Math.abs(q.x-Math.round(q.x))<EPS)
+    ||(Math.abs(p.z-Math.round(p.z))<EPS&&Math.abs(q.z-Math.round(q.z))<EPS);
+   if(n&&atCellBoundary){
+    const toward=n[0]*ux+n[2]*uz;
+    if((prism.connected.left&&toward<-.999)||(prism.connected.right&&toward>.999))continue;
+   }
   }
   faces.push(edge);
  }
