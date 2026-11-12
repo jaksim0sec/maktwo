@@ -28,7 +28,8 @@ function face(ctx,id,faceIndex,points,shade){
  ctx.drawImage(tile,left,top,Math.max(...xs)-left+1,Math.max(...ys)-top+1);
  ctx.restore();
 }
-// The icon and world mesh share the same AABB geometry.
+// Item previews share the exact partial-voxel geometry with world meshing/collision.
+// Isometric box projection is applied once when the icon is cached, not per frame.
 export function drawShapeIcon(ctx,id){
  const boxes=shapeBoxes(id,0,0,0,{facing:0,upper:false});if(!boxes)return false;
  const pr=(x,y,z)=>[32+(x-z)*22,43-y*29+(x+z)*7];
@@ -37,11 +38,12 @@ export function drawShapeIcon(ctx,id){
   face(ctx,id,1,[pr(x,y,Z),pr(X,y,Z),pr(X,Y,Z),pr(x,Y,Z)],.82);
   face(ctx,id,0,[pr(X,y,z),pr(X,y,Z),pr(X,Y,Z),pr(X,Y,z)],.72);
   face(ctx,id,2,[pr(x,Y,z),pr(X,Y,z),pr(X,Y,Z),pr(x,Y,Z)],1);
- }return true;
+ }
+ return true;
 }
 export function drawItemIcon(ctx,id,x,y,size=64){
  ctx.save();ctx.translate(x,y);ctx.scale(size/64,size/64);
- if(drawShapeIcon(ctx,id)){}
+ if(drawShapeIcon(ctx,id)){} 
  else if(id===B.TORCH||id===B.LANTERN||id===B.CAMPFIRE||id===B.GLOW_MUSHROOM){
   if(id===B.CAMPFIRE){poly(ctx,[[10,46],[31,33],[55,46],[34,58]],'#70523d');poly(ctx,[[15,47],[19,39],[43,47],[39,55]],'#af815b')}
   else if(id===B.LANTERN){poly(ctx,[[19,19],[45,19],[48,49],[16,49]],'#a17948');poly(ctx,[[22,24],[42,24],[43,44],[21,44]],'#ffd38b');poly(ctx,[[18,15],[46,15],[43,21],[21,21]],'#d8b274');}
@@ -54,6 +56,7 @@ export function drawItemIcon(ctx,id,x,y,size=64){
  else if(id===B.STONE_SLAB||id===B.WOOD_SLAB){const c=id===B.STONE_SLAB?'#838b90':'#ab916c';poly(ctx,[[9,30],[32,17],[55,30],[32,43]],c);poly(ctx,[[9,30],[32,43],[32,55],[9,42]],'#726c60');poly(ctx,[[32,43],[55,30],[55,42],[32,55]],'#8b7967');}
  else if(id===B.CHAIR){poly(ctx,[[20,10],[44,10],[44,42],[20,42]],'#85664b');poly(ctx,[[15,37],[33,28],[50,38],[32,48]],'#b39770');for(const x of [19,42])poly(ctx,[[x,40],[x+5,40],[x+5,60],[x,60]],'#80634d');}
  else if(id===B.FLOWER_POT){poly(ctx,[[21,26],[43,26],[40,52],[24,52]],'#a8735e');poly(ctx,[[28,25],[35,25],[35,12],[28,12]],'#628568');poly(ctx,[[20,14],[32,6],[44,14],[34,25],[25,24]],'#d09cab');}
+ else if(block(id).render==='cross'&&id!==B.FLOWER){const c=block(id).color;poly(ctx,[[30,28],[35,28],[35,57],[30,57]],'#63845f');poly(ctx,[[17,22],[31,9],[47,22],[34,37]],c);poly(ctx,[[20,40],[32,29],[46,40],[31,51]],c);}
  else if(id===B.FLOWER){poly(ctx,[[30,29],[34,29],[35,56],[30,56]],'#67905f');for(const [dx,dy] of [[0,-11],[-10,0],[10,0],[0,10]])poly(ctx,[[32+dx-8,25+dy-8],[32+dx+8,25+dy-8],[32+dx+8,25+dy+8],[32+dx-8,25+dy+8]],'#d991a4');poly(ctx,[[28,21],[36,21],[36,29],[28,29]],'#f2c37b');}
  else if(id===B.PATH||id===B.WATER){const c=id===B.WATER?'#7194ab':'#969082';poly(ctx,[[7,34],[32,18],[57,34],[32,53]],c);poly(ctx,[[12,34],[32,23],[52,34],[32,48]],id===B.WATER?'#9fc4ce':'#b0aaa0');}
  else{

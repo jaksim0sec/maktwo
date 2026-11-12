@@ -80,15 +80,15 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT].includes(id))continue;
+  const id=chunk.get(x,y,z);if(![B.FLOWER,B.TORCH,B.LANTERN,B.CAMPFIRE,B.DOOR,B.PATH,B.GLOW_MUSHROOM,B.FENCE,B.WORKBENCH,B.STONE_STAIRS,B.WOOD_STAIRS,B.STONE_SLAB,B.WOOD_SLAB,B.CHAIR,B.FLOWER_POT,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS].includes(id))continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(isStairs(id)||isSlab(id)||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,world.getShapeState?.(wx,y,wz));continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,world.getDoorState?.(wx,y,wz));continue}
  if(id===B.PATH){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.GLOW_MUSHROOM){gardenMesh(opaque,id,wx,y,wz);continue}
   if(id===B.FENCE||id===B.WORKBENCH){gardenMesh(opaque,id,wx,y,wz);continue}
-  if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
-  flowerMesh(opaque,wx,y,wz,world.seed);
+  if(id!==B.FLOWER&&BLOCKS[id].render!=='cross'){fixture(opaque,id,wx,y,wz);continue}
+  flowerMesh(opaque,wx,y,wz,world.seed,id);
 
  }
  return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
@@ -165,9 +165,12 @@ export function gardenMesh(dest,id,x,y,z){
  }
 }
 
-export function flowerMesh(dest,x,y,z,seed=0){
+// Colored petals, leaves and a small centre. Slightly varied blooms, no flat X artifacts.
+export function flowerMesh(dest,x,y,z,seed=0,id=B.FLOWER){
+ if(id===B.REEDS){for(const dx of [.35,.52,.67])cube(dest,x+dx,y+.04,z+.44,.045,.58+hash(x,dx,z,seed)*.32,.045,rgb('#779677'));return;}
+ if(id===B.FIREFLY_GRASS){for(const dx of [.33,.5,.66])cube(dest,x+dx,y+.03,z+.47,.04,.35+hash(x,dx,z,seed)*.18,.05,rgb('#6c9b69'));for(const dx of [.33,.68])cube(dest,x+dx,y+.51,z+.47,.07,.07,.07,rgb('#efc76f'),-1.08);return;}
  const n=hash(x,0,z,seed),h=.55+hash(x,1,z,seed)*.16;
- const petal=n<.26?'#b97999':n<.52?'#d8a8b9':n<.78?'#e4c69b':'#ab99c5';
+ const petal=id===B.HEATHER?'#a78baa':id===B.BLUE_FLOWER?'#819dc8':n<.26?'#b97999':n<.52?'#d8a8b9':n<.78?'#e4c69b':'#ab99c5';
  cube(dest,x+.47,y+.045,z+.47,.06,h-.08,.06,rgb('#628764'));
  cube(dest,x+.33,y+.27,z+.46,.16,.045,.09,rgb('#72956e'));
  cube(dest,x+.51,y+.33,z+.44,.16,.045,.09,rgb('#668a63'));
@@ -175,10 +178,19 @@ export function flowerMesh(dest,x,y,z,seed=0){
  for(const [dx,dz] of [[-.13,0],[.13,0],[0,-.13],[0,.13]])cube(dest,x+.44+dx,cy-.02,z+.44+dz,.12,.105,.12,rgb(petal));
  cube(dest,x+.462,cy+.025,z+.462,.076,.08,.076,rgb('#d7b77e'));
 }
+// Partial voxel shapes keep the authored block material and physical AABBs aligned.
 export function shapeMesh(dest,id,x,y,z,state){
- const boxes=shapeBoxes(id,x,y,z,state)||[],c=rgb(BLOCKS[id].color);
+ const boxes=shapeBoxes(id,x,y,z,state)||[];
+ const c=rgb(BLOCKS[id].color);
  for(const b of boxes){const dx=b.x-x,dy=b.y-y,dz=b.z-z;
-  for(let f=0;f<FACES.length;f++){const face=FACES[f],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);quad(dest,verts,c,face.shade+4*materialFor(id,f))}
+  for(let f=0;f<FACES.length;f++){
+   const face=FACES[f],verts=face.corners.map(([a,v,t])=>[x+dx+a*b.w,y+dy+v*b.h,z+dz+t*b.d]);
+   quad(dest,verts,c,face.shade+4*materialFor(id,f));
+  }
  }
- if(id===B.FLOWER_POT){cube(dest,x+.43,y+.33,z+.43,.14,.33,.14,rgb('#608360'));cube(dest,x+.36,y+.55,z+.36,.28,.12,.28,rgb('#cf95a7'));cube(dest,x+.41,y+.65,z+.41,.18,.08,.18,rgb('#e3c6a4'))}
+ if(id===B.FLOWER_POT){
+  cube(dest,x+.43,y+.33,z+.43,.14,.33,.14,rgb('#608360'));
+  cube(dest,x+.36,y+.55,z+.36,.28,.12,.28,rgb('#cf95a7'));
+  cube(dest,x+.41,y+.65,z+.41,.18,.08,.18,rgb('#e3c6a4'));
+ }
 }

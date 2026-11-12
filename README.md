@@ -1,3 +1,12 @@
+## v1.10: 자연 지형 · 확장 재질
+
+- 신규 지형용 블록 ID 30~54 25종. 기존 블록 ID와 저장 파일 형식 유지.
+- 생성 버전 3: 고원 눈·얼음, 석회암, 퇴적층, 침엽수림, 습지, 붉은 협곡, 자연식물과 약한 자연발광을 하나의 월드 생성 흐름에 통합.
+- 발광 이끼·반딧불 풀은 아주 낮은 광량으로 주변을 밝힘. 강한 인공광 대신 은은한 장식용 조명.
+- 32×32 재질 아틀라스 22층, 하나의 GPU 배열 텍스처. 식물은 기존 청크 메시에 포함되어 별도 draw call 없음.
+- 월드 생성 버전 1·2를 사용하는 기존 저장 월드는 기존 지형을 계속 사용함. 새 월드만 버전 3 적용.
+- PWA 캐시 v1.10.0 갱신.
+
 ## v1.6: cozy survival and landscape PWA
 
 - Survival baseline: finite per-world inventory (`maktwo:survival:<world>`), starter supplies, mining yields, placement consumes resources, and a simple craft tab in the in-world hologram. Existing `mcweb:<world>` voxel and door saves are unchanged. Crafting recipes are intentionally minimal and do not attempt to model a full crafting-tree game.

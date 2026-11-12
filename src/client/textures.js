@@ -2,7 +2,7 @@
 // all opaque blocks, retaining the existing seven-float greedy mesh format.
 // Each pixel modulates the block's authored RGB color, not replacing its palette.
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면'];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영'];
 export function materialFor(id,face){
  switch(id){
   case 1:return face===2?1:face===3?3:2;
@@ -17,9 +17,20 @@ export function materialFor(id,face){
   case 13:return 12;
   case 18:return 13;
   case 23:return face===2?14:10;
-  case 24:case 26:return 9;
-  case 25:case 27:case 28:return 10;
+  case 24:case 26:return 9; // cobblestone for stone stairs/slabs
+  case 25:case 27:case 28:return 10; // boards
   case 29:return 3;
+  case 30:case 38:case 52:return 19;
+  case 31:case 39:case 40:return 3;
+  case 32:return 15;
+  case 33:return 16;
+  case 34:case 36:case 37:case 43:return 17;
+  case 35:case 44:return 18;
+  case 41:case 42:return 20;
+  case 45:return face===2||face===3?7:21;
+  case 46:case 48:return 8;
+  case 47:return face===2||face===3?7:21;
+  case 54:return 22; // fired-earth modulation
   default:return 0;
  }
 }
@@ -129,6 +140,22 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
    else f*=.88+.045*Math.sin(px*.72+.2*Math.sin(py*.25));
    if(px>23&&px<27&&py>12&&py<15)f*=1.1;
    r=1;g=.96;b=.88;
+  }else if(m===14){ // Snow: packed, low-contrast flakes.
+   f=.94+.07*patch+.025*(fine-.5);if(n>.981)f*=.85;
+  }else if(m===15){ // Frozen lake: irregular, translucent frost seams.
+   f=.87+.10*patch;if(Math.abs(Math.sin(px*.31+py*.11))<.09)f*=1.07;
+  }else if(m===16){ // Shale and layered bedrock: subtle fractured strata.
+   f=.78+.22*patch;if(Math.abs(Math.sin(py*.36+px*.12))<.07)f*=.76;
+  }else if(m===17){ // Granite: broad mineral clusters.
+   f=.80+.22*patch+.08*(fine-.5);if(n>.95)f*=1.10;
+  }else if(m===18){ // Moss: tiny organic flakes and dark undergrowth.
+   f=.77+.22*patch;if(fine>.83)f*=1.1;
+  }else if(m===19){ // Layered ochre sand and red clay.
+   f=.82+.16*patch+.035*Math.sin(py*.42+px*.11);
+  }else if(m===20){ // Cedar and birch bark.
+   f=barkGrain(x,y,size,n,patch);if(px%9<1.0)f*=.89;
+  }else if(m===21){ // Quartz crystals: pale branching veins.
+   f=.87+.14*patch;if(Math.abs(py*.72-px*.40-10)<2.2)f*=1.12;
   }else if(m===13){ // Crafting table: a pixelated nine-cell tool-marked tabletop.
    const cellX=Math.floor(px/10.67),cellY=Math.floor(py/10.67);
    const groove=px%10.67<1.0||py%10.67<1.0;
