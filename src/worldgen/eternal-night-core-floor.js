@@ -19,6 +19,8 @@ export const CORE_FLOOR_DEFAULTS = Object.freeze({
   slabThickness: 8,
   districtLuxuryMax: 0.94,
   luxuryNoiseAmplitude: 0.035,
+  luxuryNoiseDensity: 0.5,
+  luxuryNoiseConcentration: 0.5,
   ratios: Object.freeze({
     centerRadius: 0.225,
     mainShaftRadius: 0.055,
@@ -53,6 +55,8 @@ export function createFloorLayout({
   seed = 0,
   districtLuxuryMax = CORE_FLOOR_DEFAULTS.districtLuxuryMax,
   luxuryNoiseAmplitude = CORE_FLOOR_DEFAULTS.luxuryNoiseAmplitude,
+  luxuryNoiseDensity = CORE_FLOOR_DEFAULTS.luxuryNoiseDensity,
+  luxuryNoiseConcentration = CORE_FLOOR_DEFAULTS.luxuryNoiseConcentration,
   ratios = {},
 } = {}) {
   const halfWidth = width / 2;
@@ -66,6 +70,11 @@ export function createFloorLayout({
   if (!(districtLuxuryMax > 0 && districtLuxuryMax < 1)
     || !(luxuryNoiseAmplitude >= 0 && luxuryNoiseAmplitude <= districtLuxuryMax)) {
     throw new RangeError('Invalid district luxury range');
+  }
+
+  if (!(luxuryNoiseDensity >= 0 && luxuryNoiseDensity <= 1)
+    || !(luxuryNoiseConcentration >= 0 && luxuryNoiseConcentration <= 1)) {
+    throw new RangeError('Noise density and concentration must be between 0 and 1');
   }
 
   const dimensions = {};
@@ -90,7 +99,7 @@ export function createFloorLayout({
   return Object.freeze({
     ...dimensions,
     width, halfWidth, centerX, centerZ, floorY, floorTop, floorHeight, slabThickness, slabBottom,
-    seed, noiseSeed, districtLuxuryMax, luxuryNoiseAmplitude,
+    seed, noiseSeed, districtLuxuryMax, luxuryNoiseAmplitude, luxuryNoiseDensity, luxuryNoiseConcentration,
     diagonalLimit: Math.SQRT2 * halfWidth,
     innerHalfWidth,
     innerDiagonalLimit: Math.SQRT2 * innerHalfWidth,
@@ -149,6 +158,7 @@ function gridValue(x, z, seed) {
 }
 
 const NOISE_RESOLUTION = 192;
+const BRANCH_ATTACHMENTS = [0.25, 0.47, 0.69, 0.36, 0.58, 0.80];
 const branchFields = new WeakMap();
 
 function curvePoint(start, bend, end, t) {
@@ -159,12 +169,13 @@ function curvePoint(start, bend, end, t) {
     a * start[1] + b * bend[1] + c * end[1]];
 }
 
-function stampCurve(field, start, bend, end, radius, strength) {
+function stampCurve(field, start, bend, end, radius, strength, growth, concentrationPower) {
   const scale = (NOISE_RESOLUTION - 1) / 2;
   const steps = 10;
   let [x, z] = start.map(value => (value + 1) * scale);
-  for (let step = 1; step <= steps; step++) {
-    const [nextX, nextZ] = curvePoint(start, bend, end, step / steps).map(value => (value + 1) * scale);
+  for (let step = 1; (step - 1) / steps < growth; step++) {
+    const progress = Math.min(growth, step / steps);
+    const [nextX, nextZ] = curvePoint(start, bend, end, progress).map(value => (value + 1) * scale);
     const dx = nextX - x;
     const dz = nextZ - z;
     const lengthSq = dx * dx + dz * dz;
@@ -179,7 +190,7 @@ function stampCurve(field, start, bend, end, radius, strength) {
         const distanceSq = (col - x - along * dx) ** 2 + (row - z - along * dz) ** 2;
         const falloff = Math.max(0, 1 - distanceSq / (brush * brush));
         const index = row * NOISE_RESOLUTION + col;
-        field[index] = Math.max(field[index], strength * falloff * falloff);
+        field[index] = Math.max(field[index], strength * falloff ** concentrationPower);
       }
     }
     x = nextX;
@@ -188,12 +199,14 @@ function stampCurve(field, start, bend, end, radius, strength) {
 }
 
 function getBranchField(layout) {
-  if (layout.luxuryNoiseAmplitude === 0) return null;
+  if (layout.luxuryNoiseAmplitude === 0 || layout.luxuryNoiseDensity === 0) return null;
   let field = branchFields.get(layout);
   if (field) return field;
 
   field = new Float32Array(NOISE_RESOLUTION ** 2);
   const spread = Math.max(0.45, Math.min(1.55, layout.noiseCellSize / (layout.halfWidth * 0.12)));
+  const density = layout.luxuryNoiseDensity;
+  const concentrationPower = 1 + 2 * layout.luxuryNoiseConcentration;
   for (let district = 0; district < 4; district++) {
     const random = salt => gridValue(district, salt, layout.noiseSeed);
     const x = (district === 0 || district === 3 ? 1 : -1) * (0.38 + 0.08 * random(0));
@@ -209,16 +222,25 @@ function getBranchField(layout) {
     const start = offset(center, -0.26, 0.06 * random(3));
     const end = offset(center, 0.28, 0.10 * random(4));
     const bend = offset(center, 0, (random(5) < 0 ? -1 : 1) * (0.12 + 0.06 * random(6)));
-    stampCurve(field, start, bend, end, 0.047, 1);
+    // Grow the trunk first, then the same seeded branches in order as density rises.
+    const defaultBranchCount = random(7) > 0.30 ? 3 : 2;
+    const growth = density <= 0.5
+      ? density * 2 * (1 + defaultBranchCount)
+      : 1 + defaultBranchCount + (density * 2 - 1) * (BRANCH_ATTACHMENTS.length - defaultBranchCount);
+    const trunkGrowth = Math.min(1, growth);
+    stampCurve(field, start, bend, end, 0.047, trunkGrowth, trunkGrowth, concentrationPower);
 
-    const branchCount = random(7) > 0.30 ? 3 : 2;
     const firstSide = random(8) < 0 ? -1 : 1;
-    for (let branch = 0; branch < branchCount; branch++) {
-      const root = curvePoint(start, bend, end, 0.25 + 0.22 * branch + 0.07 * random(9 + branch));
-      const side = branch === 1 ? -firstSide : firstSide;
-      const tip = offset(root, 0.09 + 0.12 * random(12 + branch), side * (0.16 + 0.07 * random(15 + branch)));
-      const turn = offset(root, 0.02 + 0.08 * random(18 + branch), side * 0.05);
-      stampCurve(field, root, turn, tip, branch === 2 ? 0.023 : 0.031, branch === 2 ? 0.52 : 0.74);
+    for (let branch = 0; branch < growth - 1; branch++) {
+      const branchGrowth = Math.min(1, growth - 1 - branch);
+      const salt = branch < 3 ? branch : branch + 24;
+      const root = curvePoint(start, bend, end, BRANCH_ATTACHMENTS[branch] + 0.07 * random(9 + salt));
+      const side = branch % 2 === 0 ? firstSide : -firstSide;
+      const tip = offset(root, 0.09 + 0.12 * random(12 + salt), side * (0.16 + 0.07 * random(15 + salt)));
+      const turn = offset(root, 0.02 + 0.08 * random(18 + salt), side * 0.05);
+      const radius = branch >= 2 ? 0.023 : 0.031;
+      const strength = branch >= 2 ? 0.52 : 0.74;
+      stampCurve(field, root, turn, tip, radius, strength, branchGrowth, concentrationPower);
     }
   }
   branchFields.set(layout, field);
