@@ -1,5 +1,6 @@
-import {block,BLOCK as B} from './blocks.js?v=0.9.0';import {clamp} from '../util/math.js';
-export const GRAVITY=24;
+import {block,BLOCK as B} from './blocks.js?v=1.0.0';import {clamp} from '../util/math.js';
+import {toVoxels} from './scale.js';
+export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
 function climbStep(world,e,width,height){
@@ -10,7 +11,7 @@ function climbStep(world,e,width,height){
 }
 export function collides(world,x,y,z,width=0.6,height=1.8){const e=1e-5;for(let bx=Math.floor(x-width/2+e);bx<=Math.floor(x+width/2-e);bx++)for(let by=Math.floor(y+e);by<=Math.floor(y+height-e);by++)for(let bz=Math.floor(z-width/2+e);bz<=Math.floor(z+width/2-e);bz++)if(block(world.get(bx,by,bz)).solid)return true;return false}
 export function inWater(world,e){return world.get(e.x,e.y+.5,e.z)===B.WATER}
-export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);const wasGrounded=e.grounded;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?6:GRAVITY)*dt,-35,25);else e.vy=0;
+export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);const wasGrounded=e.grounded;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?toVoxels(6):GRAVITY)*dt,-35,25);else e.vy=0;
  const sub=Math.max(1,Math.ceil(Math.hypot(e.vx,e.vy,e.vz)*dt/.18));const step=dt/sub;e.grounded=false;
  for(let n=0;n<sub;n++){
   for(const [axis,vel] of [['x','vx'],['z','vz']]){const old=e[axis];e[axis]+=e[vel]*step;if(collides(world,e.x,e.y,e.z,w,h)){// Step up a low obstacle when walking.

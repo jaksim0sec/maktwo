@@ -14,7 +14,7 @@ function emit(target,type,props={}){
  return e;
 }
 
-test('primary mouse is use, secondary mouse is sustained mining, R is unused, UI suppresses actions',()=>{
+test('mouse tap installs; held mouse mines; UI clears pointer states',()=>{
  const oldDoc=globalThis.document,oldWin=globalThis.window;
  const doc=new EventTarget(),win=new EventTarget(),canvas=new EventTarget();
  Object.assign(doc,{pointerLockElement:null});
@@ -22,25 +22,20 @@ test('primary mouse is use, secondary mouse is sustained mining, R is unused, UI
  globalThis.document=doc;globalThis.window=win;
  try{
   const input=new Input(canvas);
-  emit(doc,'keydown',{code:'KeyR'});
-  assert.equal(input.read().place,false);
-  emit(doc,'keydown',{code:'KeyW'});
-  assert.equal(input.read().forward,true);
-  input.setUiMode(true);
-  assert.equal(input.read().place,false);
+  emit(doc,'keydown',{code:'KeyR'});assert.equal(input.read().place,false);
+  emit(doc,'keydown',{code:'KeyW'});assert.equal(input.read().forward,true);
+  input.setUiMode(true);assert.equal(input.read().forward,false);
+  emit(doc,'keydown',{code:'KeyW'});input.setUiMode(false);
   assert.equal(input.read().forward,false);
-  emit(doc,'keydown',{code:'KeyW'});
-  input.setUiMode(false);
-  assert.equal(input.read().forward,false,'closing the menu must not preserve a stuck movement key');
-  emit(canvas,'mousedown',{button:2});
-  assert.equal(input.locked,true);
-  emit(canvas,'mousedown',{button:2});
-  assert.equal(input.read().mine,true);
-  emit(canvas,'mousedown',{button:0});
-  assert.equal(input.read().use,true);
-  doc.pointerLockElement=null;emit(doc,'pointerlockchange');
-  assert.equal(input.read().mine,false,'unlocked pointer must release mining state');
-  assert.equal(input.read().use,false,'unlocked pointer must release placement state');
+  emit(canvas,'mousedown',{button:0});assert.equal(input.locked,true);
+  emit(canvas,'mousedown',{button:0});assert.equal(input.read().mine,false);
+  input.pointer.start=performance.now()-500;assert.equal(input.read().mine,true);
+  emit(doc,'mouseup',{button:0});assert.equal(input.read().use,false,'hold never installs');
+  emit(canvas,'mousedown',{button:0});emit(doc,'mouseup',{button:0});
+  assert.equal(input.read().use,true,'short click issues exactly one place');
+  assert.equal(input.read().use,false);
+  emit(canvas,'mousedown',{button:0});input.setUiMode(true);
+  assert.equal(input.read().mine,false);
  }finally{globalThis.document=oldDoc;globalThis.window=oldWin}
 });
 
@@ -71,7 +66,7 @@ test('UI documents explain placement and expose a one-click resume path',()=>{
  const controller=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
  assert.match(page,/id="resume"/);
  assert.match(page,/id="control-hint"/);
- assert.match(page,/아이템 장착 후 좌클릭/);
+ assert.match(page,/아이템 선택 후 짧게 클릭 또는 탭/);
  assert.match(controller,/e\.code==='KeyE'/);
  assert.match(controller,/this\.requestGameFocus\(\)/);
 });

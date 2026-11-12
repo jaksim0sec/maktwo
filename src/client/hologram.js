@@ -1,3 +1,4 @@
+import {BLOCK_SIZE} from '../core/scale.js';
 // A collection of small, world-anchored surfaces, not a screen-space modal.
 // The scene's depth buffer occludes each tile just like any other world object.
 const VS=`#version 300 es
@@ -7,7 +8,7 @@ layout(location=1) in vec2 aUV;
 layout(location=2) in float aCard;
 uniform mat4 uVP;
 out vec2 vUV;flat out int vCard;
-void main(){vUV=aUV;vCard=int(aCard+.5);gl_Position=uVP*vec4(aPosition,1.);}`;
+void main(){vUV=aUV;vCard=int(aCard+.5);gl_Position=uVP*vec4(aPosition*${BLOCK_SIZE.toFixed(2)},1.);}`;
 const FS=`#version 300 es
 precision highp float;
 in vec2 vUV;flat in int vCard;
@@ -27,25 +28,29 @@ const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
-function cardGeometry(palette,items){
+function cardGeometry(palette,items,compact=false){
  const cards=[
   {id:'tab:blocks',name:'건축',x:-.76,y:.53,w:.43,h:.22,depth:-.02},
   {id:'tab:lights',name:'조명',x:-.27,y:.53,w:.43,h:.22,depth:-.035},
   {id:'hand',name:'맨손',x:.27,y:.53,w:.43,h:.22,depth:-.035},
   {id:'close',name:'닫기',x:.76,y:.53,w:.43,h:.22,depth:-.02},
  ];
+ if(compact){
+  cards.forEach((card,i)=>{card.x=[-.56,-.18,.18,.56][i];card.w=.33});
+ }
  for(let i=0;i<items.length;i++){
-  const col=i%5,row=Math.floor(i/5),x=(col-2)*.44,y=.12-row*.43;
-  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,x,y,w:.385,h:.36,depth:-.06+Math.abs(x)*.065});
+  const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
+  const x=compact?(col-1)*.42:(col-2)*.44,y=.12-row*.43;
+  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,x,y,w:compact?.375:.385,h:.36,depth:-.06+Math.abs(x)*.065});
  }
  return cards;
 }
 export {cardGeometry};
-export function createAnchor(player){
+export function createAnchor(player,compact=false){
  const yaw=player.yaw,pitch=player.pitch,cp=Math.cos(pitch),sp=Math.sin(pitch);
  const forward=[-Math.sin(yaw)*cp,sp,-Math.cos(yaw)*cp],right=[Math.cos(yaw),0,-Math.sin(yaw)],up=[Math.sin(yaw)*sp,cp,Math.cos(yaw)*sp];
  const eye=[player.x,player.y+player.eye+(player.visualStepOffset||0),player.z];
- const center=add(add(add(eye,forward,2.65),right,.42),up,-.24);
+ const center=add(add(add(eye,forward,2.65),right,compact?0:.42),up,-.24);
  return{center,forward,right,up};
 }
 export function spatialHit(anchor,cards,camera,ray){
@@ -72,16 +77,16 @@ function pointerRay(player,nx,ny,aspect){
 }
 function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(`Spatial inventory shader: ${gl.getShaderInfoLog(shader)}`);return shader}
 export class Hologram{
- constructor(gl){this.gl=gl;this.opened=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.dirty=true;
+ constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,15*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
- open(player){this.opened=true;this.anchor=createAnchor(player);this.hover=null;this.pointer=null;this.buildGeometry()}
+ open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
  close(){this.opened=false;this.pointer=null;this.hover=null}
- setInventory(palette,items,selected){this.palette=palette;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items);this.dirty=true;this.buildGeometry()}
+ setInventory(palette,items,selected){this.palette=palette;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact);this.dirty=true;this.buildGeometry()}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
    const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;

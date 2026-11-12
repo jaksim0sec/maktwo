@@ -1,4 +1,5 @@
-import {WorldManager} from '../core/world.js?v=0.9.0';import {Player,EntityManager} from '../entities/entities.js?v=0.9.0';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js?v=0.9.0';import {block,BLOCK as B,HOTBAR,LIGHTBAR} from '../core/blocks.js?v=0.9.0';import {Renderer} from './renderer.js?v=0.9.0';import {applyCameraLook} from './camera.js?v=0.9.0';import {Hologram} from './hologram.js?v=0.9.0';import {Input} from './input.js?v=0.9.0';import {clamp} from '../util/math.js';import {explode} from '../core/systems.js';import {MiningProgress} from '../core/mining.js?v=0.9.0';
+import {WorldManager} from '../core/world.js?v=1.0.0';import {Player,EntityManager} from '../entities/entities.js?v=1.0.0';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js?v=1.0.0';import {block,BLOCK as B,HOTBAR,LIGHTBAR} from '../core/blocks.js?v=1.0.0';import {Renderer} from './renderer.js?v=1.0.0';import {applyCameraLook} from './camera.js?v=1.0.0';import {Hologram} from './hologram.js?v=1.0.0';import {Input} from './input.js?v=1.0.0';import {clamp} from '../util/math.js';import {explode} from '../core/systems.js';import {MiningProgress} from '../core/mining.js?v=1.0.0';
+import {registerPWA} from './pwa.js';
 const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
@@ -63,8 +64,8 @@ class Game{
   el.classList.toggle('ui-active',this.uiOpen);
   el.textContent=this.panel==='inventory'?'월드에 뜬 카드를 조준하고 클릭 · E 닫기 · Q 맨손':
    this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 돌아가기로 복귀':
-   this.selected<0?'맨손 · 좌클릭 누르고 채굴 · 1~0 장착 · E 공간 가방':
-   '장착 중 · 좌클릭 설치 · 우클릭 누르고 채굴 · Q 맨손 · E 공간 가방';
+   this.selected<0?'누르고 채굴 · 1~0 장착 · E 공간 가방':
+   '클릭 설치 · 길게 누르기 채굴 · Q 맨손 · E 가방';
  }
  showMining(ratio){const el=$('mine-progress');if(!el)return;el.style.setProperty('--progress',`${Math.round(ratio*100)}%`);el.classList.toggle('active',ratio>0)}
 
@@ -151,13 +152,13 @@ class Game{
  interaction(dt,input){
   this.interactTimer=Math.max(0,this.interactTimer-dt);
   const p=this.player,d=p.direction(),origin={x:p.x,y:p.y+p.eye,z:p.z};
-  const miningMode=input.mine||(this.selected<0&&input.use);
-  this.target=raycast(this.world,origin,d,6,{hitWater:miningMode,hitDecor:miningMode});
-  const placing=(this.selected>=0&&input.use)||input.place;
+  const miningMode=input.mine;
+  this.target=raycast(this.world,origin,d,7.5,{hitWater:miningMode,hitDecor:miningMode});
+  const placing=(this.selected>=0&&input.use);
   if(!placing)this.placeLatch=false;
   if(placing&&this.selected>=0){
    this.mining.reset();this.showMining(0);
-   if(this.placeLatch||this.interactTimer>0||!this.target)return;
+   if(this.interactTimer>0||!this.target)return;
    this.placeLatch=true;
    const t=this.target,x=t.x+t.normal.x,y=t.y+t.normal.y,z=t.z+t.normal.z;
    const id=this.paletteItems[this.selected],old=this.world.get(x,y,z);
@@ -180,7 +181,8 @@ class Game{
  }
 
  tick(dt){this.portalCooldown=Math.max(0,this.portalCooldown-dt);const p=this.player,input=this.input.read();p.update(this.world,dt,input);if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){const names=[...this.manager.worlds.keys()];this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;}this.world.tick();this.entities.tick(dt,p);this.effects.tick(dt);this.interaction(dt,input);if(p.dead){p.hp=20;p.dead=false;Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0,visualStepOffset:0});this.status('Respawned')}}
- frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.panel==='inventory')this.hologram.aim(this.player);this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,3,2);this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}requestAnimationFrame(t=>this.frame(t))}
- hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${this.world.name} · ${this.world.mode.toUpperCase()}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} loaded / ${this.renderer.lastDrawnChunks} drawn · ${this.entities.entities.length} mobs`;$('target').textContent=this.target?`조준: ${block(this.target.id).name} · ${this.selected<0?'누르고 채굴':'좌클릭 설치'}`:this.selected<0?'맨손 · 채굴':'블록을 조준해 설치';$('health').textContent='♥'.repeat(Math.ceil(p.hp/2))+'♡'.repeat(10-Math.ceil(p.hp/2));$('flight').textContent=p.fly?'FLYING':'SURVIVAL PHYSICS'}
+ frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.panel==='inventory')this.hologram.aim(this.player);this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}requestAnimationFrame(t=>this.frame(t))}
+ hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${this.world.name} · ${this.world.mode.toUpperCase()}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} loaded / ${this.renderer.lastDrawnChunks} drawn · ${this.entities.entities.length} mobs`;$('target').textContent=this.target?`조준: ${block(this.target.id).name} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 채굴':'블록을 조준해 설치';$('health').textContent='♥'.repeat(Math.ceil(p.hp/2))+'♡'.repeat(10-Math.ceil(p.hp/2));$('flight').textContent=p.fly?'FLYING':'SURVIVAL PHYSICS'}
 }
 try{new Game()}catch(err){console.error(err);$('fatal').textContent='Cannot start: '+err.message;$('fatal').hidden=false}
+registerPWA();

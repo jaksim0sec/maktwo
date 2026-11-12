@@ -5,6 +5,7 @@ import {BLOCK as B} from '../src/core/blocks.js';
 import {Player} from '../src/entities/entities.js';
 import {moveBody,raycast,AUTO_STEP_HEIGHT,collides} from '../src/core/physics.js';
 import {Chunk} from '../src/core/chunk.js';
+import {BLOCK_SIZE,toMeters} from '../src/core/scale.js';
 import {generateChunk} from '../src/worldgen/generators.js';
 
 function walkToBarrier(height,ceiling=false){
@@ -15,10 +16,11 @@ function walkToBarrier(height,ceiling=false){
  for(let i=0;i<20;i++){p.vz=-4;p.vx=0;moveBody(world,p,1/60)}
  return {p,world};
 }
-test('player is slightly taller relative to unchanged unit blocks',()=>{
+test('world voxel is physically 0.8m while player keeps human proportions and saved chunk layout',()=>{
  const p=new Player(0,25,0);
- assert.ok(p.height>1.8&&p.height<2);
- assert.ok(p.eye>1.62&&p.eye<p.height);
+ assert.equal(BLOCK_SIZE,.8);
+ assert.ok(Math.abs(toMeters(p.height)-1.9)<1e-8);
+ assert.ok(Math.abs(toMeters(p.eye)-1.7)<1e-8&&p.eye<p.height);
  assert.equal(new Chunk(0,0).data.length,16*16*64);
 });
 test('auto step climbs exactly one full block without jumping',()=>{

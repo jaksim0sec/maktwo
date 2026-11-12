@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "MakTwo · Endless Night",
+  "short_name": "MakTwo",
+  "description": "빛을 조금씩 넓히며 가꾸는 끝나지 않는 밤의 복셀 정원",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#161c1e",
+  "theme_color": "#202529",
+  "orientation": "any",
+  "icons": [
+    {"src":"./icons/maktwo-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./icons/maktwo-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

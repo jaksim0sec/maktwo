@@ -1,4 +1,4 @@
-# MakTwo · Endless Night v0.9.0
+# MakTwo · Endless Night v1.0.0
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -15,36 +15,41 @@ Node 18+ is enough. WebGL2 must be available in the browser. Do **not** open `in
 npm test
 ```
 
-## Controls
+## Current controls (v1.0)
 
 | Input | Action |
 |---|---|
-| W A S D | Walk |
-| Mouse / touch swipe | Look |
-| Space | Jump |
-| Shift | Crouch / descend while flying |
-| Ctrl | Sprint |
-| Left click with empty hand | **Hold** to mine (block-dependent break times); attack nearby mob |
-| Left click with an equipped block | Place **one** block per press |
-| Right click | Hold to mine even while equipped |
-| Q / tap the same hotbar slot | Unequip, return to empty hands |
-| 1..0 or scroll | Select from the current hotbar |
-| L or the light button | Switch between the original building hotbar and three light fixtures |
-| Light palette 1 / 2 / 3 | Torch / Lantern / Campfire |
-| F | Toggle flight |
-| G | Spawn a sheep |
-| Shift+G | Spawn a zombie for debugging |
-| B | Make a small block explosion at target |
-| P | Save edited blocks |
-| E or I | Open separate **world-anchored 3D inventory tiles**. Keep looking with the mouse and aim at a tile to select; E closes it. World geometry can occlude tiles |
-| M | Open/close HTML settings (separate from the in-world hologram) |
-| Settings → 주변 물 정리 | Clear only player-edited water within 24 blocks and save automatically |
-| H | Open/close help |
-| Escape | Browser releases pointer lock; E toggles the in-world bag |
+| PC WASD / Space / Shift | Move / jump / crouch |
+| PC mouse | Look (click once to capture the mouse) |
+| PC **short left click** | Place one block if an item is equipped |
+| PC **hold left click (420ms+)** | Begin mining; hold until the selected block's break time is reached |
+| Phone **drag left half** | Analog movement, based on displacement from touch start (no joystick overlay) |
+| Phone **drag right half** | Look around; two simultaneous fingers supported |
+| Phone **tap** | Place if an item is equipped; tapping the hotbar chooses an item |
+| Phone **hold right half (420ms+)** | Mine a targeted block until completed; moving to look cancels the hold |
+| Phone Jump / Descend buttons | Jump or fly downward |
+| 1..0 / bottom hotbar / wheel | Select block; tap same slot again or Q to unequip |
+| E / I / Bag | Open world-anchored holographic building bag (portrait-responsive) |
+| L | Switch between building blocks and lights |
+| M / Settings icon | Open HTML settings, switch world, save and recover water |
+| F / P | Toggle flight / save the current world |
 
-Touch users: left side drag to walk, right side drag to look; the buttons offer jumping, placing and breaking blocks.
+## Offline & installation
 
-## v0.6.0: Step-up and water recovery
+- GitHub Pages supports installable PWA mode: open the game once while online, then install from the browser menu (Android: *Install app*; iOS Safari: *Add to Home Screen*).
+- Service Worker caches the complete static app shell, workers, WebGL shaders and icons for the selected scope. Subsequent launches and gameplay can work without network **after the first successful cache install**. No cloud synchronization exists.
+- Saves remain in `localStorage`, same keys and chunk coordinates as before. Browser storage cleanup or uninstalling app/browser data may remove saves. Back up important worlds before clearing site data.
+- Gameplay still requires a browser with WebGL2. Desktop and mobile rendering require device checks; Node tests do not measure FPS or guarantee browser GPU compatibility.
+
+## Physical scale and performance
+
+- One voxel side is physically **0.8 m**, including the WebGL world/hologram projection. The logical grid, chunk IDs, generated terrain and saved edits remain **integer voxel coordinates**. The player's physical height remains ~1.9 m and eye height ~1.7 m; creature render meshes remain meter-sized.
+- Streaming loads 37 chunks in a rounded 3-chunk ring instead of 49 square-ring chunks, with a smaller 56-chunk residency target. No change to the existing 16×16×64 storage size or generation algorithm.
+- PC/multitouch gestures are handled as discrete taps versus holds, with cancellation after drag, visibility change and opening the UI.
+
+## Historical version notes (superseded controls are not current)
+
+### v0.6.0: Step-up and water recovery
 
 - The voxel grid and existing saves are **unchanged**. Player collision height is 1.90 vs 1.80 previously; eye height 1.70 vs 1.62, so blocks look roughly 5% smaller relative to the player.
 - Grounded entities can automatically climb obstacles up to one full block using a 0.125-step collision clearance sweep. Two-block walls and low ceilings still block passage.
@@ -114,7 +119,7 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 
 **Known limitation:** Runtime FPS and light appearance must be checked on a browser with working WebGL2; Node tests validate core behavior and mesh output only.
 
-## Usability and night contrast v0.4
+### Usability and night contrast v0.4
 
 - Ambient sky and ground lighting are deliberately dimmer. Warm torch, lantern and campfire light gives a visible, cozy pool of light that can be extended gradually by building.
 - **How to build:** look at an existing block, select a new block with 1–0 or mouse wheel, then right-click (or press **R**) to place it adjacent to the targeted face. Left-click breaks the targeted block.
@@ -123,14 +128,14 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - All three light fixture meshes are generated, not only torches. Nearby light lookup searches only relevant chunk indices so more distant light placements do not raise frame-wide scan costs.
 - This artistic lighting is still non-occluding: walls do not cast shadows. Visual appearance and FPS on real hardware require browser testing.
 
-## Spatial inventory & softer night atmosphere v0.5.1
+### Spatial inventory & softer night atmosphere v0.5.1
 
 - The creative building bag is an in-game CSS 3D layer over the live world, opened by **E / I** or the bottom-left **Bag** button. It uses no extra WebGL scene and blocks movement/placement while open. Clicking an item selects it and returns to gameplay in one step. **M** opens the settings separately.
 - Warm fixtures now have a **larger, softer radius** and less intense orange centers, using a smooth distance-squared attenuation that does not introduce per-pixel square roots.
 - Night is **not pitch black**: moderate dim ambient light preserves terrain silhouettes. A lightweight sky gradient moves with the camera pitch, transitioning from charcoal overhead to a muted horizon instead of a flat navy fill.
 - This is artistic lighting, not occlusion or shadow casting. Rendering and pointer-lock behavior still need visual verification in a real browser; Node tests do not measure FPS or prove GPU shader compilation.
 
-## v0.7: No wall-penetrating light / a truly in-game holographic bag
+### v0.7: No wall-penetrating light / a truly in-game holographic bag
 
 - Light is propagated through **reachable air cells** in a local 80×64×80 voxel volume. Opaque walls stop it; doorways let it through, and corners naturally receive weaker reflected-looking light. Light is never calculated by sampling the wall voxel itself.
 - The grid is recomputed when the view moves into a new chunk, nearby blocks change or chunks load/unload. It is computed in a **dedicated Web Worker** and uploaded as a single WebGL2 3D texture; the fragment shader uses **one texture lookup**, instead of evaluating 8 lights per pixel. CPU synchronous fallback is available if Worker construction fails.
@@ -139,7 +144,7 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - Settings and help remain accessible HTML overlays on **M / H**. Existing saved blocks, generation, mesh worker and physics behavior are unchanged.
 - Tests include opaque-wall light blocking, doorway propagation, overlapping lamp compression, volume snapshots, and hologram hit tests. **Actual browser WebGL rendering remains unverified in the automated environment** and should be checked on-device.
 
-## v0.9.0: World-anchored inventory and hold-to-break
+### v0.9.0: World-anchored inventory and hold-to-break
 
 - Replaces the large camera-facing menu surface with small, separated cards in the **actual world coordinates**, anchored when opened. The regular camera turns during selection, and **scene depth testing** allows opaque terrain to occlude the tiles. Individual cards use one shared small atlas and one batched draw call. This is not a fullscreen HTML/CSS modal, though the settings and help overlays remain ordinary HTML.
 - Clicking with a selected item now **places one block per mouse press**. Press Q, select the same item again, or choose **맨손** in the spatial bag to unequip; empty-hand left-click then **mines while held**. Right-click can mine while an item is equipped. R no longer places blocks.
