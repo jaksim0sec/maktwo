@@ -1,0 +1,1 @@
+export class EventBus{#listeners=new Map();on(name,fn){let s=this.#listeners.get(name);if(!s)this.#listeners.set(name,s=new Set());s.add(fn);return()=>s.delete(fn)}emit(name,payload){for(const fn of this.#listeners.get(name)||[])fn(payload)}}

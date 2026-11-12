@@ -1,0 +1,13 @@
+export class Input{
+ constructor(canvas){this.canvas=canvas;this.keys=new Set();this.held={};this.mouse={left:false,right:false};this.locked=false;this.dx=0;this.dy=0;this.touchLook=null;this.touchMove=null;
+  document.addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'].includes(e.code))e.preventDefault();this.keys.add(e.code)});
+  document.addEventListener('keyup',e=>this.keys.delete(e.code));window.addEventListener('blur',()=>{this.keys.clear();this.mouse.left=false;this.mouse.right=false});document.addEventListener('pointerlockchange',()=>this.locked=document.pointerLockElement===canvas);
+  document.addEventListener('mousemove',e=>{if(this.locked){this.dx+=e.movementX;this.dy+=e.movementY}});
+  canvas.addEventListener('mousedown',e=>{if(!this.locked){canvas.requestPointerLock?.();return}if(e.button===0)this.mouse.left=true;if(e.button===2)this.mouse.right=true});document.addEventListener('mouseup',e=>{if(e.button===0)this.mouse.left=false;if(e.button===2)this.mouse.right=false});canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  canvas.addEventListener('touchstart',e=>{for(const t of e.changedTouches){if(t.clientX<innerWidth*.4&&this.touchMove===null)this.touchMove={id:t.identifier,x:t.clientX,y:t.clientY,dx:0,dy:0};else if(this.touchLook===null)this.touchLook={id:t.identifier,x:t.clientX,y:t.clientY}}},{passive:false});
+  canvas.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches){if(this.touchLook?.id===t.identifier){this.dx+=(t.clientX-this.touchLook.x)*2;this.dy+=(t.clientY-this.touchLook.y)*2;this.touchLook.x=t.clientX;this.touchLook.y=t.clientY}if(this.touchMove?.id===t.identifier){this.touchMove.dx=Math.max(-1,Math.min(1,(t.clientX-this.touchMove.x)/60));this.touchMove.dy=Math.max(-1,Math.min(1,(t.clientY-this.touchMove.y)/60))}}},{passive:false});
+  canvas.addEventListener('touchend',e=>{for(const t of e.changedTouches){if(this.touchMove?.id===t.identifier)this.touchMove=null;if(this.touchLook?.id===t.identifier)this.touchLook=null}});
+ }
+ read(){const k=this.keys,m=this.touchMove;return{forward:k.has('KeyW')||k.has('ArrowUp')||((m?.dy||0)<-.25),backward:k.has('KeyS')||k.has('ArrowDown')||((m?.dy||0)>.25),left:k.has('KeyA')||k.has('ArrowLeft')||((m?.dx||0)<-.25),right:k.has('KeyD')||k.has('ArrowRight')||((m?.dx||0)>.25),jump:k.has('Space')||this.held.jump,crouch:k.has('ShiftLeft')||this.held.crouch,sprint:k.has('ControlLeft')||k.has('ControlRight'),mine:this.mouse.left||this.held.mine,place:this.mouse.right||this.held.place}}
+ consumeLook(){const result=[this.dx,this.dy];this.dx=0;this.dy=0;return result}
+}
