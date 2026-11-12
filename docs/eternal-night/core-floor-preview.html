@@ -49,6 +49,8 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
 <label><span>가로폭 <output id="width-value">1024</output></span><input id="width" type="range" min="512" max="4096" step="64" value="1024"></label>
 <label><span>층고 <output id="height-value">540</output></span><input id="height" type="range" min="180" max="900" step="6" value="540"></label>
+<label title="배치에 사용할 섹션 면적 비율. 간격이나 경계에 따라 실제 밀도는 더 낮아질 수 있어요."><span>건물 밀도 <output id="density-value"></output></span><input id="density" type="range" min="0" max="100" step="1"></label>
+<label title="건물 외곽 사이에 비워 둘 최소 칸 수"><span>건물 간격 <output id="spacing-value"></output></span><input id="spacing" type="range" min="0" max="4" step="1"></label>
 <div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
 <div id="error" role="status"></div>
@@ -59,7 +61,7 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <script type="module">
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, verticalSpansAt, zoneAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
-import { BUILDING_TYPES, createDistrictPlan, districtColumn, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
+import { BUILDING_TYPES, DISTRICT_BUILD_DEFAULTS, createDistrictPlan, districtColumn, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
 
 const noiseOptions = [
   ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "물길의 폭과 분포 면적"],
@@ -119,6 +121,13 @@ for (const [key, label] of Object.entries(ratioLabels)) {
 const get = id => document.getElementById(id);
 const canvas = get("map"), section = get("section"), side = get("side-section"), profile = get("profile");
 const scanHeight = get("height-scan"), mode = get("view-mode");
+const densityInput = get("density"), spacingInput = get("spacing");
+densityInput.value = 100 * DISTRICT_BUILD_DEFAULTS.density;
+spacingInput.value = DISTRICT_BUILD_DEFAULTS.spacing;
+function updateBuildingControls() {
+  get("density-value").textContent = `${densityInput.value}%`;
+  get("spacing-value").textContent = `${spacingInput.value}칸`;
+}
 const contexts = new Map([canvas, section, side, profile].map(c=>[c,c.getContext("2d",{alpha:false})]));
 const zoneColors = ["#111419","#51606a","#d05e6e","#1f8ba9","#5589ca","#72579c","#283a3e","#4c5a66"];
 const zoneNames = ["허공","공용 구조","중앙 통로","공중정원","미니 통로","주 동선","대단지","중앙부"];
@@ -147,7 +156,10 @@ function regenerate() {
       width:Number(get("width").value), floorHeight:Number(get("height").value), seed:Number(get("seed").value),
       ...Object.fromEntries(Object.entries(noiseInputs).map(([key,input])=>[key,input.valueAsNumber])), ratios,
     });
-    const city = createDistrictPlan(next);
+    const city = createDistrictPlan(next, undefined, {
+      density:densityInput.valueAsNumber / 100,
+      spacing:spacingInput.valueAsNumber,
+    });
     if (layout && x !== null) {
       x = next.centerX + (x-layout.centerX)*next.width/layout.width;
       z = next.centerZ + (z-layout.centerZ)*next.width/layout.width;
@@ -336,8 +348,10 @@ function queue() {
 document.querySelectorAll("aside input").forEach(input=>input.addEventListener("input",()=>{
   const output = get(input.id+"-value");
   if (output) output.textContent=input.value;
+  updateBuildingControls();
   queue();
 }));
+updateBuildingControls();
 queue();
 </script>
 </body>
