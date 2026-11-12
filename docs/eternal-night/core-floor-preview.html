@@ -40,6 +40,7 @@ input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
 <label><span>시드 <output id="seed-value">42</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="42"></label>
 <label><span>가로폭 <output id="width-value">1024</output></span><input id="width" type="range" min="512" max="4096" step="64" value="1024"></label>
 <label><span>층고 <output id="height-value">540</output></span><input id="height" type="range" min="180" max="900" step="6" value="540"></label>
+<div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
 <div id="error" role="status"></div>
 <small>가로폭과 층고는 시험용 기본값입니다. 지형 색은 생성기의 구역 ID와 호화도에 대응합니다.</small>
@@ -49,11 +50,38 @@ input[type=range]{width:100%;margin:0;height:16px;accent-color:#a35ad6}
 <script type="module">
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, sampleFloorRect, verticalSpansAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
+const noiseOptions = [
+  ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "줄기 길이와 가지 수"],
+  ["luxuryNoiseConcentration", "노이즈 집중도", 1, 0.01, "높을수록 선 중심에 집중"],
+  ["luxuryNoiseAmplitude", "노이즈 강도", 0.20, 0.005, "호화도 증가폭의 상한"],
+];
+const noiseInputs = Object.fromEntries(noiseOptions.map(([key, label, max, step, help]) => {
+  const item = document.createElement("label");
+  item.title = help;
+  const line = document.createElement("span");
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  const value = document.createElement("output");
+  line.append(caption, value);
+  const input = document.createElement("input");
+  input.type = "range";
+  input.min = "0";
+  input.max = max;
+  input.step = step;
+  input.value = CORE_FLOOR_DEFAULTS[key];
+  input.setAttribute("aria-label", label);
+  value.textContent = input.value;
+  input.addEventListener("input", () => { value.textContent = input.value });
+  item.append(line, input);
+  document.querySelector("#noise-controls").append(item);
+  return [key, input];
+}));
+
 const ratioLabels = {
   centerRadius:"중앙부 반경",mainShaftRadius:"중앙 원통",gardenOffset:"정원 위치",
   gardenRadius:"정원 반경",miniShaftOffset:"미니 통로 위치",miniShaftRadius:"미니 통로 반경",
   roadHalfWidth:"동선 반폭",rimWidth:"외곽 여백",luxuryFalloff:"호화도 감소폭",
-  noiseCellSize:"그물 간격"
+  noiseCellSize:"가지 뻗는 범위"
 };
 const controlHost=document.querySelector("#ratio-controls");
 for (const [key, label] of Object.entries(ratioLabels)) {
@@ -99,7 +127,11 @@ function paint(){
     layout=createFloorLayout({
       width:Number(document.querySelector("#width").value),
       floorHeight:Number(document.querySelector("#height").value),
-      seed:Number(document.querySelector("#seed").value),ratios
+      seed:Number(document.querySelector("#seed").value),
+      luxuryNoiseDensity:noiseInputs.luxuryNoiseDensity.valueAsNumber,
+      luxuryNoiseConcentration:noiseInputs.luxuryNoiseConcentration.valueAsNumber,
+      luxuryNoiseAmplitude:noiseInputs.luxuryNoiseAmplitude.valueAsNumber,
+      ratios
     });
     error.textContent="";
   }catch(e){error.textContent=e.message;return}
