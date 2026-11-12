@@ -10,7 +10,7 @@ const FINISHES=[B.CONCRETE,B.SHOP_BRICK,B.STAINED_PLASTER,B.METAL_PANEL,B.WALL_T
 const random=(rx,rz,seed,salt)=>hash(rx,rz,salt,seed+1957);
 export function blueprintFor(rx,rz,seed){
  const n=s=>random(rx,rz,seed,s);
- if(n(0)<.16)return null;
+ if(n(0)<.16&&(rx!==0||rz!==0))return null; // guarantee a visible ruin near the initial region
  const type=ARCHETYPES[Math.floor(n(1)*ARCHETYPES.length)];
  const width=18+Math.floor(n(2)*6),depth=20+Math.floor(n(3)*5);
  const x=rx*GRID+4,z=rz*GRID+4;
