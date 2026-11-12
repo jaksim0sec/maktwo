@@ -76,7 +76,7 @@ export function createFloorLayout({
   }
   const {
     centerRadius, mainShaftRadius, gardenOffset, gardenRadius, miniShaftOffset,
-    miniShaftRadius, roadHalfWidth, rimWidth, luxuryFalloff, noiseCellSize,
+    miniShaftRadius, roadHalfWidth, rimWidth, luxuryFalloff,
   } = dimensions;
   const innerHalfWidth = halfWidth - rimWidth;
   if (gardenOffset <= mainShaftRadius + gardenRadius || gardenOffset <= Math.SQRT2 * gardenRadius
@@ -99,9 +99,6 @@ export function createFloorLayout({
     gardenRadiusSq: gardenRadius ** 2,
     miniShaftRadiusSq: miniShaftRadius ** 2,
     inverseDoubleFalloffSq: 0.5 / (luxuryFalloff ** 2),
-    inverseNoiseCellSize: 1 / noiseCellSize,
-    noiseShiftX: gridValue(0, 0, noiseSeed) * 0.5,
-    noiseShiftZ: gridValue(1, 0, noiseSeed) * 0.5,
     gardenCenters: cardinalCenters(centerX, centerZ, gardenOffset),
     miniShaftCenters: cardinalCenters(centerX, centerZ, miniShaftOffset),
   });
@@ -151,20 +148,98 @@ function gridValue(x, z, seed) {
   return ((hash ^ (hash >>> 16)) >>> 0) / 0x80000000 - 1;
 }
 
-function latticeNoise(layout, x, z) {
-  const gridX = x * layout.inverseNoiseCellSize;
-  const gridZ = z * layout.inverseNoiseCellSize;
-  const phaseX = layout.noiseShiftX * (2 * Math.PI);
-  const phaseZ = layout.noiseShiftZ * (2 * Math.PI);
-  // Bend both families of lines continuously so their crossings stay connected.
-  const u = gridX + layout.noiseShiftX + 0.22 * Math.sin(1.8 * gridZ + phaseX);
-  const v = gridZ + layout.noiseShiftZ + 0.22 * Math.sin(2.3 * gridX + phaseZ);
-  const distance = Math.min(Math.abs(u - Math.round(u)), Math.abs(v - Math.round(v)));
-  const ridge = Math.max(0, 1 - distance / 0.20);
-  return 2 * ridge * ridge * (3 - 2 * ridge) - 1;
+const NOISE_RESOLUTION = 192;
+const branchFields = new WeakMap();
+
+function curvePoint(start, bend, end, t) {
+  const a = (1 - t) ** 2;
+  const b = 2 * t * (1 - t);
+  const c = t ** 2;
+  return [a * start[0] + b * bend[0] + c * end[0],
+    a * start[1] + b * bend[1] + c * end[1]];
 }
 
-function luxuryForZone(layout, x, z, ax, az, zone) {
+function stampCurve(field, start, bend, end, radius, strength) {
+  const scale = (NOISE_RESOLUTION - 1) / 2;
+  const steps = 10;
+  let [x, z] = start.map(value => (value + 1) * scale);
+  for (let step = 1; step <= steps; step++) {
+    const [nextX, nextZ] = curvePoint(start, bend, end, step / steps).map(value => (value + 1) * scale);
+    const dx = nextX - x;
+    const dz = nextZ - z;
+    const lengthSq = dx * dx + dz * dz;
+    const brush = radius * scale * (1 - 0.55 * (step - 1) / steps);
+    const minX = Math.max(0, Math.floor(Math.min(x, nextX) - brush));
+    const maxX = Math.min(NOISE_RESOLUTION - 1, Math.ceil(Math.max(x, nextX) + brush));
+    const minZ = Math.max(0, Math.floor(Math.min(z, nextZ) - brush));
+    const maxZ = Math.min(NOISE_RESOLUTION - 1, Math.ceil(Math.max(z, nextZ) + brush));
+    for (let row = minZ; row <= maxZ; row++) {
+      for (let col = minX; col <= maxX; col++) {
+        const along = lengthSq ? Math.max(0, Math.min(1, ((col - x) * dx + (row - z) * dz) / lengthSq)) : 0;
+        const distanceSq = (col - x - along * dx) ** 2 + (row - z - along * dz) ** 2;
+        const falloff = Math.max(0, 1 - distanceSq / (brush * brush));
+        const index = row * NOISE_RESOLUTION + col;
+        field[index] = Math.max(field[index], strength * falloff * falloff);
+      }
+    }
+    x = nextX;
+    z = nextZ;
+  }
+}
+
+function getBranchField(layout) {
+  if (layout.luxuryNoiseAmplitude === 0) return null;
+  let field = branchFields.get(layout);
+  if (field) return field;
+
+  field = new Float32Array(NOISE_RESOLUTION ** 2);
+  const spread = Math.max(0.45, Math.min(1.55, layout.noiseCellSize / (layout.halfWidth * 0.12)));
+  for (let district = 0; district < 4; district++) {
+    const random = salt => gridValue(district, salt, layout.noiseSeed);
+    const x = (district === 0 || district === 3 ? 1 : -1) * (0.38 + 0.08 * random(0));
+    const z = (district < 2 ? 1 : -1) * (0.38 + 0.08 * random(1));
+    const angle = Math.PI * random(2);
+    const forwardX = Math.cos(angle);
+    const forwardZ = Math.sin(angle);
+    const offset = ([originX, originZ], forward, across) => [
+      originX + spread * (forward * forwardX - across * forwardZ),
+      originZ + spread * (forward * forwardZ + across * forwardX),
+    ];
+    const center = [x, z];
+    const start = offset(center, -0.26, 0.06 * random(3));
+    const end = offset(center, 0.28, 0.10 * random(4));
+    const bend = offset(center, 0, (random(5) < 0 ? -1 : 1) * (0.12 + 0.06 * random(6)));
+    stampCurve(field, start, bend, end, 0.047, 1);
+
+    const branchCount = random(7) > 0.30 ? 3 : 2;
+    const firstSide = random(8) < 0 ? -1 : 1;
+    for (let branch = 0; branch < branchCount; branch++) {
+      const root = curvePoint(start, bend, end, 0.25 + 0.22 * branch + 0.07 * random(9 + branch));
+      const side = branch === 1 ? -firstSide : firstSide;
+      const tip = offset(root, 0.09 + 0.12 * random(12 + branch), side * (0.16 + 0.07 * random(15 + branch)));
+      const turn = offset(root, 0.02 + 0.08 * random(18 + branch), side * 0.05);
+      stampCurve(field, root, turn, tip, branch === 2 ? 0.023 : 0.031, branch === 2 ? 0.52 : 0.74);
+    }
+  }
+  branchFields.set(layout, field);
+  return field;
+}
+
+function branchNoise(field, layout, x, z) {
+  const scale = (NOISE_RESOLUTION - 1) / 2;
+  const u = (x / layout.halfWidth + 1) * scale;
+  const v = (z / layout.halfWidth + 1) * scale;
+  const col = Math.floor(u);
+  const row = Math.floor(v);
+  const index = row * NOISE_RESOLUTION + col;
+  const sx = u - col;
+  const sz = v - row;
+  const near = field[index] + sx * (field[index + 1] - field[index]);
+  const far = field[index + NOISE_RESOLUTION] + sx * (field[index + NOISE_RESOLUTION + 1] - field[index + NOISE_RESOLUTION]);
+  return near + sz * (far - near);
+}
+
+function luxuryForZone(layout, x, z, ax, az, zone, field) {
   if (zone === CORE_ZONE.MAIN_ROUTE) return 1;
   if (zone !== CORE_ZONE.DISTRICT) return 0;
 
@@ -175,8 +250,8 @@ function luxuryForZone(layout, x, z, ax, az, zone) {
   const sumDistanceSq = dx * dx + dz * dz + acrossX * acrossX + acrossZ * acrossZ;
   // Harmonic mean of the two axis fields 1 / (1 + distance² / falloff²).
   const base = layout.districtLuxuryMax / (1 + sumDistanceSq * layout.inverseDoubleFalloffSq);
-  if (layout.luxuryNoiseAmplitude === 0) return base;
-  const value = base + layout.luxuryNoiseAmplitude * latticeNoise(layout, x, z);
+  if (!field) return base;
+  const value = base + layout.luxuryNoiseAmplitude * branchNoise(field, layout, x, z);
   return Math.max(0, Math.min(layout.districtLuxuryMax, value));
 }
 
@@ -186,7 +261,7 @@ export function luxuryAt(layout, x, z) {
   const dz = z - layout.centerZ;
   const ax = Math.abs(dx);
   const az = Math.abs(dz);
-  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az));
+  return luxuryForZone(layout, dx, dz, ax, az, classify(layout, ax, az), getBranchField(layout));
 }
 
 /**
@@ -201,6 +276,7 @@ export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, st
     || zones.length < size || (weights != null && weights.length < size)) {
     throw new RangeError('Invalid core floor sample rectangle or output size');
   }
+  const field = weights == null ? null : getBranchField(layout);
   let index = 0;
   for (let row = 0; row < depth; row++) {
     const z = z0 + row * step - layout.centerZ;
@@ -210,7 +286,7 @@ export function sampleFloorRect(layout, x0, z0, width, depth, zones, weights, st
       const ax = Math.abs(x);
       const zone = classify(layout, ax, az);
       zones[index] = zone;
-      if (weights != null) weights[index] = luxuryForZone(layout, x, z, ax, az, zone);
+      if (weights != null) weights[index] = luxuryForZone(layout, x, z, ax, az, zone, field);
       index++;
     }
   }
