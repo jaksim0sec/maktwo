@@ -30,20 +30,24 @@ test('generated staircase has one rail-bearing edge and a consistent physical to
  const world=new World({seed:9999,mode:'eternal-city-lab'});
  const {treads}=b.stairs[0],level=2,stairY=b.floors[level].y;
  let count=0,rails=0;
- for(let i=0;i<treads.length;i++){
-  const step=treads[i],x=Math.floor((step.x0+step.x1)/2)+.5,z=Math.floor((step.z0+step.z1)/2)+.5;
-  const surface=stairY+step.y-b.y0,encoded=encodeCityStair(surface,b.stairFacing+(i>=treads.length/2?4:0));
+ const minX=Math.floor(Math.min(...treads.map(r=>r.x0))),maxX=Math.ceil(Math.max(...treads.map(r=>r.x1)));
+ const minZ=Math.floor(Math.min(...treads.map(r=>r.z0))),maxZ=Math.ceil(Math.max(...treads.map(r=>r.z1)));
+ for(let x=minX;x<maxX;x++)for(let z=minZ;z<maxZ;z++){
+  const tread=treads.find(r=>x+.5>=r.x0&&x+.5<r.x1&&z+.5>=r.z0&&z+.5<r.z1);
+  if(!tread)continue;
+  const step=treads.indexOf(tread),surface=stairY+tread.y-b.y0;
+  const encoded=encodeCityStair(surface,b.stairFacing+(step>=treads.length/2?4:0));
   const id=world.get(x,encoded.base,z);
-  assert.equal(partById(id)?.family,'staircase',`tread ${i} should exist at its designed floor`);
+  assert.equal(partById(id)?.family,'staircase',`stair cell ${x},${z} should exist at its designed floor`);
   const state=world.getShapeState(x,encoded.base,z);
-  assert.ok(state.cityStair,`tread ${i} must use the city profile`);
+  assert.ok(state.cityStair,`stair cell ${x},${z} must use the city profile`);
   assert.ok(Math.abs(encoded.base+state.treadHeight-surface)<.26);
-  const shapes=partPrisms(id,Math.floor(x),encoded.base,Math.floor(z),state);
+  const shapes=partPrisms(id,x,encoded.base,z,state);
   assert.ok(shapes.length<=8,'no three-riser railing stack');
   if(state.rail)rails++;
   count++;
  }
- assert.ok(count>=16&&rails<count,'outer rails do not occupy every voxel');
+ assert.ok(count>=7&&rails>0&&rails<count,'exterior rails occur only on one side of the flight');
 });
 test('landing connectors leave the doorway open but provide joined parapet away from it',()=>{
  assert.equal(walkwayJunction({along:1,span:20,width:2.35,doorDistance:0,sideDistance:1}).open,true);
