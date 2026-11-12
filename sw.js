@@ -1,5 +1,6 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.13.0';
+const CACHE_NAME='maktwo-shell-v1.13.0-r2';
+const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
@@ -17,6 +18,25 @@ const APP_FILES=[
 // A slow connection cannot partially overwrite code in a previously working build.
 const CANONICAL_ASSETS=new Set(APP_FILES.map(p=>new URL(p,self.registration.scope).pathname));
 const ENTRY=new URL('./index.html',self.registration.scope).href;
+let refreshing=null;
+const currentCache=async()=>{
+ const snapshots=(await caches.keys()).filter(name=>name.startsWith(SNAPSHOT_PREFIX)).sort();
+ return caches.open(snapshots.at(-1)||CACHE_NAME);
+};
+// Replace the offline build only after every file in the new build is ready.
+function refreshSnapshot(){
+ if(refreshing)return refreshing;
+ refreshing=(async()=>{
+  const name=SNAPSHOT_PREFIX+Date.now();
+  try{
+   const cache=await caches.open(name);
+   await cache.addAll(APP_FILES.map(p=>new Request(new URL(p,self.registration.scope),{cache:'reload'})));
+   const keys=await caches.keys();
+   await Promise.all(keys.filter(key=>key.startsWith('maktwo-shell-')&&key!==name).map(key=>caches.delete(key)));
+  }catch(error){await caches.delete(name);throw error}
+ })().finally(()=>{refreshing=null});
+ return refreshing;
+}
 const canonicalURL=request=>{
  const url=new URL(request.url);
  // Cache only this app's explicit files, not every GET request to the origin.
@@ -45,11 +65,17 @@ self.addEventListener('fetch',event=>{
  const url=canonicalURL(request);
  if(!url)return;
  event.respondWith((async()=>{
-  const cache=await caches.open(CACHE_NAME);
-  const response=await cache.match(url);
-  if(response)return response;
-  // The worker only becomes active after every listed asset was cached.
-  // Unexpected navigation can still fall through safely when online.
-  try{return await fetch(request)}catch{return request.mode==='navigate'?(await cache.match(ENTRY)||Response.error()):Response.error()}
+  const cache=await currentCache();
+  const cached=await cache.match(url);
+  try{
+   // Always request current code online, even when the worker itself has not changed.
+   const fresh=await fetch(new Request(request,{cache:'no-cache'}));
+   if(!fresh.ok)throw new Error(`HTTP ${fresh.status}`);
+   if(cached&&(request.mode==='navigate'||/\.(?:html|css|js)$/.test(new URL(url).pathname))){
+    const [oldText,newText]=await Promise.all([cached.clone().text(),fresh.clone().text()]);
+    if(oldText!==newText)event.waitUntil(refreshSnapshot().catch(error=>console.warn('[MakTwo] Offline snapshot refresh failed:',error)));
+   }
+   return fresh;
+  }catch{return cached||(request.mode==='navigate'?await cache.match(ENTRY):null)||Response.error()}
  })());
 });

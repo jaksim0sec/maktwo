@@ -119,3 +119,54 @@ test('offline worker activates and serves cached navigation, modules, and icons 
  const icon=await run('fetch',{request:{url:scope+'icons/maktwo-192.png',method:'GET',mode:'cors'}});
  assert.equal(icon.status,200);
 });
+
+test('online code update replaces the offline snapshot atomically',async()=>{
+ const {runInNewContext}=await import('node:vm');
+ const scope='https://example.test/maktwo/',listeners={},storage=new Map();
+ let version='old',offline=false,failAsset=false;
+ const key=request=>typeof request==='string'?request:request.url;
+ const cachesMock={
+  async open(name){
+   if(!storage.has(name))storage.set(name,new Map());
+   const entries=storage.get(name);
+   return {
+    async addAll(requests){
+     for(const request of requests){
+      const response=await network(request);
+      if(!response.ok)throw Error('precache failed');
+      entries.set(key(request),response);
+     }
+    },
+    async match(request){return entries.get(key(request))?.clone()}
+   };
+  },
+  async keys(){return [...storage.keys()]},
+  async delete(name){return storage.delete(name)}
+ };
+ const network=async request=>{
+  if(offline)throw Error('offline');
+  if(failAsset&&key(request).endsWith('/style.css'))throw Error('partial download');
+  return new Response(version+':'+key(request));
+ };
+ const self={registration:{scope},location:{origin:'https://example.test'},clients:{claim:async()=>{}},skipWaiting:async()=>{},addEventListener:(name,fn)=>listeners[name]=fn};
+ runInNewContext(source('sw.js'),{self,caches:cachesMock,URL,Response,Request,fetch:network,console:{warn(){}}});
+ const run=async(name,request)=>{
+  const tasks=[];let response;
+  listeners[name]({request,waitUntil:p=>tasks.push(p),respondWith:p=>{response=p}});
+  const value=response?await response:undefined;
+  await Promise.all(tasks);
+  return value;
+ };
+ await run('install');await run('activate');
+ version='new';failAsset=true;
+ const url=scope+'src/client/game.js';
+ assert.match(await (await run('fetch',new Request(url))).text(),/^new:/);
+ assert.equal(storage.size,1,'failed refresh leaves the old complete snapshot');
+ offline=true;
+ assert.match(await (await run('fetch',new Request(url))).text(),/^old:/);
+ offline=false;failAsset=false;
+ assert.match(await (await run('fetch',new Request(url))).text(),/^new:/);
+ offline=true;
+ assert.match(await (await run('fetch',new Request(url))).text(),/^new:/);
+ assert.equal(storage.size,1,'successful refresh removes the old snapshot');
+});
