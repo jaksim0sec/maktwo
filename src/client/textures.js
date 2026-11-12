@@ -20,9 +20,37 @@ export function materialFor(id,face){
  }
 }
 function rand(x,y,s){let n=Math.imul(x+37,73856093)^Math.imul(y+51,19349663)^Math.imul(s+11,83492791);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295}
+
+// Wood is drawn into a tiny reusable tile once, not computed during gameplay.
+// Side faces use (horizontal coordinate, world height), so veins must run
+// vertically. Curved fibres and an occasional knot replace the old y%6 bands.
+export function barkGrain(x,y,size,n=0,smooth=0){
+ const u=x*32/size,v=y*32/size;
+ const knot=Math.exp(-(((u-11.4)/4.2)**2+((v-19.5)/6.2)**2));
+ const bend=.7*Math.sin(v*.23+u*.06)+.5*Math.sin(v*.48-u*.15)+knot*1.9*Math.sin(v*.23);
+ const fiber=u+bend;
+ const broad=Math.sin(fiber*.93+.45*Math.sin(v*.17));
+ const fine=Math.sin(fiber*2.15+.22*Math.sin(v*.29));
+ const ring=Math.cos(fiber*3.45+knot*.8);
+ return .91+.081*broad+.031*fine+.016*ring+.025*(smooth-.5)+.019*(n-.5)-.075*knot;
+}
+export function endGrain(x,y,size,n=0){
+ const u=x/size-.52,v=y/size-.47;
+ const drift=.024*Math.sin(y*.45)+.015*Math.cos(x*.33);
+ const r=Math.hypot((u+drift)*1.07,(v-drift)*.92);
+ const grain=Math.sin(r*62+2.2*Math.sin((x+y)*.15));
+ return .89+.105*grain+.028*(n-.5);
+}
+export function plankGrain(x,y,size,n=0){
+ const u=x*32/size,v=y*32/size;
+ const joint=(v%16+16)%16;
+ const seam=Math.min(joint,16-joint);
+ const vein=Math.sin(v*.63+.22*Math.sin(u*.36))*.043+Math.sin(v*1.65+u*.09)*.018;
+ return .96+vein+.023*(n-.5)-(seam<.7?.12:0);
+}
 export function makeTextureLayers(size=TEXTURE_SIZE){const layers=MATERIALS.length,out=new Uint8Array(size*size*layers*4);
  for(let m=0;m<layers;m++)for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-  const n=rand(x,y,m),smooth=rand(Math.floor(x/4),Math.floor(y/4),m),xnorm=x/size,ynorm=y/size;
+  const n=rand(x,y,m),smooth=rand(Math.floor(x/4),Math.floor(y/4),m);
   let f=.91+.15*n+.06*smooth;
   if(m===0){ // speckled grass
    if(n>.90)f*=1.09;
@@ -32,10 +60,10 @@ export function makeTextureLayers(size=TEXTURE_SIZE){const layers=MATERIALS.leng
    if((x+Math.floor(smooth*3))%11===0&&y%7<5)f*=.83;
    if(m===8&&(x%13===0||y%12===0))f*=.79;
   }else if(m===4){f=.95+.10*n+.025*Math.sin(x*.52+y*.4)}
-  else if(m===5){if(y%6===0)f*=.80;f*=.96+.08*Math.sin(y*.7+n*2)}
-  else if(m===6){const radius=Math.hypot(xnorm-.5,ynorm-.5);f*=.90+.14*Math.sin(radius*24)}
+  else if(m===5){f=barkGrain(x,y,size,n,smooth)}
+  else if(m===6){f=endGrain(x,y,size,n)}
   else if(m===7){if(n>.81)f*=1.13}
-  else if(m===9){if(y%8===0)f*=.69;else if((x+(Math.floor(y/8)%2)*13)%19===0)f*=.80;f*=.96+.04*Math.sin(y*.45)}
+  else if(m===9){f=plankGrain(x,y,size,n)}
   else if(m===10){if(x%8===0||y%8===0)f*=.84}
   else if(m===11){if(n>.94&&((x+y)%7<3))f*=1.18}
   else if(m===12){if(x%8===0)f*=.78;if(y===(size/3|0)||y===(size*2/3|0))f*=.83;}

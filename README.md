@@ -1,4 +1,6 @@
-> v1.3.0: Restored PC pointer-lock camera on C (right-drag remains for free cursor), preserved movement and camera control in the in-world inventory, redesigned HUD/settings/help. No world format changes.
+> v1.3.1: Replaced repetitive horizontal wood stripes with irregular vertical bark grain and knots, concentric wood-end rings and softer plank structure. Texture stays 32×32 and the GPU vertex layout is unchanged.
+
+> v1.3.1: Restored PC pointer-lock camera on C (right-drag remains for free cursor), preserved movement and camera control in the in-world inventory, redesigned HUD/settings/help. No world format changes.
 
 > v1.2.0: Mobile gesture overhaul. Left-zone drag moves without placing; right-zone tap builds/uses, right-zone long hold mines, right-zone drag looks around. Two fingers can act independently. Minor finger jitter is filtered; interrupted gestures reset safely. The missing `canvasCursor` implementation is restored; pointer targeting uses CSS-pixel coordinates.
 
