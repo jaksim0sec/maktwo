@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영원한 밤 · 단일 코어층</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#16191e;color:#e9edf2}
+*{box-sizing:border-box}body{margin:0;padding:24px;min-height:100vh}
+main{max-width:950px;margin:auto}header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:21px;letter-spacing:-.04em;margin:0 0 16px}small{color:#9ca8b7}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 255px;gap:24px;align-items:start}
+canvas{display:block;width:100%;max-width:640px;aspect-ratio:1;background:#111419;image-rendering:auto;border:1px solid #35404c;border-radius:12px}
+.controls{display:grid;gap:11px}label{display:grid;gap:5px;font-size:13px;color:#c9d4dc}
+input{width:100%;background:#232a34;color:#eef3fa;border:1px solid #46515f;border-radius:7px;padding:8px;font:inherit}
+details{border-top:1px solid #39414a;padding-top:12px}summary{cursor:pointer;color:#e6eaf1;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 15px;margin-top:14px;color:#b9c4cf;font-size:12px}
+.legend span::before{content:"";width:9px;height:9px;display:inline-block;background:var(--dot);border-radius:2px;margin-right:6px}
+#readout{height:20px;font-variant-numeric:tabular-nums;color:#b9c4cf;font-size:12px;margin:10px 0}
+#error{color:#ff9a9a;font-size:12px;min-height:16px}
+@media(max-width:700px){body{padding:14px}.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr}details{grid-column:1/-1}.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>단일 코어층 · 평면 생성</h1><small>한 층의 구역과 호화도</small></header>
+<div class="layout">
+<section>
+<canvas id="map" width="512" height="512" aria-label="코어층 배치와 호화도 지도"></canvas>
+<p id="readout">지도를 가리키면 좌표와 호화도가 표시됩니다</p>
+<div class="legend">
+<span style="--dot:#8794a0">바닥</span><span style="--dot:#e33c45">중앙 통로</span>
+<span style="--dot:#25a7d7">공중정원</span><span style="--dot:#438de9">미니 통로</span>
+<span style="--dot:#a35ad6">주 동선 · 호화도 1</span><span style="--dot:#6b9f73">대단지 · 밝을수록 호화</span>
+</div>
+</section>
+<aside class="controls">
+<label>시드<input id="seed" type="number" step="1" value="42"></label>
+<label>코어 가로폭 · 블록<input id="width" type="number" min="100" max="200000" step="16" value="1024"></label>
+<details>
+<summary>비율 · 중심에서 변까지 거리 기준</summary>
+<div class="grid" id="ratio-controls"></div>
+</details>
+<div id="error" role="status"></div>
+<small>가로폭과 층고는 시험용 기본값입니다. 지형 색은 생성기의 구역 ID와 호화도에 대응합니다.</small>
+</aside>
+</div>
+</main>
+<script type="module">
+import { CORE_FLOOR_DEFAULTS, CORE_ZONE, createFloorLayout, sampleFloorRect } from "../../src/worldgen/eternal-night-core-floor.js";
+
+const ratioLabels = {
+  centerRadius:"중앙부 반경",mainShaftRadius:"중앙 원통",gardenOffset:"정원 위치",
+  gardenRadius:"정원 반경",miniShaftOffset:"미니 통로 위치",miniShaftRadius:"미니 통로 반경",
+  roadHalfWidth:"동선 반폭",rimWidth:"외곽 여백",luxuryFalloff:"호화도 감소폭",
+  noiseCellSize:"그물 간격"
+};
+const controlHost=document.querySelector("#ratio-controls");
+for (const [key, label] of Object.entries(ratioLabels)) {
+  const item=document.createElement("label");
+  item.textContent=label;
+  const input=document.createElement("input");
+  input.type="number";input.min="0.001";input.max="0.99";input.step="0.001";
+  input.value=CORE_FLOOR_DEFAULTS.ratios[key];input.dataset.ratio=key;
+  item.append(input);controlHost.append(item);
+}
+const canvas=document.querySelector("#map"),ctx=canvas.getContext("2d",{alpha:false});
+const readout=document.querySelector("#readout"),error=document.querySelector("#error");
+let layout,queued=false;
+const width=canvas.width,height=canvas.height;
+const zones=new Uint8Array(width*height),weights=new Float32Array(width*height);
+const frame=ctx.createImageData(width,height);
+const palette=[
+  [17,20,25],[134,146,158],[227,60,69],[37,167,215],
+  [67,141,233],[163,90,214],[0,0,0],[85,98,112]
+];
+function paint(){
+  queued=false;
+  const ratios={};
+  for(const input of controlHost.querySelectorAll("input"))ratios[input.dataset.ratio]=Number(input.value);
+  try{
+    layout=createFloorLayout({width:Number(document.querySelector("#width").value),seed:Number(document.querySelector("#seed").value),ratios});
+    error.textContent="";
+  }catch(e){error.textContent=e.message;return}
+  const step=layout.width/width;
+  const left=layout.centerX-layout.halfWidth+step/2;
+  const top=layout.centerZ-layout.halfWidth+step/2;
+  sampleFloorRect(layout,left,top,width,height,zones,weights,step);
+  const pixels=frame.data;
+  for(let i=0;i<zones.length;i++){
+    const zone=zones[i],o=i*4;
+    if(zone===CORE_ZONE.DISTRICT){
+      const t=weights[i];
+      pixels[o]=36+Math.round(t*125);
+      pixels[o+1]=70+Math.round(t*108);
+      pixels[o+2]=46+Math.round(t*80);
+    }else{
+      const c=palette[zone];
+      pixels[o]=c[0];pixels[o+1]=c[1];pixels[o+2]=c[2];
+    }
+    pixels[o+3]=255;
+  }
+  ctx.putImageData(frame,0,0);
+}
+function queue(){if(!queued){queued=true;requestAnimationFrame(paint)}}
+document.querySelectorAll("input").forEach(input=>input.addEventListener("input",queue));
+canvas.addEventListener("pointermove",event=>{
+  if(!layout)return;
+  const bounds=canvas.getBoundingClientRect();
+  const col=Math.floor((event.clientX-bounds.left)*width/bounds.width);
+  const row=Math.floor((event.clientY-bounds.top)*height/bounds.height);
+  if(col<0||row<0||col>=width||row>=height)return;
+  const x=(layout.centerX-layout.halfWidth+(col+0.5)*layout.width/width).toFixed(1);
+  const z=(layout.centerZ-layout.halfWidth+(row+0.5)*layout.width/height).toFixed(1);
+  const i=row*width+col;
+  const names=["허공","공용 바닥","중앙 통로","공중정원","미니 통로","주 동선","대단지","중앙부"];
+  readout.textContent="x "+x+" · z "+z+" · "+names[zones[i]]+" · 호화도 "+weights[i].toFixed(3);
+});
+canvas.addEventListener("pointerleave",()=>{readout.textContent="지도를 가리키면 좌표와 호화도가 표시됩니다"});
+queue();
+</script>
+</body>
+</html>
