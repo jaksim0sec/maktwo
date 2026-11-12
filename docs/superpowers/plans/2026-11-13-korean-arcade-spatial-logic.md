@@ -23,18 +23,20 @@
 
 ### Task 1: Interior rooms and storefront orientation
 **Files:** `src/worldgen/eternal-night-buildings.js`, `test/eternal-night-commercial-architecture.test.mjs`
-- [ ] RED: 소형 점포의 네 방향 출입구와 서비스실 구획 검사
-- [ ] GREEN: 실제 입구가 있는 정면과 뒤편 부속실 구획을 일치시킴
-- [ ] RED/GREEN: 고층 건물 시장층의 길고 비어 있는 버퍼를 분할된 점포/창고로 치환
+- [x] RED: 소형 점포의 네 방향 출입구와 서비스실 구획 검사
+- [x] GREEN: 실제 입구가 있는 정면과 뒤편 부속실 구획을 일치시킴
+- [x] RED/GREEN: 고층 건물 시장층의 길고 비어 있는 버퍼를 분할된 점포/창고로 치환
 
 ### Task 2: Context-aware facade
 **Files:** `src/worldgen/eternal-night-facade.js`, `src/worldgen/eternal-night-game.js`, `test/eternal-night-commercial-architecture.test.mjs`
-- [ ] RED: 점포·주거·공방 입면 패턴, 전면부 간판/설비 규칙 검사
-- [ ] GREEN: 창·벽·셔터·간판·배기구를 용도/층/입구에만 배치
-- [ ] 확인: 구조/장식이 같은 복셀을 무의미하게 덮어쓰지 않음
+- [x] RED: 점포·주거·공방 입면 패턴, 전면부 간판/설비 규칙 검사
+- [x] GREEN: 창·벽·셔터·간판·배기구를 용도/층/입구에만 배치
+- [x] 확인: 구조/장식이 같은 복셀을 무의미하게 덮어쓰지 않음
 
 ### Task 3: Dense street cluster and regressions
 **Files:** `src/worldgen/eternal-night-precincts.js`, `test/eternal-night-commercial-architecture.test.mjs`
-- [ ] RED/GREEN: 골목 쪽 작은 점포를 우선 배치하고 부지 여백 축소
-- [ ] 구형/신형 도시 생성 경로 격리와 정해진 층고·교량·충돌 불변 확인
-- [ ] 최종 커밋 전 브랜치 대조와 검증된 항목·미검증 항목 보고
+- [x] RED/GREEN: 골목 쪽 작은 점포를 우선 배치하고 부지 여백 축소
+- [x] 구형/신형 도시 생성 경로 격리와 정해진 층고·교량·충돌 불변 확인
+- [x] 최종 커밋 전 브랜치 대조와 검증된 항목·미검증 항목 보고
+
+검증: 순수 구조·방향·입면 규칙, 시드 9999 전체 계획과 구획 실제 복셀 출력 검사. Node 전체 suite·모바일 Chromium 렌더링은 별도 확인 필요.

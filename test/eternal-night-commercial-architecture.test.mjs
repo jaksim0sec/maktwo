@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {designBuilding,designShopModule} from '../src/worldgen/eternal-night-buildings.js';
+import {createCityPlan,stampCityChunk} from '../src/worldgen/eternal-night-game.js';
+import {Chunk} from '../src/core/chunk.js';
+import {BLOCK as B,block} from '../src/core/blocks.js';
 import {facadeBay,enclosedPassageBay} from '../src/worldgen/eternal-night-facade.js';
 
 const makeTall=()=>({id:3,x0:0,z0:0,x1:34,z1:42,y0:8,y1:80,type:0,highRise:true,program:'market',support:null,phase:.2,precinct:0});
@@ -49,4 +52,32 @@ test('enclosed connecting corridors are mostly solid walls and have no random sh
  assert.ok(bays.filter(b=>b.window).length<=2,'bridge must not become a curtain wall');
  assert.ok(bays.every(b=>b.sign===false),'signs require an actual tenant');
  assert.ok(bays.every(b=>b.wall||b.window),'every edge is enclosed');
+});
+
+test('seed 9999 rasterizes solid service walls and a true two-cell door while retaining high-rises',()=>{
+ const plan=createCityPlan(9999);
+ const shops=plan.volumes.filter(v=>v.support===null&&v.floors.length===1);
+ const street=shops.find(v=>v.frontSide===2);
+ assert.ok(street,'south-facing lane-front shop is present');
+ const modules=street.floors[0],store=modules.rooms.find(r=>r.kind==='service');
+ assert.ok(store&&modules.partitions.length===2);
+ const chunks=new Map();
+ const at=(x,y,z)=>{
+  const cx=Math.floor(x/16),cz=Math.floor(z/16),key=cx+','+cz;
+  if(!chunks.has(key)){const c=new Chunk(cx,cz,768);stampCityChunk(c,9999);chunks.set(key,c)}
+  return chunks.get(key).get((Math.floor(x)%16+16)%16,Math.floor(y),(Math.floor(z)%16+16)%16);
+ };
+ const mid=({a,b})=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+ for(const partition of modules.partitions){
+  const [x,z]=mid(partition);
+  assert.ok(block(at(x,modules.y+1,z)).opaque,'actual backroom wall');
+ }
+ const [dx,dz]=mid(store.door);
+ assert.equal(at(dx,modules.y,dz),B.DOOR);
+ assert.equal(at(dx,modules.y+1,dz),B.DOOR_TOP);
+ const market=plan.volumes.filter(v=>v.support===null&&v.program==='market'&&v.floors.length>1&&v.floors.length<70);
+ assert.ok(market.length>0);
+ assert.ok(market.every(v=>v.floors.length<=14),'local shop-house height');
+ assert.ok(plan.volumes.some(v=>v.floors.length>=70&&v.floors.length<=80),'core landmark is preserved');
+ assert.ok(plan.links.length>100,'multilevel connections remain generated');
 });
