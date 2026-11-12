@@ -6,7 +6,7 @@ export const block=id=>BLOCKS[id]||BLOCKS[0];
 export const HOTBAR=[BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.PLANKS,BLOCK.GLASS,BLOCK.SAND,BLOCK.WATER,BLOCK.TORCH,BLOCK.PORTAL];
 
 // Warm practical lighting: three reusable fixtures; color and falloff are renderer-agnostic.
-BLOCKS[BLOCK.TORCH].light={color:'#ffd4a0',radius:9,intensity:1.12,offsetY:.75};
-BLOCKS[BLOCK.LANTERN].light={color:'#ffdeb0',radius:12,intensity:1.3,offsetY:.63};
-BLOCKS[BLOCK.CAMPFIRE].light={color:'#ffb77c',radius:14,intensity:1.55,offsetY:.45};
+BLOCKS[BLOCK.TORCH].light={color:'#ffb16d',radius:11,intensity:1.85,offsetY:.75};
+BLOCKS[BLOCK.LANTERN].light={color:'#ffd098',radius:13,intensity:1.9,offsetY:.63};
+BLOCKS[BLOCK.CAMPFIRE].light={color:'#ff9754',radius:14,intensity:2.0,offsetY:.45};
 export const LIGHTBAR=[BLOCK.TORCH,BLOCK.LANTERN,BLOCK.CAMPFIRE];

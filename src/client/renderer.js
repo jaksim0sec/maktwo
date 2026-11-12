@@ -4,7 +4,7 @@ precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
 uniform mat4 uVP;uniform vec3 uCamera;uniform float uTime;
 out vec3 vColor;out float vFog;out vec3 vPos;out float vEmission;
-void main(){gl_Position=uVP*vec4(aPos,1.);vPos=aPos;vEmission=aShade<0.?1.:0.;vColor=aColor*abs(aShade);float d=length(aPos-uCamera);vFog=clamp((d-28.)/70.,0.,1.);}`;
+void main(){gl_Position=uVP*vec4(aPos,1.);vPos=aPos;vEmission=aShade<0.?1.:0.;vColor=aColor*abs(aShade);float d=length(aPos-uCamera);vFog=clamp((d-24.)/62.,0.,1.);}`;
 const FRAG=`#version 300 es
 precision highp float;
 in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;
@@ -13,7 +13,7 @@ uniform vec4 uLightPos[8];uniform vec3 uLightColor[8];uniform int uLightCount;
 uniform float uTime;
 out vec4 frag;
 void main(){
- vec3 light=vec3(.82,.87,1.03)*uBrightness;
+ vec3 light=vec3(.65,.72,.93)*uBrightness;
  for(int i=0;i<8;i++){
   if(i>=uLightCount)break;
   vec3 delta=vPos-uLightPos[i].xyz;
@@ -95,8 +95,8 @@ export class Renderer{
   if(e.flash>0)cube(arr,x-.3,y+.4,z-.28,.6,.2,.56,rgb('#ff8787'))}
  for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);return new Float32Array(arr)}
  frame(world,player,entities,effects){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*this.renderScale,width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
-  const fog=[.135,.16,.215];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
-  const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.56);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
+  const fog=[.046,.056,.085];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
+  const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.24);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   // GPU cost is bounded: only the eight nearest loaded light sources per frame.
   const nearby=world.lights.near(player.x,camY,player.z,8,30);
   this.lightPositions.fill(0);this.lightColors.fill(0);

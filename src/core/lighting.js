@@ -33,9 +33,17 @@ export class LightIndex {
  }
  near(x,y,z,limit=8,range=32){
   const candidates=[],rangeSq=range*range;
-  for(const light of this.sources.values()){
-   const d2=(light.x-x)**2+(light.y-y)**2+(light.z-z)**2;
-   if(d2<=rangeSq)candidates.push({light,d2});
+  // Query only loaded chunks overlapping the local light radius.
+  // Growing a distant village must not make every frame scan all of its lights.
+  const minX=Math.floor((x-range-1)/SIZE),maxX=Math.floor((x+range)/SIZE);
+  const minZ=Math.floor((z-range-1)/SIZE),maxZ=Math.floor((z+range)/SIZE);
+  for(let cx=minX;cx<=maxX;cx++)for(let cz=minZ;cz<=maxZ;cz++){
+   const positions=this.byChunk.get(key(cx,cz));if(!positions)continue;
+   for(const pos of positions){
+    const light=this.sources.get(pos);if(!light)continue;
+    const d2=(light.x-x)**2+(light.y-y)**2+(light.z-z)**2;
+    if(d2<=rangeSq)candidates.push({light,d2});
+   }
   }
   candidates.sort((a,b)=>a.d2-b.d2);
   return candidates.slice(0,limit).map(entry=>entry.light);

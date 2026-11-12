@@ -1,4 +1,4 @@
-# MakTwo · Endless Night v0.3
+# MakTwo · Endless Night v0.4
 
 An unhurried, moonlit voxel garden. **Morning never comes**: build a warm place in an endless gentle night. Built on a dependency-free WebGL2 voxel sandbox. The world loads immediately, with no start menu. Click the canvas to capture the mouse (required by the browser). Inspired by the block-building genre; no Minecraft assets, copyrighted textures, code, or external libraries.
 
@@ -25,7 +25,7 @@ npm test
 | Shift | Crouch / descend while flying |
 | Ctrl | Sprint |
 | Left click | Break block / attack mob |
-| Right click | Place block |
+| Right click or R | Place a block against the face you are looking at |
 | 1..0 or scroll | Select from the current hotbar |
 | L or the light button | Switch between the original building hotbar and three light fixtures |
 | Light palette 1 / 2 / 3 | Torch / Lantern / Campfire |
@@ -34,7 +34,8 @@ npm test
 | Shift+G | Spawn a zombie for debugging |
 | B | Make a small block explosion at target |
 | P | Save edited blocks |
-| Escape | Release mouse pointer |
+| E | Open controls / free the mouse; press again to return to the game |
+| Escape | Release mouse pointer and open controls |
 
 Touch users: left side drag to walk, right side drag to look; the buttons offer jumping, placing and breaking blocks.
 
@@ -96,3 +97,12 @@ This is an engine playground, **not a full Minecraft recreation**. It has no cra
 - Keep terrain readability with gentle moonlight; no morning/sunrise transition.
 
 **Known limitation:** Runtime FPS and light appearance must be checked on a browser with working WebGL2; Node tests validate core behavior and mesh output only.
+
+## Usability and night contrast v0.4
+
+- Ambient sky and ground lighting are deliberately dimmer. Warm torch, lantern and campfire light gives a visible, cozy pool of light that can be extended gradually by building.
+- **How to build:** look at an existing block, select a new block with 1–0 or mouse wheel, then right-click (or press **R**) to place it adjacent to the targeted face. Left-click breaks the targeted block.
+- **No repeated Esc:** press **E** to release the mouse and open the settings. All toolbar and hotbar buttons stay clickable. Press **E** again or click **Return to game**; clicking the world also resumes mouse look. Esc now opens the controls after releasing pointer lock.
+- The HUD shows the essential controls, including the menu shortcut, without relying on an initial tutorial screen.
+- All three light fixture meshes are generated, not only torches. Nearby light lookup searches only relevant chunk indices so more distant light placements do not raise frame-wide scan costs.
+- This artistic lighting is still non-occluding: walls do not cast shadows. Visual appearance and FPS on real hardware require browser testing.

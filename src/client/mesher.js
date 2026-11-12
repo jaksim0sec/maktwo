@@ -77,7 +77,7 @@ export function meshChunk(world,chunk){
  }
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
-  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH)continue;
+  const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH&&id!==B.LANTERN&&id!==B.CAMPFIRE)continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
   if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
   const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
