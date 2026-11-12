@@ -8,6 +8,7 @@ import {createCityPlan} from '../src/worldgen/eternal-night-game.js';
 import {partById} from '../src/core/part-library.js';
 import {meshChunkData} from '../src/client/mesher.js';
 import {Chunk,SIZE} from '../src/core/chunk.js';
+import {buildLightVolume,makeOccluderSnapshot} from '../src/core/lightVolume.js';
 
 test('market precincts pack connected modules and upper districts have their own programmes',()=>{
   const plan=createCityPlan(9999);
@@ -24,6 +25,24 @@ test('market precincts pack connected modules and upper districts have their own
   assert.ok(new Set(plan.links.map(l=>l.typology)).size>=4);
   assert.ok(plan.links.some(l=>l.typology==='annex'&&l.landings.some(p=>p.kind==='annex-bay')));
   assert.ok(roots.some(v=>v.floors.some(f=>f.outline.length>8)));
+});
+
+test('the spawn interior has opaque room divisions and ceiling fixtures that light the aisle',()=>{
+  const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
+  const {x,y,z}=world.spawn(),plan=createCityPlan(world.seed);
+  const v=plan.volumes.find(v=>x>v.x0&&x<v.x1&&z>v.z0&&z<v.z1&&y>=v.y0&&y<v.y1);
+  const f=v.floors.find(f=>Math.round(f.y)===y);
+  let divisions=0;
+  for(const {a,b} of f.partitions) {
+    const xx=(a[0]+b[0])/2,zz=(a[1]+b[1])/2;
+    if(block(world.get(xx,y,zz)).opaque&&block(world.get(xx,y+1,zz)).opaque)divisions++;
+  }
+  assert.ok(divisions>=2,'the shop and service rooms have visible solid divisions');
+  const source=world.lights.near(x,y+3,z,30,15).find(l=>l.id===B.FLUORESCENT&&l.y>y+1&&l.y<f.top);
+  assert.ok(source,'a working overhead fixture is present on the spawn floor');
+  const width=12,height=12,depth=12,origin=[Math.floor(source.x)-6,y-1,Math.floor(source.z)-6];
+  const bytes=buildLightVolume(makeOccluderSnapshot(world,origin,width,height,depth),[{...source,rgb:[.8,.9,1]}],{width,height,depth,origin});
+  assert.ok(bytes[((6*height+1)*width+6)*4+2]>25,'the walkway beneath the lamp receives blue-white light');
 });
 
 test('the city voxelizes high-rise floors, varied parts and multiple bridge heights',()=>{

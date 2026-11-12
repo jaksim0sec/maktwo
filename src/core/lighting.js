@@ -47,7 +47,7 @@ export class LightIndex {
  }
  // Spatial query for every loaded light whose source lies within a light-volume.
  // A distant newly placed torch must not disappear merely because 20 closer lights exist.
- inBounds(minX,maxX,minZ,maxZ,{minY=0,maxY=64,limit=80}={}){
+ inBounds(minX,maxX,minZ,maxZ,{minY=0,maxY=64,limit=80,focus}={}){
   const chosen=[];
   const firstX=Math.floor(minX/SIZE),lastX=Math.floor((maxX-1e-6)/SIZE);
   const firstZ=Math.floor(minZ/SIZE),lastZ=Math.floor((maxZ-1e-6)/SIZE);
@@ -57,7 +57,13 @@ export class LightIndex {
     if(source&&source.x>=minX&&source.x<maxX&&source.z>=minZ&&source.z<maxZ&&source.y>=minY&&source.y<maxY)chosen.push(source);
    }
   }
-  // Deterministic ordering avoids flickering picks in equally populated chunks.
+  if(focus&&chosen.length>limit){
+   const [x,y,z]=focus;
+   const distance=s=>(s.x-x)**2+((s.y-y)*1.5)**2+(s.z-z)**2;
+   chosen.sort((a,b)=>distance(a)-distance(b)||a.x-b.x||a.y-b.y||a.z-b.z);
+   return chosen.slice(0,limit);
+  }
+  // Deterministic ordering when all emitters fit in the volume.
   chosen.sort((a,b)=>a.x-b.x||a.z-b.z||a.y-b.y);
   return chosen.slice(0,limit);
  }

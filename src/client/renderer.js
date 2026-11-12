@@ -43,10 +43,8 @@ void main(){
   else if(vTurns==3)uv=vec2(uv.y,-uv.x);
   tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
  }
- // Ambient retains the material color; lamp light adds a restrained amber tint.
- // Avoid multiplying grass green to bright chartreuse near multiple torches.
- float warmth=max(emission.r,max(emission.g,emission.b));
- vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.12)+vec3(.50,.135,.035)*warmth*.60;
+ // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
+ vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
  c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);
@@ -109,6 +107,7 @@ export class Renderer{
   this.lightWorker.onmessage=({data})=>{
    if(data.token!==this.lightSerial)return;
    this.lightBusy=false;
+   // Edits invalidate the snapshot; ordinary chunk arrivals can wait for the next pass.
    if(this.world!==this.lightRequestWorld||this.world?.lightRevision!==this.lightRequestRevision)return;
    if(data.error){console.warn('Light worker error',data.error);this.lightWorker.terminate();this.lightWorker=null;return}
    const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
@@ -171,11 +170,12 @@ export class Renderer{
  updateLightVolume(world,player){
   const ox=Math.floor(player.x/16)*16-32,oz=Math.floor(player.z/16)*16-32;
   const oy=world.height>LIGHT_HEIGHT?Math.max(0,Math.min(world.height-LIGHT_HEIGHT,Math.floor(player.y/16)*16-16)):0;
-  const origin=[ox,oy,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${ox}:${oy}:${oz}`;
+  const focus=[Math.floor(player.x/8)*8+4,Math.floor(player.y/4)*4+2,Math.floor(player.z/8)*8+4];
+  const origin=[ox,oy,oz],requestKey=`${this.worldToken}:${world.lightRevision}:${world.lightChunkRevision}:${ox}:${oy}:${oz}:${focus.join(',')}`;
   if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
   const blocks=makeOccluderSnapshot(world,origin);
-  const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:oy,maxY:oy+LIGHT_HEIGHT,limit:80}).map(l=>({...l,rgb:rgb(l.color)}));
-  const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;this.lightRequestWorld=world;this.lightRequestRevision=world.lightRevision;
+  const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:oy,maxY:oy+LIGHT_HEIGHT,limit:80,focus}).map(l=>({...l,rgb:rgb(l.color)}));
+  const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;this.lightRequestWorld=world;
   if(this.lightWorker){this.lightWorker.postMessage({token,origin,blocks:blocks.buffer,sources},[blocks.buffer]);return}
   const result=buildLightVolume(blocks,sources,{origin});const gl=this.gl;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);gl.texSubImage3D(gl.TEXTURE_3D,0,0,0,0,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,gl.RGBA,gl.UNSIGNED_BYTE,result);
   this.lightOrigin=origin;this.lightAppliedKey=requestKey;this.lightBusy=false;

@@ -46,6 +46,7 @@ export function* citySpawnCandidates(seed) {
   }
   for(const v of plan.volumes) {
     const f=v.floors[0], spine=f.corridors[0];
+    if(!spine)continue;
     const x=Math.floor((spine.x0+spine.x1)/2)+.5,z=Math.floor((spine.z0+spine.z1)/2)+.5;
     yield {x,y:Math.round(f.y),z};
   }
@@ -62,7 +63,30 @@ function inspectShape(f,x,z) {
   const room=f.rooms.find(r=>containsRect(r,x,z));
   const door=f.rooms.find(({door})=>lineDistance(x,z,door.a,door.b)<.70)?.door;
   const partition=!door&&f.partitions.find(({a,b})=>lineDistance(x,z,a,b)<.56);
-  return {edge,room,door,partition,corridor:f.corridors.some(r=>containsRect(r,x,z))};
+  const corridor=f.corridors.find(r=>containsRect(r,x,z));
+  return {edge,room,door,partition,corridor};
+}
+
+function furnishRoom(room,x,z,kit,seed) {
+  const {a,b}=room.door;
+  const alongX=Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1]);
+  const midX=(a[0]+b[0])/2,midZ=(a[1]+b[1])/2;
+  const dx=alongX?0:Math.sign((room.x0+room.x1)/2-midX);
+  const dz=alongX?Math.sign((room.z0+room.z1)/2-midZ):0;
+  const depth=(x-midX)*dx+(z-midZ)*dz;
+  const across=alongX?x-midX:z-midZ;
+  const length=alongX?room.z1-room.z0:room.x1-room.x0;
+  const span=alongX?room.x1-room.x0:room.z1-room.z0;
+  if(depth<1.25||length<2.6||Math.abs(across)<.9)return null;
+  const turn=outwardTurn(-dx,-dz);
+  const offset=Math.abs(across),side=hash(Math.floor(midX),0,Math.floor(midZ),seed)<.5?-1:1;
+  // Each room keeps a clear aisle from its door to the back wall.
+  if(depth>length-1.3&&offset<span*.53)return {variant:room.kind==='service'?4:0,turn};
+  if(Math.sign(across)!==side||offset<span*.23||offset>span*.48)return null;
+  if(room.kind==='shop'&&depth<2.65)return {variant:1,turn};
+  if(room.kind==='room'&&depth>length*.55&&depth<length*.55+1)return {variant:kit.interior.includes(3)?3:1,turn};
+  if(room.kind==='service'&&depth>2.5&&depth<3.5)return {variant:4,turn};
+  return null;
 }
 
 function stampBuilding(v,detail,x,z,seed,put,empty) {
@@ -88,7 +112,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
       // Recessed upper floors expose the roof of the previous mass as a terrace.
       if(lastShape&&lastShape.edge>=0&&columnHash>.54) {
         const previous=v.floors[f.level-1].outline;
-        put(floor,cityPart('balcony',kit.balcony),lineTurn(previous[lastShape.edge],previous[(lastShape.edge+1)%previous.length]),true);
+        put(floor,cityPart('balcony',2),lineTurn(previous[lastShape.edge],previous[(lastShape.edge+1)%previous.length]),true);
       }
       lastShape=shape;
       continue;
@@ -110,9 +134,8 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
         const column=bay===0 && edge%2===0;
         const blank=f.program==='workshops'?bay<3:f.program==='housing'?bay%2===0:bay===4;
         for(let y=floor;y<ceiling;y++) {
-          const window=!column&&!blank&&y>=floor+(f.program==='workshops'?2:1)&&y<=ceiling-2;
-          const id=column?cityPart('column',kit.column):window?cityPart('window',kit.window):
-            (bay===4||edge%2||f.level===0?cityPart('wall',kit.wall):kit.body);
+          const window=!column&&!blank&&y===floor+(f.program==='workshops'?2:1)&&y<=ceiling-2;
+          const id=column?kit.body:window?cityPart('window',kit.window):kit.body;
           put(y,id,turn,true);
         }
         if(columnHash>.985 && f.level%5===2)put(ceiling-1,cityPart('ventilation',kit.ventilation),turn,true);
@@ -123,12 +146,16 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
       }
     } else if(!hole && step<0 && !onLanding && !atAccess) {
       if(shaftSide&&!corridor) {
-        for(let y=floor;y<ceiling;y++)put(y,cityPart('wall',kit.wall),stairWallTurn);
+        for(let y=floor;y<ceiling;y++)put(y,kit.roomWall);
       } else if(partition) {
         const turn=lineTurn(partition.a,partition.b);
-        for(let y=floor;y<ceiling;y++)put(y,cityPart('partition',kit.partition),turn);
+        for(let y=floor;y<ceiling;y++) {
+          if(partition.kind==='shopfront'&&y===floor+1)put(y,cityPart('window',3),turn);
+          else put(y,kit.roomWall);
+        }
       } else if(door) {
         const turn=lineTurn(door.a,door.b);
+        for(let y=floor+2;y<ceiling;y++)put(y,kit.roomWall);
         if(room && room.kind!=='shop' && columnHash>.57 &&
            Math.floor((door.a[0]+door.b[0])/2)===xi && Math.floor((door.a[1]+door.b[1])/2)===zi) {
           put(floor,B.DOOR,turn>>1);
@@ -139,21 +166,19 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
           if(columnHash>.93)put(floor,cityPart('door',3),turn);
           if(columnHash>.81&&ceiling-floor>=4)put(ceiling-2,cityPart('sign',(kit.sign+1)%5),turn);
         }
-      } else if(corridor && mod(xi+zi+v.id,7)===0) {
-        put(ceiling-1,cityPart('interior',2),stairWallTurn);
-      } else if(room) {
-        const wallDistance=Math.min(x-room.x0,room.x1-x,z-room.z0,room.z1-z);
-        const turn=outwardTurn(x-(room.x0+room.x1)/2,z-(room.z0+room.z1)/2);
-        if(wallDistance<1.65&&columnHash>.79) {
-          const index=Math.floor(hash(xi,f.band,zi,seed)*kit.interior.length);
-          put(floor,cityPart('interior',kit.interior[index]),turn);
-          if(room.kind==='service'&&columnHash>.91)put(floor+1,cityPart('door',kit.door),turn);
-        } else if(wallDistance>1.9&&mod(xi+v.id,5)===0&&mod(zi+v.type,4)===0) {
-          put(floor,cityPart('interior',room.kind==='service'?4:1),turn);
+      } else if(corridor) {
+        const alongX=corridor.x1-corridor.x0>=corridor.z1-corridor.z0;
+        const center=alongX?(corridor.z0+corridor.z1)/2:(corridor.x0+corridor.x1)/2;
+        if(Math.floor(alongX?z:x)===Math.floor(center)&&mod((alongX?xi:zi)+v.id,6)===0) {
+          put(ceiling-1,B.FLUORESCENT,alongX?0:1);
         }
+      } else if(room) {
+        const item=furnishRoom(room,x,z,kit,seed);
+        if(item)put(floor,cityPart('interior',item.variant),item.turn);
+        if(xi===Math.floor((room.x0+room.x1)/2)&&zi===Math.floor((room.z0+room.z1)/2))put(ceiling-1,B.FLUORESCENT);
       }
     }
-    if(atAccess&&columnHash>.53&&ceiling-floor>=4)put(ceiling-1,cityPart('stairEntrance',kit.stairEntrance),v.stairFacing);
+    if(atAccess&&empty(ceiling-1)&&mod(xi+zi+v.id,5)===0)put(ceiling-1,B.FLUORESCENT,stairWallTurn>>1);
     if(step>=0) {
       const surface=f.y+stairs[step].y-v.y0;
       const facing=mod(v.stairFacing+(step>=stairs.length/2?4:0),8);
@@ -168,7 +193,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty) {
     const atrium=f.holes.find(h=>h.kind==='atrium');
     if(atrium&&!hole&&edge<0) {
       const outward=[[1,0],[-1,0],[0,1],[0,-1]].find(([dx,dz])=>containsRect(atrium,x+dx,z+dz));
-      if(outward&&empty(floor))put(floor,cityPart('balcony',kit.balcony),outwardTurn(...outward));
+      if(outward&&empty(floor))put(floor,cityPart('balcony',2),outwardTurn(...outward));
     }
   }
 }

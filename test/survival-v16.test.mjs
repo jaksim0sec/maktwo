@@ -62,11 +62,11 @@ test('landscape installed PWA and readable portrait fallback, with atomic offlin
  for(const name of ['src/core/inventory.js','src/client/item-icons.js'])assert.ok(sw.includes(name),name);
  assert.match(sw,/maktwo-shell-v\d+\.\d+\.\d+/);
 });
-test('scene stays unobstructed and warm light shader is restrained',()=>{
+test('scene stays unobstructed and the light shader uses the emitter tint',()=>{
  const css=read('style.css'),shader=read('src/client/renderer.js');
  assert.match(css,/#hud\{display:none/);
  assert.match(css,/#camera-btn\{display:none/);
  assert.match(css,/#player-status\{position:fixed;z-index:5;bottom/);
- assert.match(shader,/vec3\(\.50,\.135,\.035\)\*warmth\*\.60/);
+ assert.match(shader,/\+emission\*\.13/);
  assert.doesNotMatch(shader,/emission\*1\.38/);
 });

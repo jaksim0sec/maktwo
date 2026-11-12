@@ -20,6 +20,16 @@ test('light index tracks placement, removal and nearest light selection',()=>{
  w.set(2,27,2,B.AIR);
  assert.deepEqual(w.lights.near(0,28,0).map(x=>x.id),[B.LANTERN,B.CAMPFIRE]);
 });
+test('the light-volume budget retains nearby lights in a dense multistorey city',()=>{
+ const w=new World({seed:9999,mode:'eternal-city-lab'}),p=w.spawn();
+ for(let i=0;i<14;i++)w.stream(p.x,p.z,3,4,{roundEdges:true});
+ const x=Math.floor(p.x/16)*16-32,z=Math.floor(p.z/16)*16-32;
+ const local=w.lights.near(p.x,p.y,p.z,80,10);
+ assert.ok(local.length>0);
+ const selected=w.lights.inBounds(x,x+80,z,z+80,{limit:80,focus:[p.x,p.y,p.z]});
+ assert.ok(selected.includes(local[0]),'a lamp next to the player survives the volume budget');
+ assert.ok(selected.length<=80);
+});
 test('light index handles negative coordinates and chunk unloading without leaking',()=>{
  const w=new World({mode:'flat'});
  w.set(-1,30,-1,B.LANTERN);

@@ -29,6 +29,7 @@ export function cityFloorKit(base,floor,limit) {
   const index=floor.program==='workshops'?0:floor.program==='housing'?(n<.36?1:2):
     floor.program==='exchange'||floor.program==='court'?(n>.64?4:3):n>.51?3:1;
   const interior=palettes[index];
-  return {...base,floor:interior.floor,partition:interior.partition,door:interior.door,
+  const wall=palettes[Math.min(index,2)].body;
+  return {...base,floor:interior.floor,roomWall:wall,door:interior.door,
     staircase:interior.staircase,sign:interior.sign,interior:interior.interior};
 }

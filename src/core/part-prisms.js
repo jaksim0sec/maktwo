@@ -75,7 +75,7 @@ export function partPrisms(id,x,y,z,state={}){
    const rise=(piece.slopeY||0)*(sourceZ-piece.z)/piece.d;
    return {x:x+a,z:z+b,lo:y+piece.y+rise,hi:y+piece.y+piece.h+rise};
   });
-  pieces.push({vertices:verts,material:piece.material,alpha:piece.alpha,solid:piece.solid,
+  pieces.push({vertices:verts,material:piece.material,alpha:piece.alpha,solid:piece.solid,emissive:piece.emissive,
    structural:piece.structural||false,connected:joined,angle});
  }
  return pieces;

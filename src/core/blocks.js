@@ -39,5 +39,5 @@ BLOCKS[BLOCK.GLOW_MOSS].light={color:'#d6bd83',radius:3,intensity:.21,offsetY:1.
 BLOCKS[BLOCK.FIREFLY_GRASS].light={color:'#e4be76',radius:2,intensity:.25,offsetY:.50};
 
 // Only surviving light strips illuminate corridors; broken tubes stay dark.
-BLOCKS[BLOCK.FLUORESCENT].light={color:'#c9d9e5',radius:6,intensity:.33,offsetY:.86};
+BLOCKS[BLOCK.FLUORESCENT].light={color:'#d5e3ec',radius:8,intensity:.78,offsetY:.75};
 BLOCKS[BLOCK.PART_INTERIOR_3].light={color:'#f3dab7',radius:8,intensity:.43,offsetY:.75};

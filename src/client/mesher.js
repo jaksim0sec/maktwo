@@ -30,10 +30,10 @@ function partTemplate(id,facing,connected,simple,stairRise){
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
  for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise})||[]){
-  const color=COLORS[piece.material],target=piece.alpha?transparent:opaque;
+  const color=piece.emissive?[.97,.90,.78]:COLORS[piece.material],target=piece.alpha?transparent:opaque;
   for(const face of prismFaces(piece,true)){
    const n=prismNormal(face);if(!n)continue;
-   const shade=(.74+.26*Math.abs(n[1]))+4*materialFor(piece.material,0);
+   const shade=piece.emissive?-1.2:(.74+.26*Math.abs(n[1]))+4*materialFor(piece.material,0);
    for(let j=1;j<face.length-1;j++)for(const i of [0,j,j+1])target.push(...face[i],...color,shade);
   }
  }

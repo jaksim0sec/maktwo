@@ -132,7 +132,8 @@ export function designBuilding(volume, unit, random) {
         const door0=(start+end)/2-unit*.55+(highRise&&program==='housing'?(bay%2===0?.26:-.26)*unit:0),door1=door0+unit*1.1;
         rooms.push({...rect(Math.min(wallU,edgeU),start,Math.max(wallU,edgeU),end,shop?'shop':program==='workshops'||volume.type===4?'service':'room'),
           door:wall(wallU,door0,wallU,door1,'door')});
-        partitions.push(wall(wallU,start,wallU,door0,'partition'),wall(wallU,door1,wallU,end,'partition'),
+        const frontage=shop?'shopfront':'partition';
+        partitions.push(wall(wallU,start,wallU,door0,frontage),wall(wallU,door1,wallU,end,frontage),
           wall(wallU,end,edgeU,end,'partition'));
         if (start===front+unit*1.6 || (side>0 && start-roomLength<near+stair.landing)) {
           partitions.push(wall(wallU,start,edgeU,start,'partition'));
@@ -140,7 +141,7 @@ export function designBuilding(volume, unit, random) {
         if(shop&&highRise&&Math.abs(edgeU-outer)>.8)partitions.push(wall(edgeU,start,edgeU,end,'partition'));
         if(gallery&&side<0&&shop) {
           const display=(start+end)/2;
-          partitions.push(wall(edgeU,start,edgeU,display-unit*.65,'partition'),wall(edgeU,display+unit*.65,edgeU,end,'partition'));
+          partitions.push(wall(edgeU,start,edgeU,display-unit*.65,'shopfront'),wall(edgeU,display+unit*.65,edgeU,end,'shopfront'));
         }
         if(highRise&&program==='housing'&&Math.abs(edgeU-wallU)>unit*3) {
           const internal=wallU+(edgeU-wallU)*.44;

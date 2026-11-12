@@ -417,7 +417,7 @@ export function partGeometry(id){
   const mat=[floors[4],floors[4],metals[3],stones[0],metals[1]][v];
   if(v===0){put(.13,0,.18,.74,.84,.65,mat);for(const y of [.24,.49])put(.17,y,.13,.66,.045,.08,dark);}
   if(v===1){put(.09,.41,.11,.82,.10,.65,mat);for(const x of [.16,.76])for(const z of [.2,.64])put(x,0,z,.08,.43,.09,mat);put(.17,.46,.68,.65,.31,.10,mat);}
-  if(v===2){put(.10,.77,.27,.8,.10,.46,dark);for(const z of [.35,.56])put(.19,.73,z,.63,.06,.08,stones[4]);}
+  if(v===2){put(.10,.77,.27,.8,.10,.46,dark);for(const z of [.35,.56])put(.19,.73,z,.63,.06,.08,stones[4],false,false,{emissive:true});}
   if(v===3){put(.25,.02,.25,.50,.42,.50,stones[2]);put(.45,.36,.46,.10,.39,.10,metals[0]);for(const x of [.24,.65])put(x,.55,.40,.12,.21,.12,tiles[2]);}
   if(v===4){put(.19,.03,.17,.62,.86,.66,mat);put(.22,.61,.12,.56,.17,.065,metals[3]);for(const y of [.18,.43])put(.26,y,.10,.48,.035,.05,dark);}
   break;
