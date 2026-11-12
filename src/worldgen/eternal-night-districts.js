@@ -9,7 +9,6 @@ export const BUILDING_TYPES = [
   {label:'상층 증축', color:[155,185,143], width:4, floors:7},
   {label:'연결교', color:[191,179,235]},
 ];
-export const DISTRICT_BUILD_DEFAULTS = Object.freeze({density:.56, spacing:1});
 const BRIDGE = 6;
 const STOREY = 6;
 const NEIGHBORS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
@@ -150,7 +149,7 @@ function partition(layout, grid) {
   return {labels, sections:centers, tangentX, tangentZ};
 }
 
-function populate(layout, grid, partitioned, density, spacing) {
+function populate(layout, grid, partitioned) {
   const {size, step, left, top, luxury, noise, buildable} = grid;
   const {labels, sections, tangentX, tangentZ} = partitioned;
   const occupied = new Uint8Array(labels.length);
@@ -172,7 +171,7 @@ function populate(layout, grid, partitioned, density, spacing) {
     });
     let coverage = 0;
     for (const i of ranked) {
-      if (coverage >= density * ranked.length) break;
+      if (coverage >= .56 * ranked.length) break;
       const x = i % size, z = Math.floor(i / size);
       if (occupied[i] || !buildable[i]) continue;
       const l = .62 * luxury[i] + .38 * section.luxury;
@@ -188,7 +187,7 @@ function populate(layout, grid, partitioned, density, spacing) {
         const bx = x - Math.floor(w / 2), bz = z - Math.floor(d / 2);
         if (bx >= 0 && bz >= 0 && bx+w <= size && bz+d <= size) {
           let valid = true;
-          for (let dz = -spacing; dz < d + spacing && valid; dz++) for (let dx = -spacing; dx < w + spacing; dx++) {
+          for (let dz = -1; dz <= d && valid; dz++) for (let dx = -1; dx <= w; dx++) {
             const tx = bx+dx, tz = bz+dz;
             if (tx < 0 || tz < 0 || tx >= size || tz >= size) continue;
             const j = tz*size + tx;
@@ -272,14 +271,7 @@ function populate(layout, grid, partitioned, density, spacing) {
   return {volumes, links};
 }
 
-export function createDistrictPlan(layout, resolution = 128, {
-  density = DISTRICT_BUILD_DEFAULTS.density,
-  spacing = DISTRICT_BUILD_DEFAULTS.spacing,
-} = {}) {
-  if (!Number.isFinite(density) || density<0 || density>1 ||
-      !Number.isInteger(spacing) || spacing<0 || spacing>4) {
-    throw new RangeError('Invalid building density or spacing');
-  }
+export function createDistrictPlan(layout, resolution = 128) {
   if (!Number.isInteger(resolution) || resolution<16 || resolution>192) throw new RangeError('Invalid district resolution');
   const size = resolution, cells = size*size, step = layout.width/size;
   const left=layout.centerX-layout.halfWidth, top=layout.centerZ-layout.halfWidth;
@@ -301,7 +293,7 @@ export function createDistrictPlan(layout, resolution = 128, {
   }
   const grid={size,step,left,top,zones,luxury,noise,ids,buildable};
   const partitioned=partition(layout,grid);
-  const {volumes,links}=populate(layout,grid,partitioned,density,spacing);
+  const {volumes,links}=populate(layout,grid,partitioned);
   const columns=Array.from({length:cells},()=>[]);
   for (const v of volumes) for (let z=v.gz; z<v.gz+v.gd; z++) for (let x=v.gx; x<v.gx+v.gw; x++) columns[z*size+x].push(v);
   for (const column of columns) column.sort((a,b)=>a.y0-b.y0);
