@@ -65,7 +65,9 @@ The material ID stays in the chunk voxel array. An optional form byte encodes sl
 
 Creative mode has independent quick slots, unlimited materials, and access to all recipes. Survival inventory is stored separately. Flight uses the usual collision checks.
 
-## Ruined city architecture v5: plan-informed composition
+## Legacy ruined city architecture v5 (compatibility only)
+
+The active `building:*` studios now use `src/worldgen/architectural-components.js`: reusable part families, independent storey footprints, per-cell architectural style bytes, connected stair rail geometry, and material variants. The five old floor-plan archetypes described below remain for old `ruins` generation and regression compatibility, not as the primary studio generator.
 
 Architectural floor-plan references (structural organization only, no copyrighted drawings or facade copies):
 1. **Shop-house**: [former rice-store narrow house in Seoul](https://www.imwood.co.kr/news/articleView.html?idxno=22839), shop and entry alongside a separated stair core

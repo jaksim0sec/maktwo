@@ -95,7 +95,7 @@ export function partAt(p,x,y,z){
    const sign=partVariant(p,'sign',0),base=[B.SHOP_SIGN,B.ARCH_METAL_GALVANIZED,
     B.SHOP_SIGN,B.SHOP_AWNING,B.WARNING_STRIPE][sign];
    // A sign is an assembly of backing, supports and optional lighting.
-   if(dy===4&&u>=13&&u<=17)return {id:sign===2&&u===15?B.FLUORESCENT:base};
+   if(dy===4&&u>=13&&u<=17)return {id:sign===2&&u===15?B.FLUORESCENT:sign===1&&u===15?B.SHOP_SIGN:base};
    if(dy===3&&((sign===1&&(u===14||u===15))||
      (sign===3&&(u===13||u===17))||(sign===4&&(u===13||u===16))))
     return {id:sign===1?B.ARCH_METAL_BLACK_PAINT:sign===3?B.SHOP_AWNING:B.SHOP_SIGN};
@@ -109,6 +109,7 @@ export function partAt(p,x,y,z){
   return {id:walls[partVariant(p,'wall',level,(along+3)>>2)]};
  }
  const aisle=partVariant(p,'passage',level);
+ if(aisle===3&&u===6&&v>15&&v%8===4&&dy===2)return {id:B.ARCH_METAL_GALVANIZED};
  if(u===5||u===6||(aisle===4&&v===Math.floor(p.depth/2)&&u>=6&&u<=9))return {id:B.AIR};
  if(dy>=2&&dy<=4){
   const split=9+(level+p.variant)%4,partition=u===split&&v>3&&v<p.depth-2;

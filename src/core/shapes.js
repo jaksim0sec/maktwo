@@ -58,7 +58,10 @@ export function shapeBoxes(id,x,y,z,state={}){
   ];
   if(variant===3)for(const offset of [.35,.65])parts.push({x:x+offset,y:y+.12,z:z+.40,w:.05,h:.76,d:.2});
   if(variant===4)parts.push({x:x+.12,y:y+.54,z:z+.40,w:.76,h:.06,d:.2});
-  if(variant===5)parts.push({x:x+.12,y:y+.41,z:z+.40,w:.76,h:.055,d:.2});
+  if(variant===5){
+   parts.push({x:x+.12,y:y+.14,z:z+.40,w:.76,h:.28,d:.2});
+   parts.push({x:x+.12,y:y+.41,z:z+.40,w:.76,h:.055,d:.2});
+  }
   return id===B.WINDOW_EW?rotateBoxes(parts,x,z,1):parts;
  }
  if(id===B.CHAIR){

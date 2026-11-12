@@ -1,6 +1,6 @@
 import {SIZE,HEIGHT} from '../core/chunk.js';
 import {integratedTerrain} from './integrated.js';
-import {stampArchitectureV3,stampShowcaseBuilding} from './architecture-v3.js';
+import {stampArchitectureV3} from './architecture-v3.js';
 import {stampMaterialGallery} from './material-gallery.js';
 import {stampComponentBuilding} from './architectural-components.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
