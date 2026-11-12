@@ -285,6 +285,52 @@ export function metalRailing(dest,x,y,z,hasNeighbor,axis='z'){
   break;
  }
 }
+// Visible rotor blades are thin angled trapezoids, not textured solid cubes.
+// The blades are decorative non-colliding details inside the vent housing.
+export function fanRotorMesh(dest,x,y,z,id,facing=0){
+ const part=partById(id);
+ if(part?.family!=='ventilation'||part.variant===1)return;
+ const variant=part.variant,n=variant===4?6:variant===2?5:4;
+ const color=COLORS[variant===4?109:107],frame=COLORS[variant===2?106:108];
+ const angle=((facing%8)+8)%8*Math.PI/4,c=Math.cos(angle),sn=Math.sin(angle);
+ const front=variant===2?.235:.345,centerZ=variant===3?.22:front;
+ const transform=(a,b,d=centerZ)=>{
+  const dx=a-.5,dz=d-.5;
+  return [x+.5+dx*c-dz*sn,y+b,z+.5+dx*sn+dz*c];
+ };
+ const rot=(radius,a)=>[.5+radius*Math.cos(a),.5+radius*Math.sin(a)];
+ const point=(r,a,d=centerZ)=>{const [xx,yy]=rot(r,a);return transform(xx,yy,d)};
+ const shade=1+4*materialFor(109,0);
+ for(let i=0;i<n;i++){
+  const a=i*2*Math.PI/n+variant*.11;
+  const outline=[
+   point(.085,a-.42),point(.14,a+.22),
+   point(variant===4?.31:.27,a+.47),point(variant===4?.34:.30,a-.24)
+  ];
+  quad(dest,outline,color,shade);
+  quad(dest,[...outline].reverse(),color,shade);
+  // A stamped ridge makes the metal appear pressed and tilted.
+  const ridge=[point(.12,a-.14,centerZ-.015),point(.17,a+.04,centerZ-.015),
+   point(.29,a+.28,centerZ-.015),point(.25,a+.13,centerZ-.015)];
+  quad(dest,ridge,frame,shade+.06);
+ }
+ const segments=variant===4?16:12;
+ const r1=variant===4?.355:.32,r2=variant===4?.383:.345;
+ for(let i=0;i<segments;i++){
+  const a=i*2*Math.PI/segments,b=(i+1)*2*Math.PI/segments;
+  const rim=[point(r1,a,front-.04),point(r1,b,front-.04),
+   point(r2,b,front-.04),point(r2,a,front-.04)];
+  quad(dest,rim,frame,shade);
+  quad(dest,[...rim].reverse(),frame,shade);
+ }
+ // Segmented centre cap with a raised highlight ring.
+ for(let i=0;i<8;i++){
+  const a=i*Math.PI/4,b=(i+1)*Math.PI/4;
+  const tri=[point(0,0,front-.065),point(.077,a,front-.065),point(.077,b,front-.065)];
+  for(const indices of [[0,1,2],[2,1,0]])for(const k of indices)dest.push(...tri[k],...frame,shade+.10);
+ }
+}
+
 export function gardenMesh(dest,id,x,y,z){
  const box=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
  if(id===B.WORKBENCH){
