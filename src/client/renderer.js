@@ -3,18 +3,37 @@ const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
 uniform mat4 uVP;uniform vec3 uCamera;uniform float uTime;
-out vec3 vColor;out float vFog;out float vWorldY;
-void main(){gl_Position=uVP*vec4(aPos,1.);vWorldY=aPos.y;vColor=aColor*aShade;float d=length(aPos-uCamera);vFog=clamp((d-28.)/70.,0.,1.);}`;
+out vec3 vColor;out float vFog;out vec3 vPos;out float vEmission;
+void main(){gl_Position=uVP*vec4(aPos,1.);vPos=aPos;vEmission=aShade<0.?1.:0.;vColor=aColor*abs(aShade);float d=length(aPos-uCamera);vFog=clamp((d-28.)/70.,0.,1.);}`;
 const FRAG=`#version 300 es
-precision highp float;in vec3 vColor;in float vFog;in float vWorldY;uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;out vec4 frag;
-void main(){vec3 c=vColor*uBrightness;c=mix(c,uFog,vFog);frag=vec4(c,uAlpha);}`;
+precision highp float;
+in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;
+uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;
+uniform vec4 uLightPos[8];uniform vec3 uLightColor[8];uniform int uLightCount;
+uniform float uTime;
+out vec4 frag;
+void main(){
+ vec3 light=vec3(.82,.87,1.03)*uBrightness;
+ for(int i=0;i<8;i++){
+  if(i>=uLightCount)break;
+  vec3 delta=vPos-uLightPos[i].xyz;
+  float r2=dot(delta,delta)/(uLightPos[i].w*uLightPos[i].w);
+  float strength=max(0.,1.-r2);
+  strength*=strength;
+  float flicker=1.+.025*sin(uTime*3.7+float(i)*4.2);
+  light+=uLightColor[i]*strength*flicker;
+ }
+ vec3 c=vEmission>.5?min(vColor,vec3(1.)):vColor*min(light,vec3(1.7));
+ c=mix(c,uFog,vFog);
+ frag=vec4(c,uAlpha);
+}`;
 function shader(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 function program(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
 function matMultiply(a,b){const o=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++)for(let k=0;k<4;k++)o[j*4+i]+=a[k*4+i]*b[j*4+k];return o}
 export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)/(near-far),-1,0,0,2*far*near/(near-far),0])}
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,1.2);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightPos:gl.getUniformLocation(this.program,'uLightPos[0]'),lightColor:gl.getUniformLocation(this.program,'uLightColor[0]'),lightCount:gl.getUniformLocation(this.program,'uLightCount')};this.meshes=new Map();this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.lightPositions=new Float32Array(8*4);this.lightColors=new Float32Array(8*3);this.maxPixelRatio=Math.min(typeof devicePixelRatio==='number'?devicePixelRatio:1,1.2);
  try{if(typeof Worker==='function'){
   this.worker=new Worker(new URL('./mesh.worker.js',import.meta.url),{type:'module'});
   this.worker.onmessage=({data})=>{const task=this.inflight.get(data.key);if(!task||task.token!==data.token)return;this.inflight.delete(data.key);if(data.error){console.error('Mesher worker:',data.error);task.chunk.dirty=true;this.disableWorker();return}this.completed.push({task,data})};
@@ -76,10 +95,22 @@ export class Renderer{
   if(e.flash>0)cube(arr,x-.3,y+.4,z-.28,.6,.2,.56,rgb('#ff8787'))}
  for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);return new Float32Array(arr)}
  frame(world,player,entities,effects){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*this.renderScale,width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
-  const t=world.time/24000*Math.PI*2,day=clamp(Math.sin(t)+.3,.12,1),fog=[.39+day*.22,.43+day*.25,.48+day*.23];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
-  const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,day);gl.uniform1f(this.u.time,world.time);gl.uniform1f(this.u.alpha,1);
+  const fog=[.135,.16,.215];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);
+  const camY=player.y+player.eye,vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),.05,140),view(player.yaw,player.pitch,player.x,camY,player.z));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,player.x,camY,player.z);gl.uniform3fv(this.u.fog,fog);gl.uniform1f(this.u.brightness,.56);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
+  // GPU cost is bounded: only the eight nearest loaded light sources per frame.
+  const nearby=world.lights.near(player.x,camY,player.z,8,30);
+  this.lightPositions.fill(0);this.lightColors.fill(0);
+  for(let i=0;i<nearby.length;i++){
+   const l=nearby[i],base=i*4,c=i*3;
+   this.lightPositions.set([l.x,l.y,l.z,l.radius],base);
+   const color=rgb(l.color);
+   this.lightColors.set(color.map(v=>v*l.intensity),c);
+  }
+  gl.uniform1i(this.u.lightCount,nearby.length);
+  gl.uniform4fv(this.u.lightPos,this.lightPositions);
+  gl.uniform3fv(this.u.lightColor,this.lightColors);
   const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=88;const visible=[];for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m)}this.lastDrawnChunks=visible.length;for(const m of visible)this.drawMesh(m.opaque);
-  const data=this.dynamicData(entities,effects,world.time*.01);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
+  const data=this.dynamicData(entities,effects,performance.now()*.001);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
  }
 }

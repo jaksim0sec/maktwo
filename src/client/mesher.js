@@ -15,7 +15,7 @@ const DIMS = [SIZE, HEIGHT, SIZE];
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>render==='cross');
+const CROSS = BLOCKS.map(({render})=>render==='cross'||render==='fixture');
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 
 export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
@@ -79,9 +79,33 @@ export function meshChunk(world,chunk){
  for(let y=0;y<HEIGHT;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const id=chunk.get(x,y,z);if(id!==B.FLOWER&&id!==B.TORCH)continue;
   const wx=ox+x,wz=oz+z,color=COLORS[id];
+  if(id!==B.FLOWER){fixture(opaque,id,wx,y,wz);continue}
   const v1=[[wx+.12,y,wz+.12],[wx+.88,y,wz+.88],[wx+.88,y+.87,wz+.88],[wx+.12,y+.87,wz+.12]];
   const v2=[[wx+.12,y,wz+.88],[wx+.88,y,wz+.12],[wx+.88,y+.87,wz+.12],[wx+.12,y+.87,wz+.88]];
   for(const verts of [v1,v2,[...v1].reverse(),[...v2].reverse()])quad(opaque,verts,color,1);
  }
  return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent)};
+}
+
+// Small low-poly practical lights. Negative vertex shade tags emissive surfaces
+// without adding another vertex attribute or increasing the chunk buffer stride.
+export function fixture(dest,id,x,y,z){
+ const shape=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
+ if(id===B.TORCH){
+  shape(.43,.06,.43,.14,.65,.14,'#806550');
+  shape(.405,.68,.405,.19,.17,.19,'#e9ad63',-1.5);
+  shape(.445,.81,.445,.11,.11,.11,'#ffe2a3',-1.6);
+ }else if(id===B.LANTERN){
+  shape(.31,.12,.31,.38,.09,.38,'#746858');
+  shape(.36,.22,.36,.28,.38,.28,'#ffd19a',-1.5);
+  for(const dx of [.3,.64])for(const dz of [.3,.64])shape(dx,.2,dz,.06,.44,.06,'#766b59');
+  shape(.28,.63,.28,.44,.09,.44,'#766b59');
+  shape(.45,.72,.45,.10,.11,.10,'#766b59');
+ }else if(id===B.CAMPFIRE){
+  shape(.13,.09,.28,.74,.18,.18,'#80624d');
+  shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');
+  shape(.29,.22,.31,.42,.12,.39,'#e47b45',-1.15);
+  shape(.37,.34,.37,.26,.32,.26,'#f8ae65',-1.5);
+  shape(.45,.59,.45,.10,.13,.10,'#ffe0a3',-1.7);
+ }
 }
