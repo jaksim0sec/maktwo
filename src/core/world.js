@@ -1,8 +1,8 @@
 import {Chunk,SIZE,HEIGHT} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved)c.data[idx]=id;c.dirty=true;this.lights.loadChunk(c);this.lightRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
+ constructor({seed=12345,mode='normal',version=1,name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.version=version;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz),this.seed,this.mode,this.version);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved)c.data[idx]=id;c.dirty=true;this.lights.loadChunk(c);this.lightRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
  getShapeState(x,y,z){return this.blockStates.get(this.stateKey(x,y,z))||{facing:0,upper:false}}
@@ -67,7 +67,7 @@ export class World{
   const originals=new Map();
   for(const entry of selected){
    let base=originals.get(entry.k);
-   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz),this.seed,this.mode);originals.set(entry.k,base)}
+   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz),this.seed,this.mode,this.version);originals.set(entry.k,base)}
    const bx=entry.bx,by=entry.by,bz=entry.bz;
    const original=base.get(bx-entry.cx*SIZE,by,bz-entry.cz*SIZE);
    this.edits.get(entry.k)?.delete(entry.idx);
@@ -79,11 +79,15 @@ export class World{
   this.save();
   return selected.length;
  }
- snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,time:this.time,edits,states:[...this.blockStates]})}
+ snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,time:this.time,edits,states:[...this.blockStates]})}
 
  stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.lights.unloadChunk(k);this.lightRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
- spawn(){let x=0,z=0;for(let r=0;r<20;r++){x=r*3;z=r*2;const y=surfaceAt(x,z,this.seed,this.mode);if(y>=SEA+1)return{x:x+.5,y:y+2,z:z+.5}}return{x:.5,y:30,z:.5}}
+ spawn(){let x=0,z=0;for(let r=0;r<32;r++){x=r*3;z=r*2;
+  const y=surfaceAt(x,z,this.seed,this.mode,this.version);if(y<SEA+1)continue;
+  if(this.mode==='ruins'&&(this.get(x,y+1,z)!==B.AIR||this.get(x,y+2,z)!==B.AIR))continue;
+  return{x:x+.5,y:y+2,z:z+.5};
+ }return{x:.5,y:30,z:.5}}
  save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.name,this.snapshot());return true}
- loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.name)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state)}}catch{}}
+ loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.name)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){this.version=Number.isInteger(d.generationVersion)&&d.generationVersion>=1?d.generationVersion:1;this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state)}}catch{}}
 }
-export class WorldManager{constructor(storage=null){this.storage=storage;this.worlds=new Map();this.active=null}add(name,seed,mode='normal'){const w=new World({name,seed,mode,storage:this.storage});this.worlds.set(name,w);if(!this.active)this.active=w;return w}travel(name){const dest=this.worlds.get(name);if(!dest)throw Error('Unknown world '+name);this.active.save();this.active=dest;return dest}}
+export class WorldManager{constructor(storage=null){this.storage=storage;this.worlds=new Map();this.active=null}add(name,seed,mode='normal',version=1){const w=new World({name,seed,mode,version,storage:this.storage});this.worlds.set(name,w);if(!this.active)this.active=w;return w}travel(name){const dest=this.worlds.get(name);if(!dest)throw Error('Unknown world '+name);this.active.save();this.active=dest;return dest}}
