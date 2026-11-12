@@ -169,17 +169,48 @@ function curvePoint(start, bend, end, t) {
     a * start[1] + b * bend[1] + c * end[1]];
 }
 
-function stampCurve(field, start, bend, end, radius, strength, growth, concentrationPower) {
+function smoothstep(value) {
+  return value * value * (3 - 2 * value);
+}
+
+function coherentNoise(x, z, seed) {
+  const col = Math.floor(x);
+  const row = Math.floor(z);
+  const sx = smoothstep(x - col);
+  const sz = smoothstep(z - row);
+  const a = gridValue(col, row, seed);
+  const b = gridValue(col, row + 1, seed);
+  const near = a + sx * (gridValue(col + 1, row, seed) - a);
+  const far = b + sx * (gridValue(col + 1, row + 1, seed) - b);
+  return near + sz * (far - near);
+}
+
+function riverPoint([x, z], progress, radius, seed) {
   const scale = (NOISE_RESOLUTION - 1) / 2;
-  const steps = 10;
-  let [x, z] = start.map(value => (value + 1) * scale);
+  const noiseX = x * 6;
+  const noiseZ = z * 6;
+  // A shared displacement field keeps a branch root at the same point on its trunk.
+  const bendX = coherentNoise(noiseX, noiseZ, seed ^ 0x1f123bb5) * 0.065;
+  const bendZ = coherentNoise(noiseX, noiseZ, seed ^ 0x5f356495) * 0.065;
+  const width = 0.96 + coherentNoise(noiseX, noiseZ, seed ^ 0x45d9f3b) * 0.30;
+  return [(x + bendX + 1) * scale, (z + bendZ + 1) * scale,
+    radius * scale * width * (1 - 0.55 * progress)];
+}
+
+function stampCurve(field, start, bend, end, radius, strength, growth, coreWidth, seed) {
+  const steps = 20;
+  let [x, z, startBrush] = riverPoint(start, 0, radius, seed);
   for (let step = 1; (step - 1) / steps < growth; step++) {
-    const progress = Math.min(growth, step / steps);
-    const [nextX, nextZ] = curvePoint(start, bend, end, progress).map(value => (value + 1) * scale);
-    const dx = nextX - x;
-    const dz = nextZ - z;
+    const progress = step / steps;
+    const fraction = Math.min(1, growth * steps - (step - 1));
+    const [targetX, targetZ, targetBrush] = riverPoint(curvePoint(start, bend, end, progress), progress, radius, seed);
+    const dx = (targetX - x) * fraction;
+    const dz = (targetZ - z) * fraction;
+    const nextX = x + dx;
+    const nextZ = z + dz;
+    const endBrush = startBrush + (targetBrush - startBrush) * fraction;
     const lengthSq = dx * dx + dz * dz;
-    const brush = radius * scale * (1 - 0.55 * (step - 1) / steps);
+    const brush = Math.max(startBrush, endBrush);
     const minX = Math.max(0, Math.floor(Math.min(x, nextX) - brush));
     const maxX = Math.min(NOISE_RESOLUTION - 1, Math.ceil(Math.max(x, nextX) + brush));
     const minZ = Math.max(0, Math.floor(Math.min(z, nextZ) - brush));
@@ -188,13 +219,19 @@ function stampCurve(field, start, bend, end, radius, strength, growth, concentra
       for (let col = minX; col <= maxX; col++) {
         const along = lengthSq ? Math.max(0, Math.min(1, ((col - x) * dx + (row - z) * dz) / lengthSq)) : 0;
         const distanceSq = (col - x - along * dx) ** 2 + (row - z - along * dz) ** 2;
-        const falloff = Math.max(0, 1 - distanceSq / (brush * brush));
+        const localBrush = startBrush + (endBrush - startBrush) * along;
+        if (distanceSq >= localBrush * localBrush) continue;
+        const distance = Math.sqrt(distanceSq) / localBrush;
+        // Like a river's shallow and deep bands, the core sits inside a wider shoulder.
+        const shoulder = smoothstep(1 - distance);
+        const core = smoothstep(Math.max(0, 1 - distance / coreWidth));
         const index = row * NOISE_RESOLUTION + col;
-        field[index] = Math.max(field[index], strength * falloff ** concentrationPower);
+        field[index] = Math.max(field[index], strength * (0.34 * shoulder + 0.66 * core));
       }
     }
     x = nextX;
     z = nextZ;
+    startBrush = endBrush;
   }
 }
 
@@ -206,7 +243,7 @@ function getBranchField(layout) {
   field = new Float32Array(NOISE_RESOLUTION ** 2);
   const spread = Math.max(0.45, Math.min(1.55, layout.noiseCellSize / (layout.halfWidth * 0.12)));
   const density = layout.luxuryNoiseDensity;
-  const concentrationPower = 1 + 2 * layout.luxuryNoiseConcentration;
+  const coreWidth = 0.84 - 0.54 * layout.luxuryNoiseConcentration;
   for (let district = 0; district < 4; district++) {
     const random = salt => gridValue(district, salt, layout.noiseSeed);
     const x = (district === 0 || district === 3 ? 1 : -1) * (0.38 + 0.08 * random(0));
@@ -228,7 +265,7 @@ function getBranchField(layout) {
       ? density * 2 * (1 + defaultBranchCount)
       : 1 + defaultBranchCount + (density * 2 - 1) * (BRANCH_ATTACHMENTS.length - defaultBranchCount);
     const trunkGrowth = Math.min(1, growth);
-    stampCurve(field, start, bend, end, 0.047, trunkGrowth, trunkGrowth, concentrationPower);
+    stampCurve(field, start, bend, end, 0.047, trunkGrowth, trunkGrowth, coreWidth, layout.noiseSeed);
 
     const firstSide = random(8) < 0 ? -1 : 1;
     for (let branch = 0; branch < growth - 1; branch++) {
@@ -240,7 +277,7 @@ function getBranchField(layout) {
       const turn = offset(root, 0.02 + 0.08 * random(18 + salt), side * 0.05);
       const radius = branch >= 2 ? 0.023 : 0.031;
       const strength = branch >= 2 ? 0.52 : 0.74;
-      stampCurve(field, root, turn, tip, radius, strength, branchGrowth, concentrationPower);
+      stampCurve(field, root, turn, tip, radius, strength, branchGrowth, coreWidth, layout.noiseSeed);
     }
   }
   branchFields.set(layout, field);
