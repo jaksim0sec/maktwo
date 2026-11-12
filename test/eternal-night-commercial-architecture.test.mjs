@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {designBuilding,designShopModule} from '../src/worldgen/eternal-night-buildings.js';
-import {facadeBay} from '../src/worldgen/eternal-night-facade.js';
+import {facadeBay,enclosedPassageBay} from '../src/worldgen/eternal-night-facade.js';
 
 const makeTall=()=>({id:3,x0:0,z0:0,x1:34,z1:42,y0:8,y1:80,type:0,highRise:true,program:'market',support:null,phase:.2,precinct:0});
 const lineMid=line=>[(line.a[0]+line.b[0])/2,(line.a[1]+line.b[1])/2];
@@ -43,3 +43,10 @@ test('semantic facade uses commercial storefront only at front and suppresses of
 
 // Integration tests verify the city plan's programme, not merely the facade selector.
 // The first entry on each street is a shop or low/mid-rise mixed-use building.
+
+test('enclosed connecting corridors are mostly solid walls and have no random shop signs',()=>{
+ const bays=Array.from({length:7},(_,i)=>enclosedPassageBay(i));
+ assert.ok(bays.filter(b=>b.window).length<=2,'bridge must not become a curtain wall');
+ assert.ok(bays.every(b=>b.sign===false),'signs require an actual tenant');
+ assert.ok(bays.every(b=>b.wall||b.window),'every edge is enclosed');
+});
