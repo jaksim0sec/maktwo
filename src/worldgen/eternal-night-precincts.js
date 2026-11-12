@@ -59,7 +59,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
         const nx=x+dx,nz=z+dz;
         return nx>=0&&nx<size&&nz>=0&&nz<size&&lanes[nz*size+nx]===1;
       });
-      if(nearSpine&&laneSide&&(program==='market'||program==='shops')&&random(25)<.72)
+      if(nearSpine&&laneSide&&(program==='market'||program==='shops')&&random(25)<.32)
         lotSizes.unshift(lotSizes.pop());
       let found;
       for(const [w,d] of lotSizes) {
@@ -97,7 +97,11 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
         const anchor=landmarks.get(section.district);
         const nearAnchor=anchor?Math.exp(-Math.hypot(anchor.x0-v.x0,anchor.z0-v.z0)/(step*7.5)):0;
         const cluster=nearAnchor*(18+29*random(51));
-        const preferred=landmark?70+Math.floor(random(98)*11):Math.min(66,
+        // Street-front Korean mixed-use blocks stay low/mid rise. Landmark
+        // towers and inland housing/industrial masses retain vertical scale.
+        const commercialCap=nearSpine&&(program==='market'||program==='shops')
+          ?4+Math.floor(random(47)*11):66;
+        const preferred=landmark?70+Math.floor(random(98)*11):Math.min(commercialCap,
           3+Math.round(cluster+(program==='market'?21:program==='court'?48:34)*(.2+.8*tier)*random(4)**1.45));
         const floors=Math.min(preferred,Math.floor((layout.floorTop-v.y0)/pitch)-1);
         if(floors<1)continue;

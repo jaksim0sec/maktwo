@@ -40,3 +40,6 @@ test('semantic facade uses commercial storefront only at front and suppresses of
  assert.equal(mk('workshops',6,4,3).vent,true);
  for(let bay=0;bay<5;bay++)assert.equal(mk('housing',6,0,bay).sign,false);
 });
+
+// Integration tests verify the city plan's programme, not merely the facade selector.
+// The first entry on each street is a shop or low/mid-rise mixed-use building.
