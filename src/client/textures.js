@@ -5,8 +5,9 @@ import {ARCH_MATERIALS,ARCH_MATERIAL_START} from '../core/architectural-material
 import {sampleArchitectureTexture} from './architecture-texture-sampler.js';
 import {STATION_MATERIALS,STATION_MATERIAL_START} from '../core/station-materials.js';
 import {sampleStationTexture} from './station-textures.js';
+import {sampleDetailedMaterial} from './material-art.js';
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label)];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label),'석회암 석재','대리석 석재','콘크리트 보 표면','천장 마감 표면'];
 // Only orientation-safe material families are transformed. Directional seams stay aligned.
 // Modes: 3 = quarter-turns and reflection; 1 = reflection; 0 = unchanged.
 const UV_VARIANTS=new Uint8Array(MATERIALS.length+1);
@@ -48,14 +49,17 @@ export function materialFor(id,face){
   case 31:case 39:case 40:return 3;
   case 32:return 15;
   case 33:return 16;
-  case 34:case 36:case 37:case 43:return 17;
-  case 35:case 44:return 18;
+  case 34:case 36:case 37:return 17;
+  case 43:return 91; // independent limestone, never shale
+  case 35:return 18;
+  case 44:return 92; // independent marble, never granite
   case 41:case 42:return 20;
   case 45:return face===2||face===3?7:21;
   case 46:case 48:return 8;
   case 47:return face===2||face===3?7:21;
   case 54:return 22; // quartz
-  case 55:case 73:return 23;
+  case 55:return 23;
+  case 73:return 93; // formwork concrete beam
   case 56:return 24;
   case 57:return 25;
   case 58:return 26;
@@ -78,7 +82,7 @@ export function materialFor(id,face){
   case 81:case 82:return 28;
   case 83:return 23;
   case 84:return 26;
-  case 85:return 27;
+  case 85:return 94; // distinct ceiling cladding
   default:return 0;
  }
 }
@@ -120,6 +124,18 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
   const n=rand(x,y,m),fine=rand(x>>1,y>>1,m+31),patch=rand(x>>2,y>>2,m+71);
   let f=.89+.13*patch+.055*(fine-.5),r=1,g=1,b=1;
   const px=x*32/size,py=y*32/size;
+   // 30 selected high-impact surfaces receive authored multi-scale pigments and
+   // contact darkening baked once at upload, not evaluated by the fragment shader.
+   const detailGroup=m>=90?'extra':m>=70?'station':m>=40?'architecture':'base';
+   const detailIndex=m>=90?m-90:m>=70?m-70:m>=40?m-40:m;
+   const detailed=sampleDetailedMaterial(detailGroup,detailIndex,x,y,size);
+   if(detailed){
+    const [shade,red,green,blue]=detailed,a=(m*size*size+y*size+x)*4;
+    out[a]=Math.round(Math.min(255,255*shade*red));
+    out[a+1]=Math.round(Math.min(255,255*shade*green));
+    out[a+2]=Math.round(Math.min(255,255*shade*blue));out[a+3]=255;
+    continue;
+   }
   if(m>=40+ARCH_MATERIALS.length){
    const [shade,red,green,blue]=sampleStationTexture(m-40-ARCH_MATERIALS.length,x,y,size);
    const a=(m*size*size+y*size+x)*4;

@@ -7,7 +7,7 @@ import {ARCH_MATERIALS,ARCH_MATERIAL_START} from '../src/core/architectural-mate
 import {GALLERY_BLOCK_IDS,galleryCoordinate} from '../src/worldgen/material-gallery.js';
 import {PARTS,PART_FAMILIES} from '../src/core/part-library.js';
 import {partPosition,partGallerySpawn} from '../src/worldgen/part-gallery.js';
-import {makeTextureLayers,materialFor} from '../src/client/textures.js';
+import {makeTextureLayers,materialFor,MATERIALS} from '../src/client/textures.js';
 
 test('independent galleries and the city lab have separate presets; old IDs remain stable',()=>{
  assert.deepEqual(WORLD_PRESETS.map(p=>p.mode),['materials','parts','eternal-city-lab','eternal-city-lab','station-preview','arboretum','eternal-city-lab']);
@@ -43,7 +43,7 @@ test('13 part rows each hold five isolated samples, no building geometry',()=>{
 });
 test('30 deterministic 32px architecture textures retain distinct material IDs',()=>{
  const a=makeTextureLayers(),b=makeTextureLayers();
- assert.equal(a.layers,70);assert.deepEqual(a.data,b.data);
+ assert.equal(a.layers,MATERIALS.length);assert.deepEqual(a.data,b.data);
  const signatures=new Set();
  for(let i=0;i<ARCH_MATERIALS.length;i++){
   const id=ARCH_MATERIAL_START+i,layer=materialFor(id,0)-1;
