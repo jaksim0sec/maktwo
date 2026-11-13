@@ -10,6 +10,8 @@ const SHELVES=[B.PART_BOOKSHELF_1,B.PART_BOOKSHELF_2,B.PART_BOOKSHELF_3,B.PART_B
 const RAIL=cityPart('passage',4);
 const TABLE=cityPart('interior',1);
 const STAIR=cityPart('staircase',4);
+// Shared reference for spawn placement and large-district skyline proportions.
+export const CORE_DOME_HEIGHT=86;
 const RADIAL_BAYS=32;
 const TAU=2*Math.PI;
 const wrap=(n,d)=>((n%d)+d)%d;
@@ -20,7 +22,7 @@ export function createCoreLibrary(layout,tower){
  const roofInner=tower.radius+4;
  return {
   x:layout.centerX,z:layout.centerZ,radius,base,roofInner,towerRadius:tower.radius,
-  eaves:base+54,crown:base+86,galleries:[tower.entryY,base+26],
+  eaves:base+54,crown:base+CORE_DOME_HEIGHT,galleries:[tower.entryY,base+26],
   gardens:layout.gardenCenters,gardenRadius:layout.gardenRadius,
  };
 }

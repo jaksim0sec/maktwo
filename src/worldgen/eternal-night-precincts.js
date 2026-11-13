@@ -1,12 +1,15 @@
 import {designBuilding,designShopModule,stairRisers} from './eternal-night-buildings.js';
 import {designRoofWalkway} from './eternal-night-walkways.js';
+import {CORE_DOME_HEIGHT} from './eternal-night-library.js';
 
 const TYPES={market:3,housing:1,court:2,workshops:4,shops:0};
 const CARDINAL=[[1,0],[-1,0],[0,1],[0,-1]];
 
 /** Grow lots around shared passages. The grid reserves space; the modules own the geometry. */
-// Keep landmark and mixed-use towers slightly shorter without changing floor pitch.
-const HEIGHT_FACTOR=.92;
+// High-rise masses average 1.75 dome heights, with modest seeded variation.
+// One-storey shops and street-front commercial strips retain their low scale.
+export const DISTRICT_DOME_RATIO=1.75;
+export const DISTRICT_HEIGHT_SPREAD=.17;
 export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity},randomAt) {
   const {size,step,left,top,luxury,noise,buildable}=grid;
   const {sections,labels,tangentX,tangentZ}=partitioned;
@@ -96,20 +99,20 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
         const pitch=stairRisers(v,unit)*unit/4;
         if(!pitch)continue;
         const landmark=!landmarks.has(section.district)&&w*d>=min*(min+1);
-        const anchor=landmarks.get(section.district);
-        const nearAnchor=anchor?Math.exp(-Math.hypot(anchor.x0-v.x0,anchor.z0-v.z0)/(step*7.5)):0;
-        const cluster=nearAnchor*(18+29*random(51));
-        // Street-front Korean mixed-use blocks stay low/mid rise. Landmark
-        // towers and inland housing/industrial masses retain vertical scale.
-        const commercialCap=nearSpine&&(program==='market'||program==='shops')
-          ?4+Math.floor(random(47)*11):66;
-        const preferred=landmark?70+Math.floor(random(98)*11):Math.min(commercialCap,
-          3+Math.round(cluster+(program==='market'?21:program==='court'?48:34)*(.2+.8*tier)*random(4)**1.45));
-        const floors=Math.min(Math.max(1,Math.round(preferred*HEIGHT_FACTOR)),Math.floor((layout.floorTop-v.y0)/pitch)-1);
+        // Keep the typical district roof near 1.75x the dome above the shared base.
+        // Building-specific stair pitch determines floor count, never a taller storey.
+        const centered=(random(98)*2-1)*DISTRICT_HEIGHT_SPREAD;
+        const landmarkBonus=landmark?.07:0;
+        const targetHeight=CORE_DOME_HEIGHT*DISTRICT_DOME_RATIO*(1+centered+landmarkBonus);
+        const streetFront=nearSpine&&(program==='market'||program==='shops');
+        const streetCap=4+Math.floor(random(47)*7);
+        const preferred=Math.max(2,Math.round(targetHeight/pitch));
+        const floors=Math.min(streetFront?Math.min(preferred,streetCap):preferred,
+          Math.floor((layout.floorTop-v.y0)/pitch)-1);
         if(floors<1)continue;
         v.y1=v.y0+pitch*floors;
         if(!designBuilding(v,unit,random))continue;
-        if(landmark&&floors>=Math.round(70*HEIGHT_FACTOR))landmarks.set(section.district,v);
+        if(landmark)landmarks.set(section.district,v);
       }
       if(v.y1>=layout.floorTop)continue;
       volumes.push(v);precinct.modules.push(v.id);used+=w*d;

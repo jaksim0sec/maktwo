@@ -2,7 +2,7 @@ import {block as itemBlock} from '../core/blocks.js';
 import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
-import {distantCityMesh} from './city-distance.js';
+import {distantCityMesh,distanceSectorVisible} from './city-distance.js';
 import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolume} from '../core/lightVolume.js';
@@ -250,7 +250,9 @@ export class Renderer{
   this.worker.postMessage({key,revision,token,yMin,yMax,detailY,offset,height:chunk.height,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighborBuffers,doorStates:states},buffers);
  }
  syncCityDistance(world,cx,cz){
-  const key=cx+','+cz;
+  // Rebuild the distant panorama only when the camera changes its 32-block anchor.
+  const ax=Math.round(cx/2)*2,az=Math.round(cz/2)*2;
+  const key=ax+','+az;
   if(this.farResult){
    const {middle,far,coveredRadius,job}=this.farResult;
    this.farResult=null;
@@ -272,15 +274,19 @@ export class Renderer{
      };
      this.farWorker.onerror=event=>this.failFarWorker(event.message);
     }
-    this.farJob={cx,cz,key};
-    this.farWorker.postMessage({seed:world.seed,cx,cz,token:this.worldToken,includeFar:!this.farMesh});
+    this.farJob={cx:ax,cz:az,key};
+    this.farWorker.postMessage({seed:world.seed,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh});
     return;
    }catch(error){this.failFarWorker(error)}
   }
-  const plan=createCityPlan(world.seed),options={enhanced:this.farEnabled};
+  const plan=createCityPlan(world.seed),options={enhanced:this.farEnabled,partitionForView:!this.farEnabled};
   if(this.farEnabled&&!this.farMesh)this.farMesh=this.upload(cityFarMesh(plan));
-  this.distanceMesh=this.replace(this.distanceMesh,distantCityMesh(plan,cx,cz,options));
-  this.middleCoverage={radius:options.coveredRadius,x:(cx+.5)*SIZE,z:(cz+.5)*SIZE};
+  this.distanceMesh=this.replace(this.distanceMesh,distantCityMesh(plan,ax,az,options));
+  if(this.distanceMesh){
+   this.distanceMesh.sectors=options.sectors||null;
+   this.distanceMesh.landmarkVertices=options.landmarkVertices||0;
+  }
+  this.middleCoverage={radius:options.coveredRadius,x:(ax+.5)*SIZE,z:(az+.5)*SIZE};
   this.distanceKey=key;
  }
  failFarWorker(error){
@@ -348,6 +354,7 @@ export class Renderer{
   }
  }
  drawMesh(mesh){if(!mesh?.count)return;this.lastDrawCalls++;const gl=this.gl;gl.bindVertexArray(mesh.vao);gl.drawArrays(gl.TRIANGLES,0,mesh.count)}
+ drawMeshRange(mesh,first,count){if(!mesh?.count||count<=0)return;this.lastDrawCalls++;const gl=this.gl;gl.bindVertexArray(mesh.vao);gl.drawArrays(gl.TRIANGLES,first,count)}
  dynamicData(entities,effects,time){
   const arr=[];
   for(const e of entities){
@@ -401,7 +408,25 @@ export class Renderer{
    gl.enable(gl.POLYGON_OFFSET_FILL);
    if(this.distanceMesh?.count){
     gl.polygonOffset(1,1);
-    this.drawMesh(this.distanceMesh);this.lastDistanceDrawCalls++;
+    const mesh=this.distanceMesh;
+    if(mesh.sectors?.length){
+     if(mesh.landmarkVertices){this.drawMeshRange(mesh,0,mesh.landmarkVertices);this.lastDistanceDrawCalls++}
+     // Adjacent visible sectors are contiguous in the same buffer.
+     // Merge them to keep draw-call overhead low on mobile GPUs.
+     let rangeStart=-1,rangeCount=0;
+     const flush=()=>{
+      if(rangeCount){this.drawMeshRange(mesh,rangeStart,rangeCount);this.lastDistanceDrawCalls++}
+      rangeStart=-1;rangeCount=0;
+     };
+     for(let i=0;i<mesh.sectors.length;i++){
+      const sector=mesh.sectors[i];
+      if(!sector.count)continue;
+      if(!distanceSectorVisible(i,player.yaw,width/Math.max(1,height))){flush();continue}
+      if(rangeStart<0)rangeStart=sector.start;
+      rangeCount+=sector.count;
+     }
+     flush();
+    }else{this.drawMesh(mesh);this.lastDistanceDrawCalls++}
    }
    if(this.farMesh?.count){
     const middle=this.middleCoverage;

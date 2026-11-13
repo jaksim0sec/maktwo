@@ -6,6 +6,16 @@ import {FAR_LOOK} from './far-look.js';
 import {quad,rgb} from './mesher.js';
 
 const NEAR=44, FAR=256, MAX_BUILDINGS=96;
+export const DISTANCE_SECTORS=8;
+const TAU=2*Math.PI;
+// Broad visibility window retains wide building silhouettes near sector edges.
+export function distanceSectorVisible(index,yaw,aspect=16/9){
+ const forward=Math.atan2(-Math.sin(yaw),-Math.cos(yaw));
+ const center=(index+.5)*TAU/DISTANCE_SECTORS;
+ const delta=Math.atan2(Math.sin(center-forward),Math.cos(center-forward));
+ const halfFov=Math.atan(Math.tan(75*Math.PI/360)*Math.max(.5,aspect));
+ return Math.abs(delta)<=Math.min(Math.PI,halfFov+.30+Math.PI/DISTANCE_SECTORS);
+}
 const nearSquared=NEAR**2;
 const legacyBuildingMeshes=new WeakMap();
 const buildingMeshes=new WeakMap();
@@ -16,7 +26,7 @@ export function distantCityMesh(plan,cx,cz,options) {
  const enhanced=options?.enhanced??true;
  const radius=enhanced?FAR_LOOK.middleRadius:FAR;
  const x=(cx+.5)*SIZE,z=(cz+.5)*SIZE;
- const pieces=[];
+ const pieces=[],buildingCenters=[];
  const tower=plan.tower, library=plan.library;
  if(tower&&Math.hypot(tower.x-x,tower.z-z)<=radius+tower.radius)
   pieces.push(towerSilhouette(tower));
@@ -73,13 +83,30 @@ export function distantCityMesh(plan,cx,cz,options) {
    break;
   }
   pieces.push(mesh);
+  buildingCenters.push([(volume.x0+volume.x1)/2,(volume.z0+volume.z1)/2]);
   floats+=mesh.length;
   if(!enhanced&&++count===MAX_BUILDINGS)break;
  }
  if(options)options.coveredRadius=covered;
  const merged=new Float32Array(floats);
  let offset=0;
- for(const piece of pieces){merged.set(piece,offset);offset+=piece.length}
+ if(options?.partitionForView&&!enhanced){
+  const landmarks=pieces.length-buildingCenters.length;
+  options.landmarkVertices=pieces.slice(0,landmarks).reduce((n,p)=>n+p.length,0)/7;
+  for(let i=0;i<landmarks;i++){merged.set(pieces[i],offset);offset+=pieces[i].length}
+  const bins=Array.from({length:DISTANCE_SECTORS},()=>[]);
+  for(let i=landmarks;i<pieces.length;i++){
+   const [bx,bz]=buildingCenters[i-landmarks];
+   const angle=(Math.atan2(bx-x,bz-z)+TAU)%TAU;
+   const sector=Math.min(DISTANCE_SECTORS-1,Math.floor(angle/TAU*DISTANCE_SECTORS));
+   bins[sector].push(pieces[i]);
+  }
+  options.sectors=bins.map(bin=>{
+   const start=offset/7;
+   for(const piece of bin){merged.set(piece,offset);offset+=piece.length}
+   return {start,count:offset/7-start};
+  });
+ }else for(const piece of pieces){merged.set(piece,offset);offset+=piece.length}
  return merged;
 }
 

@@ -47,36 +47,41 @@ function lineDistance(x,z,a,b) {
 const inside=insidePolygon;
 
 export function* citySpawnCandidates(seed) {
-  const plan=createCityPlan(seed);
-  const central=plan.volumes.filter(v=>v.floors.length>=45&&v.floors.some(f=>f.corridors.length));
-  central.sort((a,b)=>{
-    const dist=v=>Math.hypot((v.x0+v.x1)/2-plan.layout.centerX,(v.z0+v.z1)/2-plan.layout.centerZ);
-    return dist(a)-dist(b)||a.id-b.id;
-  });
-  const nearby=central.slice(0,Math.min(6,central.length));
-  const offset=Math.floor(hash(seed,27,51,seed)*nearby.length);
-  for(let i=0;i<nearby.length;i++){
-    const v=nearby[(offset+i)%nearby.length];
-    const mid=Math.floor(v.floors.length*(.44+hash(v.id,13,seed,seed)*.12));
-    for(const index of [mid,mid-1,mid+1]){
-      const f=v.floors[index],spine=f?.corridors[0];if(!spine)continue;
-      const x=Math.floor((spine.x0+spine.x1)/2)+.5,z=Math.floor((spine.z0+spine.z1)/2)+.5;
-      yield {x,y:Math.round(f.y),z};
-    }
-  }
-  const entries=plan.walkways.filter(link=>link.kind==='core').map(link=>link.ports[0]);
-  for(const entry of entries)for(const depth of [2,3,4]) {
-    const x=Math.floor(entry.x-entry.dx*depth)+.5,z=Math.floor(entry.z-entry.dz*depth)+.5;
-    yield {x,y:Math.round(entry.y),z};
-  }
-  for(const v of plan.volumes) {
-    const f=v.floors[0], spine=f.corridors[0];
-    if(!spine)continue;
+ const plan=createCityPlan(seed);
+ const domeTop=plan.library.crown;
+ const target=domeTop+12; // Walking floor just above the dome crown.
+ const centerX=plan.layout.centerX,centerZ=plan.layout.centerZ;
+ const candidates=plan.volumes.filter(v=>v.support===null&&v.floors?.length>5).map(v=>{
+  const floors=v.floors.filter(f=>f.corridors?.length&&f.y>=domeTop+3&&f.y<=domeTop+21);
+  if(!floors.length)return null;
+  floors.sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target)||a.y-b.y);
+  const dx=(v.x0+v.x1)/2-centerX,dz=(v.z0+v.z1)/2-centerZ;
+  return {v,floors,score:Math.hypot(dx,dz)+Math.abs(floors[0].y-target)*4};
+ }).filter(Boolean);
+ candidates.sort((a,b)=>a.score-b.score||a.v.id-b.v.id);
+ const recent=candidates.slice(0,12);
+ const offset=recent.length?Math.floor(hash(seed,27,51,seed)*Math.min(3,recent.length)):0;
+ for(let i=0;i<recent.length;i++){
+  const {floors}=recent[(i+offset)%recent.length];
+  for(const f of floors){
+   for(const spine of f.corridors){
     const x=Math.floor((spine.x0+spine.x1)/2)+.5,z=Math.floor((spine.z0+spine.z1)/2)+.5;
     yield {x,y:Math.round(f.y),z};
+   }
   }
+ }
+ // Accessible routes are fallback only, and should not override the dome-adjacent interior.
+ const entries=plan.walkways.filter(link=>link.kind==='core').map(link=>link.ports[0])
+  .sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target));
+ for(const entry of entries)for(const depth of [2,3,4]){
+  const x=Math.floor(entry.x-entry.dx*depth)+.5,z=Math.floor(entry.z-entry.dz*depth)+.5;
+  yield {x,y:Math.round(entry.y),z};
+ }
+ for(const v of plan.volumes){
+  const f=v.floors[0],spine=f?.corridors?.[0];if(!spine)continue;
+  yield {x:Math.floor((spine.x0+spine.x1)/2)+.5,y:Math.round(f.y),z:Math.floor((spine.z0+spine.z1)/2)+.5};
+ }
 }
-
 function inspectShape(f,x,z) {
   if(!inside(f.outline,x,z))return null;
   const n=f.outline.length;

@@ -75,10 +75,10 @@ test('seed 9999 rasterizes solid service walls and a true two-cell door while re
  const [dx,dz]=mid(store.door);
  assert.equal(at(dx,modules.y,dz),B.DOOR);
  assert.equal(at(dx,modules.y+1,dz),B.DOOR_TOP);
- const market=plan.volumes.filter(v=>v.support===null&&v.program==='market'&&v.floors.length>1&&v.floors.length<Math.round(70*.92));
+ const market=plan.volumes.filter(v=>v.support===null&&v.program==='market'&&v.floors.length>1&&v.floors.length<35);
  assert.ok(market.length>0);
  assert.ok(market.every(v=>v.floors.length<=14),'local shop-house height');
- assert.ok(plan.volumes.some(v=>v.floors.length>=Math.round(70*.92)&&v.floors.length<=Math.round(80*.92)),'core landmark is preserved');
+ assert.ok(plan.volumes.some(v=>v.floors.length>=16&&v.floors.length<=35),'core landmark is preserved');
  assert.ok(plan.links.length>100,'multilevel connections remain generated');
 });
 

@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.18-hologram-inventory';
+const CACHE_NAME='maktwo-shell-v1.15.19-dome-skyline-sector-cull';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
