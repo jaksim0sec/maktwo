@@ -31,3 +31,10 @@ export function loadPlayerState(storage,name,height){
    creative:Boolean(p.creative),fly:Boolean(p.creative&&p.fly)};
  }catch{return null}
 }
+
+export function deleteWorldSlot(storage,name){
+ const slots=loadWorldSlots(storage);if(!slots.some(slot=>slot.name===name))return false;
+ storage.setItem(WORLD_SLOT_KEY,JSON.stringify(slots.filter(slot=>slot.name!==name)));
+ for(const key of [`mcweb:${name}:precincts`,`mcweb:${name}:precincts:before-generator-unification`,`mcweb:${name}:precincts:before-water-cleanup`,playerKey(name),`maktwo:survival:${name}`])storage.removeItem(key);
+ return true;
+}

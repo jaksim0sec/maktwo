@@ -1,12 +1,12 @@
 import {WorldManager} from '../core/world.js';
-import {loadWorldSlots,addWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
+import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
-import {CITY_MODE} from '../worldgen/eternal-night-game.js';
+import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {screenRay} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
 import {isWallItem} from '../core/mounts.js';
@@ -225,6 +225,8 @@ class Game{
   bindClick('save',()=>{if(this.saveGameState())this.status('게임 · 소지품 저장 완료')});
    bindClick('new-game',()=>this.createGame());
    bindClick('load-world',()=>this.loadSelectedGame());
+  bindClick('delete-world',()=>this.deleteSelectedGame());
+  for(const button of document.querySelectorAll('[data-teleport]'))button.addEventListener('click',()=>this.teleportCity(button.dataset.teleport));
   bindClick('water-repair',()=>{
    const count=this.world.drainPlacedWater(this.player.x,this.player.y,this.player.z,24);
    this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
@@ -352,6 +354,22 @@ class Game{
    const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
   }));
   menu.value=this.world.name;
+  if($('city-teleports'))$('city-teleports').hidden=this.world.mode!==CITY_MODE;
+ }
+ deleteSelectedGame(){
+  const name=$('world')?.value,slot=loadWorldSlots(localStorage).find(w=>w.name===name);
+  if(!slot){this.status('삭제할 내 게임을 선택해 주세요');return}
+  if(!confirm(`${slot.label}을 삭제할까요? 저장 데이터가 지워집니다`))return;
+  if(name===this.world.name){const fallback=this.worldPresets.find(w=>w.name!==name&&w.mode===CITY_MODE);if(!fallback)return;this.travel(fallback.name)}
+  if(!deleteWorldSlot(localStorage,name))return;this.manager.worlds.delete(name);this.worldPresets=this.worldPresets.filter(w=>w.name!==name);this.refreshWorldChoices();this.status('월드 삭제 완료');
+ }
+ teleportCity(target){
+  if(this.world.mode!==CITY_MODE)return;const plan=createCityPlan(this.world.seed,this.world.version>=7?this.world.version:false);
+  const site=target==='dome'?null:plan.stations[Number(target.split('-')[1])];
+  if(target!=='dome'&&!site){this.status('이 월드에는 역이 없습니다');return}
+  const pos=site?{x:Math.round(site.x)+.5,y:site.y,z:Math.round(site.z)+(site.axis==='x'?5.5:.5)}:{x:Math.round(plan.library.x+plan.library.towerRadius+9)+.5,y:plan.library.galleries[1],z:Math.round(plan.library.z)+.5};
+  if(site?.axis==='z')pos.x=Math.round(site.x)+5.5;
+  Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.world.stream(pos.x,pos.z,2,4);this.setPanel(null);this.status('이동 완료');
  }
  createGame(){
   try{
