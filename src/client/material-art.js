@@ -83,13 +83,21 @@ function stone(u,v,seed,kind){
  const pores=sm(.75,.90,noise(u*.75,v*.74,seed+39));
  const pitting=sm(.65,.82,fbm(u*.40,v*.40,seed+42));
  let l=.91+.26*(field-.5)+.10*(finer-.5)-.12*pores-.14*pitting;
- if(kind==='marble'){
-  const warp=(noise(u*.10,v*.11,seed+51)-.5)*8+(noise(u*.24,v*.17,seed+52)-.5)*3;
-  const ridge=Math.sin((u*.47-v*.34+warp)*.76);
-  const vein=1-sm(.06,.25,Math.abs(ridge));
-  const halo=1-sm(.17,.52,Math.abs(ridge));
-  l=.98+.10*(field-.5)-.24*vein-.055*halo-.045*mineral;
-  return {l,vein,field,mineral};
+ if(kind==='marble'||kind==='veined-marble'){
+  // Quiet, broad mineral clouds replace the dense periodic sine-line scribbles.
+  // Only rare, softly bounded veins remain; both IDs keep distinct finishes.
+  const broad=fbm(u*.105+5.3,v*.115-3.1,seed+51);
+  const cloudy=fbm(u*.29-2.7,v*.24+4.9,seed+52);
+  const warpX=(noise(u*.105,v*.11,seed+53)-.5)*4.2;
+  const warpY=(noise(u*.13,v*.085,seed+54)-.5)*4.0;
+  const contour=fbm((u+warpX)*.15,(v+warpY)*.13,seed+55);
+  const presence=sm(.40,.64,broad);
+  const vein=(1-sm(.016,.065,Math.abs(contour-.66)))*presence;
+  const halo=(1-sm(.045,.12,Math.abs(contour-.66)))*presence;
+  const veined=kind==='veined-marble';
+  l=.984+.135*(broad-.5)+.045*(cloudy-.5)-.016*mineral
+    -(veined?.085:.044)*vein-(veined?.021:.011)*halo;
+  return {l,vein,field:broad,mineral};
  }
  if(kind==='limestone')l=.96+.16*(field-.5)-.15*pores-.12*pitting;
  return {l,vein:0,field,mineral};
@@ -134,7 +142,7 @@ export function sampleDetailedMaterial(group,index,x,y,size=32){
  }else if(group==='architecture')switch(index){
   case 0:case 2:{const p=ceramic(u,v,index===0?8:16,index===0?16:16,seed,.22);l=p.l;r=1.02-.025*p.wash;g=1.015;b=.98+.03*p.wash;break;}
   case 4:{const p=ceramic(u,v,16,8,seed,.23),crack=fracture(u,v,seed,16,8);l=p.l-.17*crack;r=1.005;g=1.01;b=.985;break;}
-  case 9:{const p=stone(u,v,seed,'marble');l=p.l;r=.99-.055*p.vein;g=1.0-.015*p.vein;b=1.01+.025*p.vein;break;}
+  case 9:{const p=stone(u,v,seed,'veined-marble');l=p.l;r=.99-.055*p.vein;g=1.0-.015*p.vein;b=1.01+.025*p.vein;break;}
   case 11:{const p=plaster(u,v,seed,false);l=.97+.55*(p.l-.95);r=1.015;g=1;b=.97;break;}
   case 14:{const p=concrete(u,v,seed,'plain');const patch=sm(.57,.76,fbm(u*.15,v*.14,seed+60));l=p.l-.075*patch-.025*deposits(u,v,seed+62,.24);r=1;g=.995;b=.985;break;}
   case 27:{const t=tile(u,v,16,16,seed,.08),wear=floorwear(u,v,seed);l=t.light-.17*wear-.12*deposits(u,v,seed+9,.20);r=1.015-.055*wear;g=.97;b=.95;break;}
@@ -149,7 +157,7 @@ export function sampleDetailedMaterial(group,index,x,y,size=32){
   default:break;
  }else if(group==='extra')switch(index){
   case 0:{const p=stone(u,v,seed,'limestone'),sediment=noise(u*.12,v*.34,seed+36);l=p.l-.07*sediment;r=1.01;g=.98;b=.93;break;}
-  case 1:{const p=stone(u,v,seed,'marble');l=p.l;r=1.03-.09*p.vein;g=1-.04*p.vein;b=.98+.025*p.vein;break;}
+  case 1:{const p=stone(u,v,seed,'marble');l=p.l;r=1.02-.035*p.vein;g=1-.015*p.vein;b=.985+.012*p.vein;break;}
   case 2:{const p=concrete(u,v,seed,'plain'),form=edge(mod(v,16),.7,.7),bolt=1-sm(.5,1.45,Math.hypot(mod(u+4,16)-8,mod(v+4,16)-8));l=p.l-.22*form-.28*bolt-.08*deposits(u,v,seed+50,.18);r=1;g=.99;b=.98;break;}
   case 3:{const p=tile(u,v,16,16,seed,.06);const dust=deposits(u,v,seed+12,.25);l=p.light-.13*dust;r=1.02;g=1.015;b=.985;break;}
   default:break;
