@@ -48,7 +48,9 @@ export class SubwayTrain extends Entity{
   this.stationId=site.id;
   this.homeX=this.x;this.homeZ=this.z;
   this.offset=0;this.speed=0;this.lever=0;this.cab=0;
-  this.doorOpen=new Uint8Array(train.doors.length*2);
+  this.doorTarget=new Uint8Array(train.doors.length*2);
+  this.doorOpen=new Float32Array(this.doorTarget.length);
+  this.movingDoors=0;
   this.handles=trainControls(train);
   this.shell=[...trainShell(this)];
   const length=site.bounds?(site.axis==='x'?site.bounds.x1-site.bounds.x0:site.bounds.z1-site.bounds.z0):56;
@@ -70,7 +72,9 @@ export class SubwayTrain extends Entity{
   let target=null,nearest=Math.min(maxDistance,2.8);
   for(const handle of this.handles){
    const [x,h,z]=handle.at;
-   const hit=intersectAabb(pos,ray,[x-.18,h-.18,z-.17],[x+.18,h+(handle.kind==='lever'?.40:.18),z+.17]);
+   const lever=handle.kind==='lever';
+   const reach=lever?.34:.18;
+   const hit=intersectAabb(pos,ray,[x-reach,h+(lever?.07:-.18),z-.17],[x+reach,h+(lever?.64:.18),z+.17]);
    if(hit&&hit.distance<nearest){nearest=hit.distance;target={...handle,distance:nearest}}
   }
   return target;
@@ -91,24 +95,40 @@ export class SubwayTrain extends Entity{
  useControl(handle,player){
   if(handle.kind==='door'){
    if(Math.abs(this.speed)>.01)return false;
-   const i=handle.index;
-   this.doorOpen[i]^=1;
-   const [a,y,c]=localTrainPoint(this,player.x,player.y,player.z);
-   if(!this.doorOpen[i]&&Math.abs(c-(TRAIN.center+handle.side*TRAIN.halfWidth))<player.width/2+.12&&
-      y<TRAIN.deck+TRAIN.doorHeight&&y+player.height>TRAIN.deck&&
-      Math.abs(a-(this.train.doors[i%4]+TRAIN.doorWidth/2))<TRAIN.doorWidth/2+player.width/2){
-    this.doorOpen[i]=1;return false;
-   }
+   const i=handle.index,opening=!this.doorTarget[i];
+   if(!opening&&this.doorwayOccupied(i,player))return false;
+   this.doorTarget[i]=Number(opening);
+   this.movingDoors|=1<<i;
    this.lever=0;
-   this.shell=[...trainShell(this)];
    return true;
   }
   if(this.lever){this.lever=0;return true}
-  if(this.doorOpen.includes(1))return false;
+  if(this.movingDoors||this.doorOpen.includes(1))return false;
   this.cab=handle.side;this.lever=handle.side;
   return true;
  }
- advance(dt,world){
+ doorwayOccupied(index,player){
+  if(!player)return false;
+  const [along,y,cross]=localTrainPoint(this,player.x,player.y,player.z);
+  const side=index<4?-1:1;
+  return Math.abs(cross-(TRAIN.center+side*(TRAIN.halfWidth-.15)))<player.width/2+.34&&
+   y<TRAIN.deck+TRAIN.doorHeight&&y+player.height>TRAIN.deck&&
+   Math.abs(along-(this.train.doors[index%4]+TRAIN.doorWidth/2))<TRAIN.doorWidth/2+player.width/2;
+ }
+ updateDoors(dt,player){
+  for(let i=0;i<this.doorOpen.length;i++){
+   const mask=1<<i;
+   if(!(this.movingDoors&mask))continue;
+   if(!this.doorTarget[i]&&this.doorwayOccupied(i,player))this.doorTarget[i]=1;
+   const progress=this.doorOpen[i],target=this.doorTarget[i],step=dt/.78;
+   const next=Math.abs(target-progress)<=step?target:progress+Math.sign(target-progress)*step;
+   this.doorOpen[i]=next;
+   if(next===target)this.movingDoors&=~mask;
+  }
+  this.shell=[...trainShell(this)];
+ }
+ advance(dt,world,player){
+  if(this.movingDoors)this.updateDoors(dt,player);
   if(!this.speed&&!this.lever)return 0;
   const traction=this.lever?this.lever*.84:0;
   const resistance=this.lever?.13:1.85;
@@ -141,7 +161,7 @@ export class EntityManager{
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null){
   for(const train of this.world.trainColliders){
-   const step=train.advance(dt,this.world);
+   const step=train.advance(dt,this.world,player);
    if(step)carryTrainPassenger(train,player,step);
   }
   // Wildlife is sparse and long-lived enough to make a quiet village feel settled.

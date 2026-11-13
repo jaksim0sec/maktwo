@@ -9,17 +9,17 @@ import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolu
 import {cameraEyeY,dampStepOffset} from './camera.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
-import {TRAIN} from '../worldgen/station-train.js';
+import {TRAIN,trainDoorMotion} from '../worldgen/station-train.js';
 import {stationTrainMesh} from './station-train-mesh.js';
 const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
 uniform mat4 uVP;uniform vec3 uCamera;uniform vec3 uEntityOffset;uniform float uTime;uniform vec2 uFogRange;
-out vec3 vColor;out float vFog;out vec3 vPos;out float vEmission;flat out int vMaterial;flat out int vTurns;
-void main(){vec3 worldPosition=aPos+uEntityOffset;gl_Position=uVP*vec4(worldPosition*${BLOCK_SIZE.toFixed(2)},1.);vPos=worldPosition;vEmission=aShade<0.?1.:0.;int packedMat=aShade<0.?0:int(floor(aShade*.25));vTurns=packedMat>>7;vMaterial=packedMat&127;vColor=aColor*(aShade<0.?abs(aShade):(aShade-4.*float(packedMat)));float d=length(worldPosition*${BLOCK_SIZE.toFixed(2)}-uCamera);vFog=clamp((d-uFogRange.x)/uFogRange.y,0.,1.);}`;
+out vec3 vColor;out float vFog;out vec3 vPos;out vec3 vMaterialPos;out float vEmission;flat out int vMaterial;flat out int vTurns;
+void main(){vec3 worldPosition=aPos+uEntityOffset;gl_Position=uVP*vec4(worldPosition*${BLOCK_SIZE.toFixed(2)},1.);vPos=worldPosition;vMaterialPos=aPos;vEmission=aShade<0.?1.:0.;int packedMat=aShade<0.?0:int(floor(aShade*.25));vTurns=packedMat>>7;vMaterial=packedMat&127;vColor=aColor*(aShade<0.?abs(aShade):(aShade-4.*float(packedMat)));float d=length(worldPosition*${BLOCK_SIZE.toFixed(2)}-uCamera);vFog=clamp((d-uFogRange.x)/uFogRange.y,0.,1.);}`;
 const FRAG=`#version 300 es
 precision highp float;
-in vec3 vColor;in float vFog;in vec3 vPos;in float vEmission;flat in int vMaterial;flat in int vTurns;
+in vec3 vColor;in float vFog;in vec3 vPos;in vec3 vMaterialPos;in float vEmission;flat in int vMaterial;flat in int vTurns;
 uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;uniform bool uDistant;uniform vec2 uCenterChunk;
@@ -65,7 +65,7 @@ void main(){
  // Keep authored block colors unchanged; light range is controlled by each source.
  vec3 tinted=vColor;
  if(vMaterial>0){
-  vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vPos.xz:(axis.x>axis.z?vPos.zy:vPos.xy);
+  vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vMaterialPos.xz:(axis.x>axis.z?vMaterialPos.zy:vMaterialPos.xy);
   // D4 symmetry with turn/reflection bits already packed in aShade.
   int quarter=vTurns&3;
   uv=mix(uv,uv.yx,float(quarter&1));
@@ -493,25 +493,27 @@ export class Renderer{
   }
 
   this.trainMeshes??=new Map();const trains=[];
-  const placeTrain=(e,travel=0)=>{
+  const placeTrain=(e,travel=0,recess=0)=>{
    const along=e.train.axis==='x';
-   gl.uniform3f(this.u.entityOffset,e.x+(along?travel:0),e.y,e.z+(along?0:travel));
+   gl.uniform3f(this.u.entityOffset,e.x+(along?travel:recess),e.y,e.z+(along?recess:travel));
   };
   const drawDoors=(e,mesh,glass)=>{
    const buffer=glass?mesh.doorGlass:mesh.doorSteel;
    placeTrain(e);
-   if(!e.doorOpen.includes(1)){this.drawMesh(buffer);return}
+   if(!e.doorOpen.some(value=>value>0)){this.drawMesh(buffer);return}
    // Coalesce adjacent closed leaves; only opened leaves need new offsets.
    let first=0,count=0;
    for(const range of mesh.doorRanges){
     const start=glass?range.glassFirst:range.steelFirst;
     const size=glass?range.glassCount:range.steelCount;
-    if(!e.doorOpen[range.index]){
+    const progress=e.doorOpen[range.index];
+    if(!progress){
      if(!count)first=start;
      count+=size;continue;
     }
     if(count){this.drawMesh(buffer,first,count);count=0}
-    placeTrain(e,range.leaf*TRAIN.doorTravel);
+    const {slide,recess}=trainDoorMotion(progress);
+    placeTrain(e,range.leaf*slide,-range.side*recess);
     this.drawMesh(buffer,start,size);
     placeTrain(e);
    }

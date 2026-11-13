@@ -1,4 +1,4 @@
-import {TRAIN} from '../worldgen/station-train.js';
+import {TRAIN,trainCab,trainDoorMotion} from '../worldgen/station-train.js';
 import {BLOCK as B} from './blocks.js';
 import {SIZE} from './chunk.js';
 
@@ -17,8 +17,13 @@ export function* trainShell(e){
  yield [start,TRAIN.deck,crossMin,start+.17,TRAIN.ceiling,crossMax];
  yield [end+.83,TRAIN.deck,crossMin,end+1,TRAIN.ceiling,crossMax];
  // Console fronts constrain movement in both driving cabs.
- yield [start+.70,TRAIN.deck,crossMin+.27,start+1.35,2.15,crossMax-.27];
- yield [end-.43,TRAIN.deck,crossMin+.27,end+.22,2.15,crossMax-.27];
+ for(const side of [-1,1]){
+  const {end}=trainCab(e.train,side);
+  const front=end-side*.58,back=end-side*1.48;
+  const left=Math.min(front,back),right=Math.max(front,back);
+  yield [left,TRAIN.deck,crossMin+.32,right,2.12,crossMax-.32];
+  yield [Math.min(front,front-side*.38),2.12,crossMin+.32,Math.max(front,front-side*.38),2.46,crossMax-.32];
+ }
  for(const [index,side] of [-1,1].entries()){
   const c=side<0?crossMin:crossMax-TRAIN.sideWall;
   let cursor=start;
@@ -26,10 +31,11 @@ export function* trainShell(e){
    yield [cursor,TRAIN.deck,c,left,TRAIN.ceiling,c+TRAIN.sideWall];
    const right=left+TRAIN.doorWidth;
    yield [left,TRAIN.doorHeight+TRAIN.deck,c,right,TRAIN.ceiling,c+TRAIN.sideWall];
-   const travel=e.doorOpen[index*4+i]*TRAIN.doorTravel;
+   const {slide:travel,recess}=trainDoorMotion(e.doorOpen[index*4+i]);
+   const pocket=c-side*recess;
    const mid=(left+right)/2;
-   if(left<mid-travel)yield [left,TRAIN.deck,c,mid-travel,TRAIN.deck+TRAIN.doorHeight,c+TRAIN.sideWall];
-   if(mid+travel<right)yield [mid+travel,TRAIN.deck,c,right,TRAIN.deck+TRAIN.doorHeight,c+TRAIN.sideWall];
+   if(left<mid-travel)yield [left,TRAIN.deck,pocket,mid-travel,TRAIN.deck+TRAIN.doorHeight,pocket+TRAIN.sideWall];
+   if(mid+travel<right)yield [mid+travel,TRAIN.deck,pocket,right,TRAIN.deck+TRAIN.doorHeight,pocket+TRAIN.sideWall];
    cursor=right;
   }
   yield [cursor,TRAIN.deck,c,end+1,TRAIN.ceiling,c+TRAIN.sideWall];

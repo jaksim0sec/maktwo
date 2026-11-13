@@ -21,11 +21,26 @@ test('manual jamb control opens only its own door and leaves a walkable sill',()
  const door=train.train.doors[0]+TRAIN.doorWidth/2;
  assert.ok(trainCollision([train],door,23,z,.67,1.53));
  assert.ok(train.useControl(hit,player));
- assert.equal(train.doorOpen.reduce((a,b)=>a+b,0),1);
+ assert.equal(train.doorTarget.reduce((a,b)=>a+b,0),1);
+ assert.equal(train.doorOpen[0],0);
+ train.advance(.20);
+ assert.ok(train.doorOpen[0]>0&&train.doorOpen[0]<1);
+ assert.ok(trainCollision([train],door,23,z,.67,1.53));
+ train.advance(.80);
+ assert.equal(train.doorOpen[0],1);
  assert.ok(!trainCollision([train],door,23,z,.67,1.53));
  assert.ok(trainCollision([train],door,23,TRAIN.center+TRAIN.halfWidth-.06,.67,1.53));
  assert.ok(!train.useControl(hit,new Player(door,23,z)));
  assert.ok(train.useControl(hit,player));
+ const lever=train.handles.find(handle=>handle.kind==='lever');
+ assert.equal(train.useControl(lever,player),false);
+ train.advance(.21,undefined,new Player(door,23,z));
+ assert.equal(train.doorTarget[0],1);
+ assert.equal(train.doorOpen[0],1);
+ assert.ok(train.useControl(hit,player));
+ train.advance(.80);
+ assert.equal(train.doorOpen[0],0);
+ assert.ok(trainCollision([train],door,23,z,.67,1.53));
 });
 
 test('the lever moves a single car, stops for blocks, and works after mining clears the line',()=>{
