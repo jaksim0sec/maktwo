@@ -8,7 +8,7 @@ import {moveBody} from '../src/core/physics.js';
 import {applyCameraLook,cameraEyeY,dampStepOffset} from '../src/client/camera.js';
 
 test('light sources have compact reach without recoloring source blocks',()=>{
- assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[9,10,10]);
+ assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[9,10]);
  assert.equal(block(B.GRASS).color,'#78966e');
  assert.equal(block(B.DIRT).color,'#806c59');
  assert.equal(block(B.STONE).color,'#858b90');

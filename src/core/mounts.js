@@ -3,14 +3,11 @@ import {BLOCK as B} from './blocks.js';
 // Each part is [left, bottom, depth, width, height, thickness, color, emissive].
 export const MOUNT_PARTS = {
  [B.TORCH]: [
-  [-.065,-.23,.005,.13,.20,.10,'#6c6258'],
-  [-.043,-.17,.09,.086,.33,.086,'#806550'],
-  [-.062,.16,.073,.124,.13,.124,'#ffbd73',true],
- ],
- [B.LANTERN]: [
   [-.16,.13,.005,.32,.09,.25,'#746858'],
   [-.105,-.14,.10,.21,.27,.20,'#ffd19a',true],
   [-.14,-.19,.075,.28,.055,.25,'#746858'],
+  [-.13,-.14,.08,.033,.28,.24,'#615950'],
+  [.097,-.14,.08,.033,.28,.24,'#615950'],
  ],
  [B.SHOP_SIGN]: [
   [-.36,-.17,.005,.72,.34,.08,'#8f683e'],
@@ -25,6 +22,7 @@ export const MOUNT_PARTS = {
   [-.30,-.045,.125,.60,.09,.05,'#899094'],
  ],
 };
+MOUNT_PARTS[B.LANTERN]=MOUNT_PARTS[B.TORCH];
 export const isWallItem = id => Object.hasOwn(MOUNT_PARTS,id);
 
 function rotatePair(u,v,facing){

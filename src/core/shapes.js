@@ -1,5 +1,5 @@
 import {FORMED,formedOverlap} from './construction.js';
-import {block,BLOCK as B,itemId} from './blocks.js';
+import {block,BLOCK as B,itemId,isBed} from './blocks.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {partById} from './part-library.js';
 import {fencePrisms} from './fence-joints.js';
@@ -71,6 +71,7 @@ export function shapeBoxes(id,x,y,z,state={}){
   }
   return id===B.WINDOW_EW?rotateBoxes(parts,x,z,1):parts;
  }
+ if(isBed(id))return rotateBoxes([{x:x+.08,y,z,w:.84,h:itemId(id)===B.BED?.48:.23,d:1}],x,z,facing);
  if(id===B.CRATE)return [{x:x+.085,y:y+.06,z:z+.085,w:.83,h:.79,d:.83}];
  if(id===B.CHAIR){
   return rotateBoxes([
@@ -179,7 +180,7 @@ export function solidBlockOverlap(world,x,y,z,id,body,epsilon=1e-5,form=world.ge
  if(FORMED[form])return formedOverlap(FORMED[form],x,y,z,body,epsilon);
  if(partById(id))return partOverlaps(partPrisms(id,x,y,z,world.getShapeState?.(x,y,z)||{}),body,epsilon);
  if(isDoor(id))return doorIntersectsBody(x,id===B.DOOR_TOP?y-1:y,z,world.getDoorState?.(x,y,z),body,epsilon);
- const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
+ const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isBed(id)||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
  const diagonal=isPanel(id)?diagonalPanel(id,state):null;
  if(diagonal)return overlapsPanel(diagonal,x,y,z,body,epsilon);
  const boxes=shapeBoxes(id,x,y,z,state);if(boxes)return boxes.some(b=>bodyOverlapsBox(body,b,epsilon));

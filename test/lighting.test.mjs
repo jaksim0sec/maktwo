@@ -6,8 +6,9 @@ import {Chunk} from '../src/core/chunk.js';
 import {meshChunk} from '../src/client/mesher.js';
 import {raycast} from '../src/core/physics.js';
 
-test('three different practical lights have an extensible data definition',()=>{
- assert.deepEqual(LIGHTBAR,[B.TORCH,B.LANTERN,B.CAMPFIRE]);
+test('the lantern retains torch lighting and replaces the old catalog entry',()=>{
+ assert.deepEqual(LIGHTBAR,[B.TORCH,B.CAMPFIRE]);
+ assert.deepEqual(block(B.LANTERN).light,block(B.TORCH).light);
  assert.equal(HOTBAR.length,7);
  for(const id of LIGHTBAR){const light=block(id).light;assert.ok(light);assert.ok(light.radius>0);assert.ok(light.intensity>0);assert.match(light.color,/^#[0-9a-f]{6}$/i)}
 });

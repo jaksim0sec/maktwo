@@ -1,4 +1,4 @@
-import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.js';
+import {block,BLOCK as B,isBed} from './blocks.js';import {clamp} from '../util/math.js';
 import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
 import {trainCollision} from './train-collision.js';
@@ -48,7 +48,7 @@ export function collides(world,x,y,z,width=.6,height=1.8){
  return false;
 }
 export function inWater(world,e){return world.get(e.x,e.y+.5,e.z)===B.WATER}
-export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);recoverDoorOverlap(world,e,w,h);const wasGrounded=e.grounded;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?toVoxels(6):GRAVITY)*dt,-35,25);
+export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clamp(dt,0,.08);recoverDoorOverlap(world,e,w,h);const wasGrounded=e.grounded;if(e.type==='player')e.landingSpeed=0;e.water=inWater(world,e);if(!e.fly)e.vy=clamp(e.vy-(e.water?toVoxels(6):GRAVITY)*dt,-35,25);
  const sub=Math.max(1,Math.ceil(Math.hypot(e.vx,e.vy,e.vz)*dt/.18));const step=dt/sub;e.grounded=false;
  for(let n=0;n<sub;n++){
   for(const [axis,vel] of [['x','vx'],['z','vz']]){const old=e[axis];e[axis]+=e[vel]*step;if(collides(world,e.x,e.y,e.z,w,h)){// Step up a low obstacle when walking.
@@ -59,7 +59,11 @@ export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clam
   if(collides(world,e.x,e.y,e.z,w,h)){
    // Revert the *swept* vertical movement. Never search upward with a while-loop:
    // a door closing nearby could otherwise launch the character multiple metres.
-   if(e.vy<=0)e.grounded=true;e.y=oldY;e.vy=0;
+   if(e.vy<=0){
+    e.grounded=true;
+    if(e.type==='player'&&!e.fly&&!e.water)e.landingSpeed=Math.max(e.landingSpeed,-e.vy);
+   }
+   e.y=oldY;e.vy=0;
   }
  }
  if(!e.fly&&!e.grounded&&!collides(world,e.x,e.y-.06,e.z,w,h)){}else if(!e.fly&&e.vy===0)e.grounded=true;
@@ -99,7 +103,7 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
     const baseY=id===B.DOOR_TOP?y-1:y;
     hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
    }else{
-    const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
+    const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isBed(id)||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
     const diagonal=isPanel(id)?diagonalPanel(id,state):null;
     const boxes=diagonal?null:shapeBoxes(id,x,y,z,state);
     if(diagonal){

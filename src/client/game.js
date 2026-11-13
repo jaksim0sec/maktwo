@@ -1,5 +1,5 @@
 import {WorldManager} from '../core/world.js';
-import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
+import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
@@ -123,7 +123,12 @@ class Game{
  // Inventory lives in the actual WebGL scene, not a DOM/modal overlay.
  get uiOpen(){return Boolean(this.panel)}
  setPanel(name){
-  const prior=this.panel;this.panel=name||null;if(this.panel!=='inventory'){this.inventoryPalette=null;this.inventoryPage=0;this.station=null;}this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
+  if(this.cinematic&&name!=='cinematic')return;
+  const prior=this.panel;this.panel=name||null;
+  const storage=$('storage-panel');if(storage)storage.hidden=this.panel!=='storage';
+  if(this.panel!=='storage')this.openContainer=null;
+  if(this.panel!=='inventory'){this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
+  this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
   $('toolbar')?.classList.toggle('hidden',!this.menuOpen);
   $('help')?.classList.toggle('hidden',!this.helpOpen);
   $('menu-btn')?.setAttribute('aria-expanded',String(this.menuOpen));
@@ -279,6 +284,7 @@ class Game{
   bindClick('menu-btn',()=>this.toggleMenu());
   bindClick('camera-btn',()=>this.toggleCameraMode());
   bindClick('debug-toggle',()=>{const enabled=document.body.classList.toggle('debug-ui');$('debug-toggle')?.setAttribute('aria-pressed',String(enabled))});
+  bindClick('close-storage',()=>this.requestGameFocus());
   bindClick('bag-btn',()=>this.togglePanel('inventory'));
   bindClick('train-board',()=>this.toggleTrainBoard());
   bindClick('train-door',()=>this.toggleTrainDoors());
@@ -364,6 +370,11 @@ class Game{
    this.select(next,{toggle:false});
   },{passive:false});
   document.addEventListener('keydown',e=>{
+   if(this.cinematic)return;
+   if(this.panel==='storage'){
+    if(e.code==='Escape'){e.preventDefault();this.requestGameFocus()}
+    return;
+   }
    if(e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
    if(this.panel==='inventory'&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)){
     e.preventDefault();this.input.keys.delete(e.code);
@@ -419,7 +430,11 @@ class Game{
   try{
    if(!this.world.save())throw Error('Unavailable world storage');
    if(this.survivalInventory.save()===false)throw Error('Unavailable inventory storage');
-   savePlayerState(localStorage,this.world.name,this.player);
+   const scene=this.cinematic;
+   let player=this.player;
+   if(scene?.type==='death')player={...player,...scene.respawn,hp:player.maxHp,stamina:100,pitch:0,fly:false};
+   if(scene?.type==='sleep')player={...player,x:scene.x,z:scene.z,pitch:scene.pitch};
+   savePlayerState(localStorage,this.world.name,player);
    localStorage.setItem(ACTIVE_WORLD_KEY,this.world.name);return true;
   }catch(error){
    console.warn('[MakTwo] Local game save failed',error);
@@ -467,6 +482,141 @@ class Game{
   if(name===this.world.name||this.travel(name))this.requestGameFocus();
  }
  travel(name){if(!this.saveGameState())return false;this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.ridingTrain=null;this.trainControls={accelerate:false,brake:false};this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.applyGraphics();this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
+ bedPair(target){
+  const {id,x,y,z}=target;
+  const facing=this.world.getShapeState(x,y,z).facing;
+  const [dx,dz]=bedDirection(facing);
+  const foot=isBedFoot(id);
+  const head={x:x-(foot?dx:0),y,z:z-(foot?dz:0)};
+  const end={x:head.x+dx,y,z:head.z+dz};
+  const base=itemId(id);
+  if(this.world.get(head.x,y,head.z)!==base||this.world.get(end.x,y,end.z)!==base+1||
+     this.world.getShapeState(end.x,y,end.z).facing!==this.world.getShapeState(head.x,y,head.z).facing)return null;
+  return {head,end,base,facing};
+ }
+ placeBed(id,x,y,z,facing){
+  if(y<1||y>=this.world.height)return false;
+  const [dx,dz]=bedDirection(facing),p=this.player;
+  const cells=[[x,z,id],[x+dx,z+dz,id+1]];
+  for(const [bx,bz,part] of cells){
+   if(!block(this.world.get(bx,y,bz)).replaceable||!block(this.world.get(bx,y-1,bz)).solid||
+      solidBlockOverlap({getShapeState:()=>({facing})},bx,y,bz,part,p,1e-5,0))return false;
+  }
+  for(const [bx,bz,part] of cells){
+   this.world.set(bx,y,bz,part);
+   this.world.setShapeState(bx,y,bz,{facing});
+  }
+  return true;
+ }
+ respawnPosition(){
+  const saved=this.survivalInventory.checkpoint,p=this.player;
+  if(saved&&saved.y>0&&saved.y<this.world.height-2){
+   const id=this.world.get(saved.x,saved.y,saved.z);
+   const pair=isBed(id)&&this.bedPair({...saved,id});
+   if(pair){
+    for(const tile of [pair.end,pair.head])for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+     const {x,y,z}={x:tile.x+dx+.5,y:tile.y,z:tile.z+dz+.5};
+     if(this.world.get(x,y,z)!==B.WATER&&collides(this.world,x,y-.65,z,p.width,p.standingHeight)&&
+        !collides(this.world,x,y,z,p.width,p.standingHeight)&&!isBed(this.world.get(x,y,z)))return {x,y,z};
+    }
+   }
+  }
+  return this.world.spawn();
+ }
+ useBed(target){
+  const pair=this.bedPair(target);
+  if(!pair){this.status('침대가 부서져 있어요');return}
+  const old=this.survivalInventory.checkpoint;
+  this.survivalInventory.checkpoint=pair.head;
+  if(!this.saveGameState()){
+   this.survivalInventory.checkpoint=old;return;
+  }
+  this.status('부활 지점을 저장했어요');
+  if(this.player.hp<this.player.maxHp)this.beginCinematic('sleep',pair);
+ }
+ beginCinematic(type,bed=null){
+  const p=this.player;
+  this.setPanel('cinematic');
+  this.cinematic={type,bed,elapsed:0,x:p.x,z:p.z,pitch:p.pitch,eye:p.eye};
+  p.vx=p.vy=p.vz=0;p.visualStepOffset=0;
+  this.ridingTrain?.control(false,false);
+  this.ridingTrain=null;this.trainControls={accelerate:false,brake:false};
+  const overlay=$('life-overlay');
+  overlay.dataset.scene=type;overlay.style.setProperty('--fade','0');overlay.hidden=false;
+  overlay.querySelector('strong').textContent=type==='death'?'사망했습니다':'잠드는 중';
+  if(type==='death'){
+   this.cinematic.respawn=this.respawnPosition();
+   this.selected=-1;
+   this.survivalInventory.clearCarried();
+   this.renderHotbar();
+   this.saveGameState();
+  }
+ }
+ updateCinematic(dt){
+  const scene=this.cinematic,p=this.player,overlay=$('life-overlay');
+  scene.elapsed+=dt;
+  const death=scene.type==='death',duration=death?2.4:2.2;
+  const progress=Math.min(1,scene.elapsed/(death?1.15:.8));
+  const ease=progress*progress*(3-2*progress);
+  const revealAt=duration-.45;
+  if(scene.elapsed<revealAt){
+   if(death){
+    p.pitch=scene.pitch+(-1.44-scene.pitch)*ease;
+    p.eye=scene.eye+(.25-scene.eye)*ease;
+   }else{
+    const {head,base}=scene.bed;
+    p.x=scene.x+(head.x+.5-scene.x)*ease;
+    p.z=scene.z+(head.z+.5-scene.z)*ease;
+    p.visualStepOffset=(head.y+(base===B.BED?.82:.55)-p.y-p.eye)*ease;
+    p.pitch=scene.pitch+(1.36-scene.pitch)*ease;
+   }
+  }else if(!scene.restored){
+   scene.restored=true;
+   if(death){
+    const pos=scene.respawn;
+    Object.assign(p,pos,{dead:false,fly:false,grounded:false,crouching:false,
+     height:p.standingHeight,eye:p.standingEye,stamina:100,staminaRecovery:0,exhausted:false,pitch:0});
+    this.world.stream(pos.x,pos.z,2,4);
+    this.portalCooldown=1;
+   }else Object.assign(p,{x:scene.x,z:scene.z,pitch:scene.pitch,eye:scene.eye});
+   p.hp=p.maxHp;p.visualStepOffset=0;
+  }
+  overlay.style.setProperty('--fade',String(Math.min(1,ease,Math.max(0,(duration-scene.elapsed)/.45))));
+  if(scene.elapsed<duration)return;
+  this.cinematic=null;overlay.hidden=true;this.setPanel(null);
+  this.saveGameState();
+  this.status(death?'부활했어요':'체력이 회복됐어요');
+ }
+ showContainer(target){
+  if(!this.saveGameState())return;
+  this.setPanel('storage');
+  this.openContainer={...target,key:this.world.stateKey(target.x,target.y,target.z)};
+  this.renderContainer();
+  $('close-storage').focus();
+ }
+ renderContainer(){
+  const target=this.openContainer,inventory=this.survivalInventory;
+  if(!target)return;
+  $('storage-title').textContent=target.id===B.CRATE?'낡은 나무 상자':'수납장';
+  const stored=inventory.containers.get(target.key)||new Map();
+  for(const [element,items,deposit] of [[$('storage-carried'),inventory.items,true],[$('storage-stored'),stored,false]]){
+   element.replaceChildren();
+   if(!items.size){element.textContent='비어 있음';continue}
+   for(const [id,count] of items){
+    const button=document.createElement('button'),icon=document.createElement('img'),label=document.createElement('span');
+    button.type='button';button.title=deposit?'넣기':'꺼내기';
+    button.setAttribute('aria-label',blockLabel(id)+' '+count+'개 '+button.title);
+    icon.src=itemIconURL(id);icon.alt='';label.textContent=blockLabel(id)+' ×'+count;
+    button.append(icon,label);
+    button.onclick=()=>{
+     if(this.world.get(target.x,target.y,target.z)!==target.id){this.requestGameFocus();return}
+     if(!inventory.transfer(target.key,id,deposit)){this.status('공간이 부족하거나 저장하지 못했어요');return}
+     this.renderHotbar();this.renderContainer();
+    };
+    element.append(button);
+   }
+  }
+ }
  interaction(dt,input){
   if(this.ridingTrain){this.target=null;this.mining.reset();this.showMining(0);return}
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
@@ -476,6 +626,10 @@ class Game{
   const aim=this.input.locked?null:(input.aim||this.input.canvasCursor());
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
   this.target=raycast(this.world,origin,ray,7.5,{hitWater:!miningMode&&this.selected>=0,hitDecor:miningMode});
+  if(input.use&&this.target&&!this.target.mounted){
+   if(isBed(this.target.id)){this.useBed(this.target);return}
+   if(isContainer(this.target.id)){this.showContainer(this.target);return}
+  }
   if(input.use&&this.target&&this.target.id===B.WORKBENCH){
    this.setPanel('inventory');this.station={world:this.world,x:this.target.x,y:this.target.y,z:this.target.z};
    this.inventoryPalette='craft';this.inventoryPage=0;this.updateHologram();this.status('작업대 · 발견한 제작법을 선택하세요');
@@ -512,7 +666,11 @@ class Game{
    const x=t.x+(!replaceWater&&axis==='x'?Math.sign(n.x):0),y=t.y+(!replaceWater&&axis==='y'?Math.sign(n.y):0),z=t.z+(!replaceWater&&axis==='z'?Math.sign(n.z):0);
    const old=this.world.get(x,y,z);
    if(block(old).replaceable){
-    if(id===B.DOOR){
+    if(isBed(id)){
+     if(this.placeBed(id,x,y,z,this.placementAngle(id)/90)){
+      this.inventory.remove(id);this.refreshInventoryUI();
+     }else this.status('침대에는 바닥 두 칸이 필요해요');
+    }else if(id===B.DOOR){
      const facing=this.placementAngle(id)/90,upperOld=this.world.get(x,y+1,z);
      if(this.world.placeDoor(x,y,z,facing,[p,...this.entities.entities])){
       if(collides(this.world,p.x,p.y,p.z,p.width,p.height)){this.world.removeDoor(x,y,z);if(old!==B.AIR)this.world.set(x,y,z,old);if(upperOld!==B.AIR)this.world.set(x,y+1,z,upperOld)}
@@ -540,6 +698,9 @@ class Game{
   if(result.completed&&target){
    if(target.mounted||this.world.get(target.x,target.y,target.z)===target.id){
     const {x,y,z,id}=target;
+    if(!target.mounted&&isContainer(id)&&this.survivalInventory.containers.has(this.world.stateKey(x,y,z))){
+     this.status('내용물을 먼저 꺼내세요');this.mining.reset();this.showMining(0);return;
+    }
     const mined=target.mounted?this.world.removeMount(x,y,z):id===B.DOOR||id===B.DOOR_TOP?
      this.world.removeDoor(x,y,z):this.world.set(x,y,z,B.AIR);
     if(mined){const item=harvestDrop(target.id);
@@ -551,12 +712,14 @@ class Game{
  }
 
  tick(dt){
+  if(this.cinematic){this.updateCinematic(dt);return}
   this.portalCooldown=Math.max(0,this.portalCooldown-dt);
   const p=this.player,input=this.input.read();
   if(this.ridingTrain){
    this.ridingTrain.control(input.forward||this.trainControls.accelerate,input.backward||this.trainControls.brake);
    p.vx=0;p.vy=0;p.vz=0;p.grounded=true;p.fly=false;
   }else p.update(this.world,dt,input);
+  if(p.dead){this.beginCinematic('death');return}
   if(!this.ridingTrain&&this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){
    const names=[...this.manager.worlds.keys()];
    this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;
@@ -569,12 +732,8 @@ class Game{
   }
   this.effects.tick(dt);
   if(this.entities.collected){this.entities.collected=false;this.renderHotbar();this.refreshInventoryUI()}
-  this.interaction(dt,input);
-  if(p.dead){
-   p.hp=20;p.dead=false;this.ridingTrain=null;this.trainControls={accelerate:false,brake:false};
-   Object.assign(p,this.world.spawn(),{vx:0,vy:0,vz:0,visualStepOffset:0});
-   this.status('시작 지점으로 돌아왔어요');
-  }
+  if(p.dead)this.beginCinematic('death');
+  else this.interaction(dt,input);
  }
  frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.panel==='inventory'){this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}

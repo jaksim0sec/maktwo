@@ -1,4 +1,4 @@
-import {block,BLOCK as B} from '../core/blocks.js';
+import {block,BLOCK as B,isBed,itemId} from '../core/blocks.js';
 import {makeTextureLayers,materialFor} from './textures.js';
 import {shapeBoxes} from '../core/shapes.js';
 import {TREE_SPECIES,treeKind,isTreeAnchor,isFallenLeaves} from '../core/tree-assets.js';
@@ -87,12 +87,22 @@ export function drawShapeIcon(ctx,id){
 }
 export function drawItemIcon(ctx,id,x,y,size=64){
  ctx.save();ctx.translate(x,y);ctx.scale(size/64,size/64);
- if(drawShapeIcon(ctx,id)){} 
+ if(isBed(id)){
+  const framed=itemId(id)===B.BED,offset=framed?0:6;
+  ctx.translate(0,offset);
+  if(framed){
+   poly(ctx,[[8,28],[28,40],[55,25],[55,36],[28,52],[8,40]],'#705746');
+   poly(ctx,[[8,16],[27,26],[27,41],[8,31]],'#826751');
+  }
+  poly(ctx,[[8,28],[36,13],[56,24],[28,41]],'#ada48e');
+  poly(ctx,[[8,28],[28,41],[56,24],[56,29],[28,47],[8,34]],'#807868');
+  poly(ctx,[[20,30],[45,17],[56,24],[28,41]],framed?'#697b77':'#777568');
+  poly(ctx,[[11,25],[23,19],[33,24],[21,31]],'#c9c1ac');
+ }else if(drawShapeIcon(ctx,id)){}
  else if(id===B.TORCH||id===B.LANTERN||id===B.CAMPFIRE||id===B.GLOW_MUSHROOM){
   if(id===B.CAMPFIRE){poly(ctx,[[10,46],[31,33],[55,46],[34,58]],'#70523d');poly(ctx,[[15,47],[19,39],[43,47],[39,55]],'#af815b')}
-  else if(id===B.LANTERN){poly(ctx,[[19,19],[45,19],[48,49],[16,49]],'#a17948');poly(ctx,[[22,24],[42,24],[43,44],[21,44]],'#ffd38b');poly(ctx,[[18,15],[46,15],[43,21],[21,21]],'#d8b274');}
+  else if(id===B.TORCH||id===B.LANTERN){poly(ctx,[[19,19],[45,19],[48,49],[16,49]],'#a17948');poly(ctx,[[22,24],[42,24],[43,44],[21,44]],'#ffd38b');poly(ctx,[[18,15],[46,15],[43,21],[21,21]],'#d8b274');}
   else if(id===B.GLOW_MUSHROOM){poly(ctx,[[29,31],[37,31],[37,57],[28,57]],'#d1bc93');poly(ctx,[[11,31],[23,20],[40,17],[54,30],[48,39],[16,39]],'#e7a877');}
-  else{poly(ctx,[[28,27],[37,27],[38,56],[29,56]],'#8b6148');poly(ctx,[[26,21],[39,21],[40,32],[26,32]],'#f8a75a');poly(ctx,[[31,8],[37,16],[38,24],[26,24],[26,17]],'#ffe2a0')}
  }else if(id===B.DOOR){poly(ctx,[[18,9],[45,9],[48,58],[16,58]],'#674831');poly(ctx,[[21,13],[42,13],[44,53],[19,53]],'#ba8d62');poly(ctx,[[24,18],[39,18],[40,30],[23,30]],'#91704f');poly(ctx,[[23,34],[40,34],[41,48],[22,48]],'#94714f');poly(ctx,[[37,33],[41,33],[41,37],[37,37]],'#ebcf89');}
  else if(id===B.WORKBENCH){poly(ctx,[[10,20],[32,10],[56,20],[33,31]],'#c8a47b');poly(ctx,[[10,20],[33,31],[33,54],[10,43]],'#866348');poly(ctx,[[33,31],[56,20],[56,43],[33,54]],'#9a7352');for(let i=0;i<3;i++)poly(ctx,[[16+i*10,18],[19+i*10,17],[35+i*10,26],[32+i*10,27]],'#79583f')}
  else if(id===B.FENCE){poly(ctx,[[11,22],[19,17],[19,55],[11,59]],'#725940');poly(ctx,[[45,16],[53,22],[53,57],[45,52]],'#876442');poly(ctx,[[16,30],[48,25],[48,32],[16,37]],'#b18a62');poly(ctx,[[16,41],[48,37],[48,44],[16,48]],'#a47c57');}

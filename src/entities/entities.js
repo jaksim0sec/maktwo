@@ -1,5 +1,5 @@
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
-import {toVoxels} from '../core/scale.js';
+import {toVoxels,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {createStationTrain} from '../worldgen/station-train.js';
 import {STATION_PREVIEW_MODE} from '../worldgen/station-preview.js';
@@ -25,7 +25,10 @@ export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this
   else if(this.staminaRecovery===0)this.stamina=Math.min(100,this.stamina+14*dt);
   const speed=toVoxels(this.fly?8:this.crouching?2.7:this.sprint?7:2.5),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
  if(this.fly){this.vy=(Number(Boolean(input.jump))-Number(Boolean(input.crouch)))*speed}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
- this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
+ this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);
+ const landing=toMeters(this.landingSpeed);
+ if(landing>11.5&&!inWater(w,this))this.hurt(Math.ceil((landing-11.5)*1.25));
+ if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
  direction(){return{x:-Math.sin(this.yaw)*Math.cos(this.pitch),y:Math.sin(this.pitch),z:-Math.cos(this.yaw)*Math.cos(this.pitch)}}}
 export class Mob extends Entity{constructor(type,x,y,z){super(type,x,y,z);this.width=toVoxels(type==='sheep'?.85:.6);this.height=toVoxels(type==='sheep'?1.15:1.8);this.hp=type==='sheep'?10:20;this.maxHp=this.hp;this.wander=0;this.wanderAngle=0;this.attackTimer=0}
  update(world,dt,player){this.wander-=dt;this.attackTimer=Math.max(0,this.attackTimer-dt);const d=dist2(this,player);let dx=0,dz=0,speed=0;

@@ -14,7 +14,7 @@ export function harvestDrop(id){
 }
 export class SurvivalInventory{
  constructor(storage=null,world='Overworld'){
-  this.storage=storage;this.world=world;this.items=new Map();this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
+  this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
  }
  get key(){return `maktwo:survival:${this.world}`}
  count(id){return this.items.get(itemId(Number(id)))||0}
@@ -56,7 +56,37 @@ export class SurvivalInventory{
   this.items.set(recipe.id,this.count(recipe.id)+recipe.count);this.seen.add(recipe.id);this.save();return true;
  }
  recordHarvest(id){const drop=harvestDrop(id);return drop===null?0:this.add(drop,1)}
- save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
+ clearCarried(){
+  this.items.clear();
+  this.quickSlots.fill(null);
+  return this.save();
+ }
+ transfer(key,id,deposit){
+  const previous=this.containers.get(key),stored=new Map(previous);
+  const from=deposit?this.items:stored,to=deposit?stored:this.items;
+  const source=from.get(id)||0,destination=to.get(id)||0;
+  const count=Math.min(source,MAX_STACK-destination);
+  if(count<=0)return false;
+  const slots=this.quickSlots,known=this.seen.has(id);
+  if(count===source)from.delete(id);else from.set(id,source-count);
+  to.set(id,destination+count);
+  if(deposit&&!from.has(id))this.quickSlots=slots.map(slot=>slot===id?null:slot);
+  if(!deposit){
+   this.seen.add(id);
+   if(!slots.includes(id)&&slots.includes(null)){
+    this.quickSlots=[...slots];
+    this.quickSlots[slots.indexOf(null)]=id;
+   }
+  }
+  if(stored.size)this.containers.set(key,stored);else this.containers.delete(key);
+  if(this.save())return true;
+  const original=deposit?source:destination;
+  if(original)this.items.set(id,original);else this.items.delete(id);
+  if(previous)this.containers.set(key,previous);else this.containers.delete(key);
+  this.quickSlots=slots;if(!known)this.seen.delete(id);
+  return false;
+ }
+ save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots,checkpoint:this.checkpoint,containers:[...this.containers].map(([key,items])=>[key,[...items]])}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
  load(){let data=null;try{const raw=this.storage?.getItem(this.key);if(raw!==null&&raw!==undefined)data=JSON.parse(raw)}catch{}
   if((data?.version===1||data?.version===2)&&Array.isArray(data.items)){
    for(const [id,n] of data.items){
@@ -67,6 +97,21 @@ export class SurvivalInventory{
    }
    if(data.version===2){for(const id of data.seen||[])if(Number.isInteger(id)&&id>0&&id<BLOCKS.length)this.seen.add(itemId(id));if(Array.isArray(data.quickSlots)&&data.quickSlots.length===HOTBAR_SIZE)this.quickSlots=data.quickSlots.map(id=>id===null?null:(Number.isInteger(id)&&id>0&&id<BLOCKS.length&&this.count(id)>0?itemId(id):null));}
   }else for(const [id,n] of Object.entries(STARTER_SUPPLIES))this.items.set(Number(id),n);
+  const checkpoint=data?.checkpoint;
+  if(checkpoint&&[checkpoint.x,checkpoint.y,checkpoint.z].every(Number.isSafeInteger))this.checkpoint=checkpoint;
+  for(const entry of Array.isArray(data?.containers)?data.containers:[]){
+   if(!Array.isArray(entry)||typeof entry[0]!=='string'||!Array.isArray(entry[1]))continue;
+   const stored=new Map();
+   for(const stack of entry[1]){
+    if(!Array.isArray(stack))continue;
+    const [id,count]=stack;
+    if(Number.isInteger(id)&&id>B.AIR&&id<BLOCKS.length&&Number.isSafeInteger(count)&&count>0){
+     const canonical=itemId(id);
+     stored.set(canonical,Math.min(MAX_STACK,(stored.get(canonical)||0)+count));
+    }
+   }
+   if(stored.size)this.containers.set(entry[0],stored);
+  }
   const assigned=new Set();
   this.quickSlots=this.quickSlots.map(id=>{
    const canonical=itemId(id);

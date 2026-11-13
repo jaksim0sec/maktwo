@@ -70,3 +70,18 @@ body.ui-open #shape-controls{display:none}
 .train-control-bar button:disabled{opacity:.4;cursor:default}
 .train-control-bar button:focus-visible{outline:2px solid #f2d2a0;outline-offset:2px}
 @media(max-width:650px){.train-control-bar{bottom:calc(76px + env(safe-area-inset-bottom));gap:4px;padding:5px;font-size:10px}.train-speed{min-width:52px}.train-control-bar button{padding:8px 6px}}
+
+#storage-panel[hidden],#life-overlay[hidden]{display:none}
+.storage-card{width:min(43rem,100%);max-height:calc(100dvh - 2rem);display:flex;flex-direction:column;padding:1rem;background:#23292a;border:1px solid #aaa39355;border-radius:.8rem;box-shadow:0 1rem 3rem #0009}
+.storage-columns{min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.storage-columns section{display:flex;flex-direction:column;min-height:0;background:#161b1c;border:1px solid #aaa39324;border-radius:.5rem;padding:.6rem}
+.storage-columns h3{display:flex;align-items:baseline;justify-content:space-between;gap:.3rem;flex-wrap:wrap;margin:0 0 .55rem;font-size:.88rem}
+.storage-columns small{font-size:.72rem;color:#beb4a3;font-weight:400}
+.storage-items{overflow:auto;display:grid;gap:.3rem;align-content:start;min-height:2rem;font-size:.75rem;color:#c9c2b6;touch-action:pan-y}
+.storage-items button{display:flex;align-items:center;gap:.4rem;text-align:left;min-height:2.75rem;padding:.2rem .4rem;background:#303737;border:1px solid #aaa39329;border-radius:.35rem}
+.storage-items button:hover,.storage-items button:focus-visible{background:#464941}
+.storage-items img{width:1.8rem;height:1.8rem;flex:none;image-rendering:pixelated}
+#life-overlay{position:fixed;inset:0;z-index:29;display:grid;place-items:center;background:#08090b;opacity:var(--fade,0);pointer-events:auto}
+#life-overlay[data-scene="death"]{background:#110c0d;backdrop-filter:blur(calc(var(--fade,0)*8px));color:#efc8bd}
+#life-overlay strong{font-size:clamp(1rem,4vw,1.8rem);letter-spacing:.04em}
+body:has(#storage-panel:not([hidden])) #toast{z-index:31}

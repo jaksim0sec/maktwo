@@ -1,5 +1,5 @@
 import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
-import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
+import {BLOCK as B,isBed,isBedFoot,itemId, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor,materialUVTransform} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
@@ -297,11 +297,19 @@ export function fixture(dest,id,x,y,z){
   for(const x of [.14,.79])shape(x,.81,.12,.06,.028,.77,'#62615c');
   shape(.13,.81,.13,.74,.035,.74,'#a28c6e');
   shape(.17,.849,.17,.66,.016,.66,'#8b775a');
- }else if(id===B.TORCH){
-  shape(.458,.04,.458,.084,.45,.084,'#806550');
-  shape(.438,.49,.438,.124,.125,.124,'#e9ad63',-1.5);
-  shape(.464,.61,.464,.072,.092,.072,'#ffe2a3',-1.6);
- }else if(id===B.LANTERN){
+ }else if(isBed(id)){
+  const frame=itemId(id)===B.BED,foot=isBedFoot(id),base=frame?.26:.025;
+  const start=foot?0:.055,end=foot?.945:1;
+  if(frame){
+   for(const leg of [.12,.78])shape(leg,.02,foot?.82:.065,.10,.25,.11,'#605044');
+   shape(.08,.19,start,.84,.095,end-start,'#78604b');
+   if(!foot)shape(.08,.16,.025,.84,.52,.075,'#6f5947');
+  }
+  shape(.105,base,start,.79,.15,end-start,'#a49c88');
+  shape(.107,base+.13,foot?0:.59,.786,.045,foot?.91:.41,frame?'#687975':'#777568');
+  shape(.12,base+.065,start,.76,.014,end-start,'#877e70');
+  if(!foot)shape(.19,base+.15,.14,.62,.075,.32,'#c0b9a6');
+ }else if(id===B.TORCH||id===B.LANTERN){
   shape(.31,.12,.31,.38,.09,.38,'#746858');
   shape(.36,.22,.36,.28,.38,.28,'#ffd19a',-1.5);
   for(const dx of [.3,.64])for(const dz of [.3,.64])shape(dx,.2,dz,.06,.44,.06,'#766b59');

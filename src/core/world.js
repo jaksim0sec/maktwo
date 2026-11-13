@@ -1,4 +1,4 @@
-import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
+import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block,isBed,isBedFoot,bedDirection,itemId} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {STATION_PREVIEW_MODE,STATION_PREVIEW_SPAWN} from '../worldgen/station-preview.js';
 import {ARBORETUM_MODE,ARBORETUM_SPAWN} from '../worldgen/trees.js';
@@ -157,6 +157,7 @@ export class World{
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz),k=key(cx,cz);
   const lx=x-cx*SIZE,lz=z-cz*SIZE,idx=Chunk.index(lx,y,lz),oldId=c.data[idx],oldForm=c.forms?.[idx]||0;
   if(oldId===id&&oldForm===form)return false;
+  const oldBedFacing=oldId!==id&&isBed(oldId)?this.getShapeState(x,y,z).facing:null;
   c.set(lx,y,lz,id);if(c.styles)c.styles[idx]=0;
   if(oldForm!==form){
    if(!c.forms)c.forms=new Uint8Array(c.data.length);
@@ -173,6 +174,12 @@ export class World{
   // changes just one cell.
   if(oldId===B.DOOR&&id!==B.DOOR&&this.get(x,y+1,z)===B.DOOR_TOP)this.set(x,y+1,z,B.AIR,{simulate,record});
   else if(oldId===B.DOOR_TOP&&id!==B.DOOR_TOP&&this.get(x,y-1,z)===B.DOOR)this.set(x,y-1,z,B.AIR,{simulate,record});
+  if(oldBedFacing!==null){
+   const [dx,dz]=bedDirection(oldBedFacing),foot=isBedFoot(oldId);
+   const bx=x+(foot?-dx:dx),bz=z+(foot?-dz:dz),other=itemId(oldId)+(foot?0:1);
+   if(this.get(bx,y,bz)===other&&this.getShapeState(bx,y,bz).facing===oldBedFacing)
+    this.set(bx,y,bz,B.AIR,{simulate,record});
+  }
   if(id!==B.DOOR)this.blockStates.delete(this.stateKey(x,y,z));this.lights.update(x,y,z,id);
   if(block(oldId).light||block(id).light||isDoor(oldId)||isDoor(id)||(block(oldId).opaque&&!oldForm)!==(block(id).opaque&&!form))
    this.lightRevision++;

@@ -285,6 +285,26 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
           if(overhead===B.FLUORESCENT||overhead===B.BROKEN_FLUORESCENT)put(ceilingY,overhead);
         }
       } else if(room) {
+        // A shelter occupies three cells inside the same room.
+        const bx=Math.floor((room.x0+room.x1)/2)-1,bz=Math.floor((room.z0+room.z1)/2)-1;
+        const atShelter=zi===bz&&(xi===bx||xi===bx+1)||xi===bx&&zi===bz+1;
+        if(atShelter&&(room.kind==='room'||room.kind==='service')&&
+          hash(bx,f.level,bz,seed^v.id^0x3bd1)<.065){
+          const usable=[[bx,bz],[bx,bz+1],[bx+1,bz]].every(([sx,sz])=>{
+            const px=sx+.5,pz=sz+.5,q=inspectShape(f,px,pz);
+            return q?.room===room&&q.edge<0&&!q.corridor&&!q.partition&&!q.door&&
+              !f.holes.some(h=>containsRect(h,px,pz))&&
+              !(shaft&&containsRect(shaft,px,pz))&&
+              !(landing&&containsRect(landing,px,pz))&&!(access&&containsRect(access,px,pz))&&
+              !stairs.some(t=>containsRect(t,px,pz));
+          });
+          if(usable&&!reservedPassage(floor)){
+            const framed=hash(bx,f.level,bz,seed^0x51cb)<.45;
+            const bed=zi===bz?(framed?B.BED:B.MATTRESS):(framed?B.BED_FOOT:B.MATTRESS_FOOT);
+            put(floor,xi!==bx?B.TORCH:bed);
+            continue;
+          }
+        }
         const desk=room.kind==='classroom'&&x>room.x0+1.3&&x<room.x1-1.3&&z>room.z0+1.3&&z<room.z1-1.3
           &&mod(xi-Math.ceil(room.x0),3)===1&&mod(zi-Math.ceil(room.z0),3)===1;
         const item=desk?{variant:1,turn:v.stairFacing}:furnishRoom(room,x,z,kit,seed);

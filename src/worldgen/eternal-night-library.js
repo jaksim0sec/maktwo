@@ -162,7 +162,7 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
  }
  if(r>=radius-4&&r<radius-3&&Math.abs(bayOffset)<.75){
   for(const y of [base+3,upper+4])if(empty(y)){
-   put(y,B.LANTERN);
+   put(y,B.TORCH);
    put(y+1,BASE);
   }
  }
@@ -183,6 +183,6 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
  }else if(!outerGallery&&!innerGallery&&r>towerRadius+12&&r<radius-17
   &&wrap(Math.floor(x),16)===4&&wrap(Math.floor(z),16)===4){
   if(empty(base))put(base,TABLE,0);
-  if(empty(base+1))put(base+1,B.LANTERN);
+  if(empty(base+1))put(base+1,B.TORCH);
  }
 }

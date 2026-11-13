@@ -11,12 +11,14 @@ const make=(name,id,count,station,pattern,key,label)=>{
 };
 export const RECIPES=Object.freeze([
  make('planks',B.PLANKS,4,'hand',['W'],{W:B.WOOD},'나무 판자 ×4'),
- make('torch',B.TORCH,4,'hand',['P','P'],{P:B.PLANKS},'횃불 ×4'),
+ make('torch',B.TORCH,4,'hand',['P','P'],{P:B.PLANKS},'랜턴 ×4'),
  make('workbench',B.WORKBENCH,1,'hand',['PP','PP'],{P:B.PLANKS},'작업대'),
  make('door',B.DOOR,1,'bench',['PP','PP','PP'],{P:B.PLANKS},'나무 문'),
  make('fence',B.FENCE,3,'bench',['PPP','P P'],{P:B.PLANKS},'나무 울타리 ×3'),
  make('path',B.PATH,4,'bench',['CC'],{C:B.COBBLE},'돌길 ×4'),
- make('lantern',B.LANTERN,1,'bench',[' O ','OTO',' O '],{O:B.ORE,T:B.TORCH},'랜턴'),
+ make('mattress',B.MATTRESS,1,'hand',['RR','RR'],{R:B.REEDS},'매트리스'),
+ make('bed',B.BED,1,'bench',[' M ','PPP'],{M:B.MATTRESS,P:B.PLANKS},'낡은 나무 침대'),
+ make('crate',B.CRATE,1,'bench',['PPP','P P','PPP'],{P:B.PLANKS},'낡은 나무 상자'),
  make('glass',B.GLASS,2,'bench',['SS','SS'],{S:B.SAND},'유리 ×2'),
  make('stone_stairs',B.STONE_STAIRS,4,'bench',['C  ','CC ','CCC'],{C:B.COBBLE},'돌 계단 ×4'),
  make('wood_stairs',B.WOOD_STAIRS,4,'bench',['P  ','PP ','PPP'],{P:B.PLANKS},'나무 계단 ×4'),

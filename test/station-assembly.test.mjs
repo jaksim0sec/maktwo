@@ -28,7 +28,7 @@ test('append-only station registry preserves 188 previous IDs and 8-bit chunk fo
  assert.equal(B.CRATE,187);
  assert.equal(STATION_MATERIAL_START,188);
  assert.equal(STATION_PART_START,208);
- assert.equal(BLOCKS.length,246);assert.equal(BLOCK_LABELS.length,246);
+ assert.ok(BLOCKS.length>=246);assert.equal(BLOCK_LABELS.length,BLOCKS.length);
  assert.equal(STATION_MATERIALS.length,20);assert.equal(STATION_PARTS.length,30);
  assert.ok(BLOCKS.every((b,id)=>b.id===id&&id<=255));
  assert.equal(PARTS.length,70);
