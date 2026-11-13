@@ -293,7 +293,17 @@ export function fixture(dest,id,x,y,z){
  }
 
  const shape=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
- if(id===B.TORCH){
+ if(id===B.CRATE){ // Weathered non-emissive cargo box with separated wood slats.
+  shape(.085,.06,.085,.83,.75,.83,'#806b52');
+  for(const y of [.10,.34,.58])for(const z of [.074,.86]){
+   shape(.12,y,z,.76,.18,.032,'#a18b69');
+   shape(.12,y+.17,z,.76,.013,.036,'#65523c');
+  }
+  for(const x of [.074,.864])for(const z of [.10,.84])shape(x,.08,z,.040,.71,.065,'#555453');
+  for(const x of [.14,.79])shape(x,.81,.12,.06,.028,.77,'#62615c');
+  shape(.13,.81,.13,.74,.035,.74,'#a28c6e');
+  shape(.17,.849,.17,.66,.016,.66,'#8b775a');
+ }else if(id===B.TORCH){
   shape(.458,.04,.458,.084,.45,.084,'#806550');
   shape(.438,.49,.438,.124,.125,.124,'#e9ad63',-1.5);
   shape(.464,.61,.464,.072,.092,.072,'#ffe2a3',-1.6);
@@ -322,11 +332,16 @@ function fluorescentMesh(dest,id){
  const lit=id===B.FLUORESCENT;
  const box=(x,y,z,w,h,d,color,shade)=>cube(dest,x,y,z,w,h,d,rgb(color),shade);
  box(.10,.87,.24,.80,.13,.52,'#747d82');
+ // Lens bezel, rear mount and fasteners; the existing lit surface is unchanged.
+ for(const x of [.16,.78])box(x,.955,.32,.055,.035,.38,'#5f666a');
+ box(.145,.81,.26,.71,.025,.025,'#9a9e9a');
+ box(.145,.81,.715,.71,.025,.025,'#9a9e9a');
  box(.14,.82,.27,.72,.06,.46,lit?'#b6c0c5':'#555b5e');
  for(const z of [.36,.57]){
   for(const x of [.12,.80])box(x,.775,z-.012,.08,.08,.09,'#8e9699');
   box(.20,.76,z,.60,.038,.065,lit?'#eff8ff':'#899094',lit?-1.20:1);
  }
+ for(const x of [.18,.79])box(x,.758,.29,.035,.042,.40,'#8e9699');
  if(!lit)box(.59,.72,.49,.20,.045,.05,'#4e5355');
 }
 

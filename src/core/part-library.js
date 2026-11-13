@@ -364,6 +364,22 @@ export function partGeometry(id){
   };
   put(.105,.12,.68,.79,.78,.043,metals[0]); // dark interior throat
   housing(.40,.28);
+  // Real housings expose mounting feet, drain lips and protective duct details.
+  if(v===2){ // Outdoor condenser unit, recessed inlet and service hardware.
+   put(.075,.10,.63,.85,.13,.22,metals[1]);
+   for(const x of [.09,.84])put(x,.025,.69,.07,.11,.18,metals[0]);
+   for(const y of [.25,.74])put(.09,y,.34,.82,.034,.035,metals[3]);
+   put(.79,.36,.315,.07,.30,.06,metals[1]);
+   for(const y of [.42,.54,.66])put(.79,y,.29,.07,.016,.04,metals[0]);
+   put(.87,.18,.63,.046,.26,.12,metals[2]);
+  }
+  if(v===3){ // Vent duct has folded seams and bent mount brackets.
+   for(const x of [.13,.82])put(x,.21,.33,.045,.66,.055,metals[3]);
+   for(const y of [.26,.72])put(.10,y,.41,.80,.025,.055,metals[0]);
+  }
+  if(v===4){ // Industrial fan: guard stand-offs and paired mounting tabs.
+   for(const x of [.08,.88])for(const y of [.18,.81])put(x,y,.37,.04,.08,.18,metals[1]);
+  }
   for(const x of [.145,.827])for(const y of [.21,.83])
    put(x,y,.353,.030,.030,.045,metals[3]); // mount screws
   if(v===0||v===4){
@@ -420,29 +436,76 @@ export function partGeometry(id){
  }
  case 'interior':{
   const mat=[floors[4],floors[4],metals[3],stones[0],metals[1]][v];
-  if(v===0){put(.13,0,.18,.74,.84,.65,mat);for(const y of [.24,.49])put(.17,y,.13,.66,.045,.08,dark);}
-  if(v===1){put(.09,.41,.11,.82,.10,.65,mat);for(const x of [.16,.76])for(const z of [.2,.64])put(x,0,z,.08,.43,.09,mat);put(.17,.46,.68,.65,.31,.10,mat);}
-  if(v===2){put(.10,.77,.27,.8,.10,.46,dark);for(const z of [.35,.56])put(.19,.73,z,.63,.06,.08,stones[4],false,false,{emissive:true});}
-  if(v===3){put(.25,.02,.25,.50,.42,.50,stones[2]);put(.45,.36,.46,.10,.39,.10,metals[0]);for(const x of [.24,.65])put(x,.55,.40,.12,.21,.12,tiles[2]);}
-  if(v===4){put(.19,.03,.17,.62,.86,.66,mat);put(.22,.61,.12,.56,.17,.065,metals[3]);for(const y of [.18,.43])put(.26,y,.10,.48,.035,.05,dark);}
+  if(v===0){ // Recessed storage cupboard, fitted drawers and handles.
+   put(.11,0,.16,.78,.88,.66,mat);
+   for(const x of [.12,.85])put(x,.03,.13,.035,.81,.05,dark);
+   for(const [y,h] of [[.08,.21],[.36,.23],[.67,.15]]){
+    put(.16,y,.105,.68,h,.035,floors[3]);
+    put(.46,y+h*.5,.087,.09,.025,.035,metals[3],false,false);
+   }
+   put(.14,.87,.13,.72,.045,.73,metals[1]);
+  }
+  if(v===1){ // Taper-free chair and table with realistically open space.
+   put(.08,.46,.09,.84,.07,.71,mat);
+   put(.105,.43,.09,.79,.025,.69,floors[3]);
+   for(const x of [.13,.78])for(const z of [.18,.69])put(x,.02,z,.07,.43,.08,metals[0]);
+   put(.18,.30,.17,.64,.035,.05,metals[1]);
+   put(.19,.30,.70,.61,.035,.05,metals[1]);
+   put(.16,.52,.72,.69,.33,.073,floors[4]);
+   for(const x of [.18,.79])put(x,.54,.71,.045,.28,.045,metals[0]);
+  }
+  if(v===2){ // Tube housing, separate reflector, retaining clips and lenses.
+   put(.09,.79,.25,.82,.11,.50,dark);
+   put(.12,.775,.275,.76,.025,.45,metals[3]);
+   for(const z of [.36,.58]){
+    put(.17,.72,z,.66,.055,.077,stones[4],false,false,{emissive:true});
+    for(const x of [.14,.82])put(x,.716,z-.018,.04,.075,.114,metals[1],false,false);
+   }
+   for(const x of [.13,.82])put(x,.90,.36,.045,.042,.25,metals[1]);
+  }
+  if(v===3){ // Planter with foot, rim, soil and individual stems.
+   put(.25,.02,.25,.50,.09,.50,stones[0]);
+   put(.29,.11,.29,.42,.35,.42,stones[2]);
+   put(.22,.42,.22,.56,.058,.56,stones[0]);
+   put(.30,.464,.30,.40,.026,.40,floors[0],false,false);
+   for(const [x,z,h] of [[.41,.43,.31],[.56,.56,.39],[.49,.35,.24]]){
+    put(x,.48,z,.038,h,.038,metals[0],false,false);
+    put(x-.055,.48+h*.63,z-.025,.14,.06,.10,tiles[2],false,false);
+   }
+  }
+  if(v===4){ // Service cabinet with seams, ventilation and inset access panel.
+   put(.16,.02,.14,.68,.91,.70,mat);
+   put(.20,.64,.105,.60,.23,.047,metals[3]);
+   for(const y of [.21,.45]){put(.21,y,.105,.58,.03,.05,dark);put(.68,y+.05,.094,.045,.08,.045,metals[3]);}
+   for(const y of [.72,.77,.82])put(.28,y,.096,.41,.016,.026,metals[0],false,false);
+   for(const x of [.19,.76])put(x,.03,.09,.048,.07,.07,metals[0]);
+  }
   break;
  }
  case 'bookshelf':{
   const timber=floors[4];
   put(0,0,.20,1,1,.59,timber);
-  if(v===4){
-   put(0,.04,.08,1,.12,.84,timber);
-   put(0,.72,.08,1,.19,.84,timber);
-   break;
-  }
-  const spines=[bricks[1],metals[1],bricks[0],stones[2],bricks[3],floors[2]];
-  for(const z of [.10,.79])for(const y of [0,.47,.94])
-   put(0,y,z,1,.06,.11,timber);
-  for(const x of [0,.93])put(x,0,.09,.07,1,.82,timber);
-  for(const z of [.13,.79])for(let row=0;row<2;row++)for(let book=0;book<6;book++){
-   if(v===3&&(book+row)%3===1)continue;
-   const h=.25+((book*3+row+v*2)%5)*.024;
-   put(.09+book*.138,.06+row*.47,z,.104,h,.075,spines[(book*5+row+v)%spines.length],false,false);
+  if(v===4){put(0,.04,.08,1,.12,.84,timber);put(0,.72,.08,1,.19,.84,timber);break;}
+  const covers=[bricks[1],metals[1],bricks[0],stones[2],bricks[3],floors[2]];
+  for(const z of [.09,.80])for(const y of [0,.47,.94])put(0,y,z,1,.056,.10,timber);
+  for(const x of [.01,.935])put(x,0,.08,.055,1,.85,timber);
+  for(const z of [.135,.805])for(let row=0;row<2;row++){
+   let x=.085,book=0;
+   while(x<.89){
+    const gap=v===3&&(book+row)%4===2;
+    const width=.085+((book*7+row+v)%4)*.012;
+    const height=.215+((book*3+row+v)%6)*.027;
+    if(!gap&&x+width<.92){
+     const color=covers[(book*5+row+v)%covers.length];
+     put(x,.057+row*.47,z,width,height,.072,color,false,false);
+     // Raised spine bands and narrow paper edges are actual geometry.
+     if((book+v)%3===0)put(x+.009,.071+row*.47,z-.012,width-.018,.020,.014,stones[4],false,false);
+    }
+    x+=width+.019;book++;
+   }
+   // A small horizontal pile breaks the uniform wall of upright spines.
+   if(row===0&&v!==3)for(let stack=0;stack<3;stack++)
+    put(.40,.064+stack*.036,z-.02,.21,.027,.098,covers[(stack+v+2)%covers.length],false,false);
   }
   break;
  }

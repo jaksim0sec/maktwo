@@ -69,8 +69,16 @@ export function shapeBoxes(id,x,y,z,state={}){
   }
   return id===B.WINDOW_EW?rotateBoxes(parts,x,z,1):parts;
  }
+ if(id===B.CRATE)return [{x:x+.085,y:y+.06,z:z+.085,w:.83,h:.79,d:.83}];
  if(id===B.CHAIR){
-  return rotateBoxes([{x:x+.13,y:y+.39,z:z+.13,w:.74,h:.17,d:.74},{x:x+.13,y:y+.55,z:z+.73,w:.74,h:.42,d:.14},...[.16,.69].flatMap(dx=>[.16,.69].map(dz=>({x:x+dx,y,z:z+dz,w:.15,h:.41,d:.15})))],x,z,facing);
+  return rotateBoxes([
+   {x:x+.12,y:y+.40,z:z+.13,w:.76,h:.12,d:.72},
+   ...[.16,.75].flatMap(dx=>[.16,.71].map(dz=>({x:x+dx,y:y+.02,z:z+dz,w:.095,h:.42,d:.09}))),
+   ...[.17,.76].map(dx=>({x:x+dx,y:y+.52,z:z+.73,w:.06,h:.42,d:.10})),
+   {x:x+.18,y:y+.78,z:z+.735,w:.65,h:.105,d:.095},
+   {x:x+.18,y:y+.58,z:z+.735,w:.65,h:.057,d:.095},
+   {x:x+.18,y:y+.25,z:z+.18,w:.61,h:.055,d:.07}
+  ],x,z,facing);
  }
  if(id===B.FLOWER_POT)return [{x:x+.29,y,z:z+.29,w:.42,h:.38,d:.42}];
  return null;
