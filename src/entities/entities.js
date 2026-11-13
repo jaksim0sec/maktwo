@@ -2,7 +2,7 @@ import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';impor
 import {toVoxels} from '../core/scale.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
-export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
+export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.stamina=100;this.staminaRecovery=0;this.exhausted=false;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
  hurt(amount,from){if(!this.creative)super.hurt(amount,from)}
  onStep(rise){this.visualStepOffset=Math.max(-1,Math.min(0,this.visualStepOffset-rise))}
  update(w,dt,input){
@@ -13,7 +13,13 @@ export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this
   this.eye+=((this.crouching?this.crouchedEye:this.standingEye)-this.eye)*(1-Math.exp(-Math.min(dt,.08)*8.5));
   // Never let the camera enter a ceiling while the capsule is crouched.
   if(collides(w,this.x,this.y+this.eye-.12,this.z,this.width,.12))this.eye=Math.min(this.eye,this.height-.08);
-  const speed=toVoxels(this.fly?8:this.crouching?2.7:input.sprint?7:5),forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
+  const forward=(input.forward?1:0)-(input.backward?1:0)+(input.moveY||0),side=(input.right?1:0)-(input.left?1:0)+(input.moveX||0);
+  this.staminaRecovery=Math.max(0,this.staminaRecovery-dt);
+  if(this.exhausted&&this.stamina>=20)this.exhausted=false;
+  this.sprint=Boolean(input.sprint)&&(forward>0||Math.abs(side)>.1)&&!this.fly&&!this.crouching&&!this.water&&!this.exhausted&&this.stamina>0;
+  if(this.sprint&&!this.creative){this.stamina=Math.max(0,this.stamina-18*dt);this.staminaRecovery=.8;if(this.stamina===0){this.exhausted=true;this.sprint=false}}
+  else if(this.staminaRecovery===0)this.stamina=Math.min(100,this.stamina+14*dt);
+  const speed=toVoxels(this.fly?8:this.crouching?2.7:this.sprint?7:5),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
  if(this.fly){this.vy=(Number(Boolean(input.jump))-Number(Boolean(input.crouch)))*speed}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
  direction(){return{x:-Math.sin(this.yaw)*Math.cos(this.pitch),y:Math.sin(this.pitch),z:-Math.cos(this.yaw)*Math.cos(this.pitch)}}}

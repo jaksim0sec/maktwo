@@ -90,7 +90,7 @@ export class Input{
    left:k.has('KeyA')||k.has('ArrowLeft'),right:k.has('KeyD')||k.has('ArrowRight'),
    moveX:m.x,moveY:-m.y,
    jump:Boolean(k.has('Space')||this.held.jump),crouch:Boolean(k.has('ShiftLeft')||this.held.crouch),
-   sprint:k.has('ControlLeft')||k.has('ControlRight'),
+   sprint:k.has('ControlLeft')||k.has('ControlRight')||Boolean(this.held.sprint),
    use:!this.inventoryMode&&taps>0,mine:!this.inventoryMode&&Boolean(minePoint||this.held.mine),aim:this.inventoryMode?null:(minePoint||picked),place:false
   };
  }
