@@ -77,8 +77,13 @@ export function stationPartGeometry(id){
    add(.09,.43,.15,.82,.025,.07,metal);
   }else if(p.variant===1){
    add(.47,0,.47,.062,1,.062,metal,true);
+   add(.40,0,.40,.20,.045,.20,'TRAIN_RUBBER');
    add(.38,.92,.45,.24,.035,.10,metal);
-   for(const y of [.23,.73])add(.425,y,.42,.15,.035,.14,metal);
+   add(.415,.938,.44,.17,.015,.12,'TRACK_RAIL');
+   for(const y of [.23,.73]){
+    add(.425,y,.42,.15,.035,.14,metal);
+    add(.436,y+.034,.428,.12,.014,.12,'TRACK_RAIL');
+   }
   }else if(p.variant===2){ // Real suspended grips: hanger, neck and dark ring.
    add(.06,.94,.43,.88,.043,.13,metal);
    for(const x of [.16,.47,.78]){
@@ -92,6 +97,8 @@ export function stationPartGeometry(id){
   }else if(p.variant===3){
    for(const x of [.08,.88])add(x,.50,.80,.035,.39,.05,metal);
    for(const y of [.59,.77])add(.10,y,.76,.78,.035,.12,metal);
+   add(.12,.636,.755,.76,.025,.095,'TRAIN_RUBBER');
+   add(.12,.814,.75,.76,.020,.105,'TRACK_RAIL');
    for(const x of [.20,.38,.56,.74])add(x,.60,.75,.025,.18,.035,metal);
   }else{
    add(.11,.08,.13,.78,.58,.69,'TRAIN_ENAMEL',true);
@@ -106,6 +113,10 @@ export function stationPartGeometry(id){
   if(p.variant===0){add(0,.00,0,1,.18,1,'TRACK_BALLAST',true);break}
   if(p.variant===1){
    add(.17,0,0,.66,.16,1,'TRACK_SLEEPER',true);
+   for(const z of [.36,.58]){
+    add(.28,.16,z,.44,.025,.070,'TRACK_GREASE');
+    for(const x of [.33,.665])add(x,.185,z+.018,.025,.014,.028,'TRACK_RAIL');
+   }
    break;
   }
   if(p.variant===2||p.variant===3){
