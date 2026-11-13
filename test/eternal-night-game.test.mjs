@@ -18,7 +18,7 @@ test('market precincts pack connected modules and upper districts have their own
   assert.ok(plan.precincts.some(p=>p.modules.length>=5));
   assert.ok(plan.volumes.filter(v=>v.support!==null).length>=25);
   assert.ok(roots.some(v=>v.floors.some(f=>f.program==='market'&&f.rooms.filter(r=>r.kind==='shop').length>=6)));
-  const tall=roots.find(v=>v.floors.length>=70);
+  const tall=roots.find(v=>v.floors.length>=Math.round(70*.92));
   assert.ok(new Set(tall.floors.map(f=>f.program)).size>=4);
   assert.ok(tall.floors.every(f=>Number.isFinite(f.luxury)&&Number.isFinite(f.access)));
   assert.ok(tall.floors.at(-1).luxury<Math.max(...tall.floors.slice(10,50).map(f=>f.luxury)));
@@ -47,11 +47,11 @@ test('the spawn interior has opaque room divisions and ceiling fixtures that lig
 
 test('the city voxelizes high-rise floors, varied parts and multiple bridge heights',()=>{
   const plan=createCityPlan(9999);
-  const tower=plan.volumes.find(v=>v.floors.length>=70&&v.floors.length<=80);
+  const tower=plan.volumes.find(v=>v.floors.length>=Math.round(70*.92)&&v.floors.length<=Math.round(80*.92));
   assert.ok(tower && plan.layout.width>=900);
   assert.ok(plan.links.some(a=>plan.links.some(b=>a!==b && a.ports[0].building===b.ports[0].building && Math.abs(a.ports[0].y-b.ports[0].y)>40)));
   const world=new World({seed:9999,mode:'eternal-city-lab'});
-  const floor=tower.floors[69],families=new Set();
+  const floor=tower.floors[Math.min(60,tower.floors.length-4)],families=new Set();
   for(let x=Math.floor(tower.x0);x<tower.x1;x++)for(let z=Math.floor(tower.z0);z<tower.z1;z++) {
     for(let y=Math.round(floor.y);y<Math.round(floor.top);y++){
       const part=partById(world.get(x,y,z));

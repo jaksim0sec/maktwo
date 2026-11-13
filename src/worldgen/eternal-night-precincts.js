@@ -5,6 +5,8 @@ const TYPES={market:3,housing:1,court:2,workshops:4,shops:0};
 const CARDINAL=[[1,0],[-1,0],[0,1],[0,-1]];
 
 /** Grow lots around shared passages. The grid reserves space; the modules own the geometry. */
+// Keep landmark and mixed-use towers slightly shorter without changing floor pitch.
+const HEIGHT_FACTOR=.92;
 export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity},randomAt) {
   const {size,step,left,top,luxury,noise,buildable}=grid;
   const {sections,labels,tangentX,tangentZ}=partitioned;
@@ -103,11 +105,11 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
           ?4+Math.floor(random(47)*11):66;
         const preferred=landmark?70+Math.floor(random(98)*11):Math.min(commercialCap,
           3+Math.round(cluster+(program==='market'?21:program==='court'?48:34)*(.2+.8*tier)*random(4)**1.45));
-        const floors=Math.min(preferred,Math.floor((layout.floorTop-v.y0)/pitch)-1);
+        const floors=Math.min(Math.max(1,Math.round(preferred*HEIGHT_FACTOR)),Math.floor((layout.floorTop-v.y0)/pitch)-1);
         if(floors<1)continue;
         v.y1=v.y0+pitch*floors;
         if(!designBuilding(v,unit,random))continue;
-        if(landmark&&floors>=70)landmarks.set(section.district,v);
+        if(landmark&&floors>=Math.round(70*HEIGHT_FACTOR))landmarks.set(section.district,v);
       }
       if(v.y1>=layout.floorTop)continue;
       volumes.push(v);precinct.modules.push(v.id);used+=w*d;
