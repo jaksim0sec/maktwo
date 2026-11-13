@@ -6,6 +6,7 @@ export const STATION_PART_FAMILIES=Object.freeze([
  {key:'track',label:'철도 선로',variants:['자갈 도상','레일 침목','주행 레일','급전 레일','선로 배선 트레이']},
  {key:'platform',label:'역 승강장',variants:['승강장 단부','점자 유도 경계','노선 안내판','개찰구','환기 그릴']},
  {key:'stationLink',label:'도시 연결부',variants:['연결통로 난간','상부 배관','전선 덕트','방향 안내 표지','계단/경사 연결']},
+ {key:'trainRunning',label:'전동차 하부·전면',variants:['차륜·대차','차체 하부 스커트','운전실 전면·통유리','차량 연결기','차간 주름막']},
 ]);
 export const STATION_PARTS=Object.freeze(STATION_PART_FAMILIES.flatMap((family,section)=>
  family.variants.map((variantName,variant)=>Object.freeze({
@@ -148,6 +149,56 @@ export function stationPartGeometry(id){
    for(const y of [.23,.36,.49,.62])add(.07,y,.09,.86,.035,.82,'STATION_PIPE');
    for(const x of [.08,.86])add(x,.07,.08,.055,.67,.84,'STATION_CABLE');
   }break;
+ }
+ case 'trainRunning':{
+  if(p.variant===0){ // Two stacked octagonal wheel silhouettes and a visible axle journal.
+   // The wheel is modeled in the X/Y plane, centered close to the outer side of a carriage.
+   const steel='TRACK_GREASE',tire='TRAIN_RUBBER',rim='TRACK_RAIL';
+   add(.04,.50,.35,.92,.10,.30,steel,true);
+   for(const center of [.26,.74]){
+    for(const [height,width] of [[.13,.21],[.22,.37],[.34,.47],[.46,.47],[.58,.37],[.67,.21]]){
+     add(center-width*.5,height,.46,width,.083,.14,tire,true);
+    }
+    add(center-.105,.38,.425,.21,.13,.21,steel);
+    add(center-.053,.416,.407,.106,.057,.025,rim);
+   }
+   add(.09,.84,.39,.82,.075,.24,'TRAIN_DOOR_STEEL',true);
+   for(const x of [.09,.84])add(x,.70,.38,.055,.15,.24,rim);
+  }else if(p.variant===1){ // Carriage lower-body sill and orange/blue horizontal livery.
+   add(0,.10,.44,1,.17,.105,'TRAIN_CORRUGATED',true);
+   add(0,.29,.439,1,.083,.11,'PLATFORM_ORANGE');
+   add(0,.41,.444,1,.045,.10,'STATION_BLUE');
+   add(.025,.05,.441,.95,.035,.11,'TRAIN_RUBBER');
+   for(const x of [.11,.88])add(x,.04,.415,.04,.32,.17,'TRAIN_DOOR_STEEL');
+  }else if(p.variant===2){ // A front-facing cab has wide windscreen and real perimeter.
+   for(const x of [.04,.89])add(x,.08,.44,.07,.88,.115,metal,true);
+   add(.05,.04,.46,.91,.20,.073,enamel,true);
+   add(.05,.87,.46,.91,.11,.073,enamel,true);
+   add(.14,.33,.49,.72,.52,.026,glass,false,true);
+   add(.17,.31,.438,.68,.040,.112,metal);
+   for(const x of [.10,.86])add(x,.30,.44,.045,.55,.10,metal);
+   add(.31,.89,.435,.38,.035,.10,'STATION_SOOT');
+   for(const x of [.15,.78]){
+    add(x,.12,.409,.095,.07,.105,'PLATFORM_TACTILE');
+    add(x,.105,.407,.095,.032,.10,metal);
+   }
+  }else if(p.variant===3){ // Exposed knuckle coupler, two spring packs and hoses.
+   add(.12,.43,.23,.76,.23,.53,'TRACK_GREASE',true);
+   add(.27,.31,.34,.46,.13,.31,'TRAIN_DOOR_STEEL',true);
+   add(.37,.56,.32,.26,.17,.34,'TRACK_RAIL',true);
+   for(const x of [.16,.73]){
+    add(x,.25,.28,.065,.29,.14,'TRAIN_RUBBER');
+    add(x,.22,.27,.085,.065,.14,'TRACK_GREASE');
+   }
+  }else{ // Bellows between carriage sections; open middle, actual flexible rubber ribs.
+   for(const x of [.035,.90])add(x,.05,.40,.065,.92,.19,dark,true);
+   for(const y of [.04,.93])add(.06,y,.40,.88,.07,.19,dark,true);
+   for(const x of [.16,.34,.52,.70,.86]){
+    add(x,.10,.395,.027,.79,.20,'TRAIN_RUBBER');
+    add(x,.905,.395,.034,.035,.20,metal);
+   }
+  }
+  break;
  }
  case 'stationLink':{
   if(p.variant===0){

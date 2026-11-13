@@ -14,7 +14,7 @@ Distinct pixel patterns are used for all 20 finishes, not one recolored noise la
 
 **Do not change old IDs.** The original 0–187 are unchanged.
 Station tiles occupy **188–207** in `station-materials.js`.
-25 assembled model blocks occupy **208–232** in `station-parts.js`.
+30 assembled model blocks occupy **208–237** in `station-parts.js`.
 All still fit a `Uint8Array` block index; changing those offsets would break
 saves. Material atlas layers for the new tiles are 71–90 (1-based).
 
@@ -27,7 +27,7 @@ The 20 tiles are grouped by use:
   teal seat vinyl, anti-slip rubber
 - Infrastructure: cable duct, vent grill, oxidized pipe
 
-The 25 3D units form five five-piece families:
+The 30 3D units form six five-piece families:
 
 1. Carriage walls: thin ribbed side, window frame and translucent glass,
    left and right sliding door leaves with sealing strips, roof cassette.
@@ -38,6 +38,9 @@ The 25 3D units form five five-piece families:
    ticket gate, ventilation grille.
 5. Transfers: deck railing, ductwork, wiring conduit, directional signage,
    stepped access.
+6. Rolling stock: stepped circular wheel-and-axle bogies, underbody skirt with
+   orange/blue waistline, wide driver windscreen and cab nose, mechanical
+   coupler, and the flexible inter-car gangway bellows.
 
 Each piece is a cluster of clipped 0..1 cuboids. Mesh, physics and selection
 share the same part geometry. Window glass is separately alpha-tagged; seats
@@ -56,7 +59,21 @@ Train shell, windows, sliding leaves and seats are built in layers Y=23–26.
 The station has grouted wall tiles, warning strips, skylight slits, operable and
 broken fluorescent tube **fixtures** (lighting preserved from existing system),
 ticket gates, vents, pipes, signage, and an end stair/access connection.
-Twenty tile swatches are available at X=-30.
+Twenty tile swatches are available at X=-30. An additional line of five
+rolling-stock pieces sits at X=-28 (Z=-5..-1).
+
+**Carriage silhouette revision:** wheels are placed on both sides below the
+floor at Y=21, below uninterrupted side skirts at Y=22. Raised body sides,
+door and window modules extend through Y=23–24. A solid roof caps the
+assembly at Y=25, with raised ribs at Y=26. Both ends of the train carry
+an actual modeled cab windscreen and exposed coupler, and the center
+has a dark concertina gangway. These are separate detailed buildable
+parts, not painted-on wheel circles.
+
+Station preview exterior vehicle parts set the existing exterior style bit,
+and the simplified mesh retains its main solid frame and translucent
+glazing. This prevents the whole train body from disappearing when it
+falls outside the fine-detail Y range.
 
 The preview does not alter `eternal-city-lab` generation or existing saved worlds.
 There is no autonomous moving train or passenger simulation. Render tests must be

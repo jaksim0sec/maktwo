@@ -10,9 +10,12 @@ const T=Object.freeze({
  furnish:[B.PART_STATION_TRAININTERIOR_1,B.PART_STATION_TRAININTERIOR_2,B.PART_STATION_TRAININTERIOR_3,B.PART_STATION_TRAININTERIOR_4,B.PART_STATION_TRAININTERIOR_5],
  track:[B.PART_STATION_TRACK_1,B.PART_STATION_TRACK_2,B.PART_STATION_TRACK_3,B.PART_STATION_TRACK_4,B.PART_STATION_TRACK_5],
  platform:[B.PART_STATION_PLATFORM_1,B.PART_STATION_PLATFORM_2,B.PART_STATION_PLATFORM_3,B.PART_STATION_PLATFORM_4,B.PART_STATION_PLATFORM_5],
- link:[B.PART_STATION_STATIONLINK_1,B.PART_STATION_STATIONLINK_2,B.PART_STATION_STATIONLINK_3,B.PART_STATION_STATIONLINK_4,B.PART_STATION_STATIONLINK_5]
+ link:[B.PART_STATION_STATIONLINK_1,B.PART_STATION_STATIONLINK_2,B.PART_STATION_STATIONLINK_3,B.PART_STATION_STATIONLINK_4,B.PART_STATION_STATIONLINK_5],
+ running:[B.PART_STATION_TRAINRUNNING_1,B.PART_STATION_TRAINRUNNING_2,B.PART_STATION_TRAINRUNNING_3,B.PART_STATION_TRAINRUNNING_4,B.PART_STATION_TRAINRUNNING_5]
 });
-const doorway=x=>[-10,-9,-1,0,9,10].includes(x);
+const doorway=x=>[-10,-9,9,10].includes(x);
+const gangway=x=>x===-1||x===0;
+const bogie=x=>[-15,-14,-4,-3,3,4,14,15].includes(x);
 const carriage=x=>x>=-18&&x<=18;
 export function stampStationPreview(chunk,seed){
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,H=chunk.height;
@@ -20,7 +23,13 @@ export function stampStationPreview(chunk,seed){
   if(y<0||y>=H)return;
   const i=(y*SIZE+lz)*SIZE+lx;
   chunk.data[i]=id;
-  if(facing){chunk.styles??=new Uint8Array(chunk.data.length);chunk.styles[i]=32|(facing&7)}
+  // Keep the actual carbody visible even if a low-detail mesh is requested.
+  const exterior=id>=B.PART_STATION_TRAINWALL_1&&id<=B.PART_STATION_TRAINWALL_5||
+   id>=B.PART_STATION_TRAINRUNNING_1&&id<=B.PART_STATION_TRAINRUNNING_5;
+  if(facing||exterior){
+   chunk.styles??=new Uint8Array(chunk.data.length);
+   chunk.styles[i]=(facing?32|(facing&7):0)|(exterior?64:0);
+  }
  };
  for(let lz=0;lz<SIZE;lz++)for(let lx=0;lx<SIZE;lx++){
   const x=ox+lx,z=oz+lz,az=Math.abs(z),ax=Math.abs(x),inside=ax<=32&&az<=21;
@@ -35,12 +44,16 @@ export function stampStationPreview(chunk,seed){
    else if(az===4)set(21,T.track[3]);
    else if(az===5&&x%4===0)set(21,T.track[4]);
    else if(z===0&&x%5===0)set(21,T.track[0]);
+   // The train chassis sits on pairs of bogies, not a solid rectangular plinth.
+   if(ax<=18&&az===4&&bogie(x))set(21,T.running[0],z>0?4:0);
+   if(ax<=18&&z===0&&x%6===0)set(21,B.STATION_TRACK_GREASE);
    if(ax<=18){
     if(az<=3)set(22,B.STATION_TRAIN_RUBBER);
     if(az===4){
-     set(22,B.STATION_TRAIN_ENAMEL);
-     set(23,doorway(x)?T.shell[(x%2+2)%2===0?2:3]:T.shell[0],z>0?4:0);
-     set(24,doorway(x)?T.shell[(x%2+2)%2===0?2:3]:T.shell[1],z>0?4:0);
+     set(22,T.running[1],z>0?4:0);
+     const side=gangway(x)?T.running[4]:doorway(x)?T.shell[(x%2+2)%2===0?2:3]:T.shell[0];
+     set(23,side,z>0?4:0);
+     set(24,gangway(x)?T.running[4]:doorway(x)?T.shell[(x%2+2)%2===0?2:3]:T.shell[1],z>0?4:0);
     }else if(az<=3){
      if(az===3&&x%3===0&&!doorway(x))set(23,T.furnish[0],z>0?4:0);
      if(z===0&&x%3===0&&!doorway(x))set(24,T.furnish[2]);
@@ -54,9 +67,15 @@ export function stampStationPreview(chunk,seed){
     set(24,T.shell[1],z>0?4:0);
    }
    if((x===-18||x===18)&&az<=4){
-    set(23,T.shell[0],2);set(24,T.shell[1],2);
-    if(z===0)set(23,T.furnish[4],2);
+    const noseFacing=x<0?2:6;
+    if(az<=3){
+     set(23,T.shell[0],noseFacing);
+     set(24,T.running[2],noseFacing);
+    }
+    if(z===0)set(23,T.furnish[4],noseFacing);
    }
+   // Each driver end projects a mechanical coupling below the front glazing.
+   if((x===-19||x===19)&&z===0)set(22,T.running[3],x<0?2:6);
   }
   // Opposing side platforms: edge marker, tactile bumps, slate and damp grime.
   if(az>=6&&az<=18&&ax<=28){
@@ -85,6 +104,10 @@ export function stampStationPreview(chunk,seed){
    if(az===17&&x%7===0)set(28,T.link[2]);
   }
   // A small 20-tile material swatch wall proves every registered tile is usable.
+  // A dedicated rolling-stock inspection row makes all underbody parts inspectable.
+  if(x===-28&&z>=-5&&z<0){
+   set(21,B.STATION_TRACK_BALLAST);set(22,T.running[z+5]);
+  }
   if(x===-30&&z>=-10&&z<10){
    set(21,B.CONCRETE);set(22,B.STATION_PLATFORM_STONE);
    set(24,188+z+10);

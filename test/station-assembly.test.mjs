@@ -25,12 +25,12 @@ test('append-only station registry preserves 188 previous IDs and 8-bit chunk fo
  assert.equal(B.CRATE,187);
  assert.equal(STATION_MATERIAL_START,188);
  assert.equal(STATION_PART_START,208);
- assert.equal(BLOCKS.length,233);assert.equal(BLOCK_LABELS.length,233);
- assert.equal(STATION_MATERIALS.length,20);assert.equal(STATION_PARTS.length,25);
+ assert.equal(BLOCKS.length,238);assert.equal(BLOCK_LABELS.length,238);
+ assert.equal(STATION_MATERIALS.length,20);assert.equal(STATION_PARTS.length,30);
  assert.ok(BLOCKS.every((b,id)=>b.id===id&&id<=255));
  assert.equal(PARTS.length,70);
  for(const part of STATION_PARTS)assert.equal(partById(part.id)?.id,part.id);
- assert.equal(new Set(STATION_PARTS.map(p=>p.id)).size,25);
+ assert.equal(new Set(STATION_PARTS.map(p=>p.id)).size,30);
 });
 test('all 20 distinct pixel tiles are loaded and mapped to consecutive atlas layers',()=>{
  const atlas=makeTextureLayers();
@@ -80,11 +80,46 @@ test('preview contains all twenty tiles and twenty-five train and station parts'
  assert.equal(at(0,21,2),B.PART_STATION_TRACK_3);
  assert.equal(at(0,22,0),B.STATION_TRAIN_RUBBER);
  assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,10)));
- assert.ok([B.PART_STATION_TRAINWALL_3,B.PART_STATION_TRAINWALL_4].includes(at(0,23,4)));
+ assert.ok([B.PART_STATION_TRAINWALL_3,B.PART_STATION_TRAINWALL_4].includes(at(-10,23,4)));
  assert.ok([B.PART_STATION_TRAININTERIOR_2,B.PART_STATION_TRAININTERIOR_3,B.AIR].includes(at(0,23,0)));
  assert.equal(at(0,24,STATION_PREVIEW_SPAWN.z|0),B.AIR);
  assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,STATION_PREVIEW_SPAWN.z|0)));
  assert.ok(WORLD_PRESETS.some(p=>p.mode==='station-preview'));
  assert.ok(PALETTES.blocks.items.includes(B.STATION_PLATFORM_STONE));
  assert.ok(PALETTES.parts.items.includes(B.PART_STATION_TRAINWALL_2));
+});
+
+test('the station train has recognizable wheels, two cabs, door pairs, side skirts and gangways',()=>{
+ const {map,at}=chunks();
+ const BOGIE=B.PART_STATION_TRAINRUNNING_1;
+ for(const z of [-4,4])for(const x of [-15,-14,-4,-3,3,4,14,15]){
+  assert.equal(at(x,21,z),BOGIE,`missing wheel at ${x},${z}`);
+  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2,`missing underbody side sill at ${x},${z}`);
+ }
+ assert.equal(at(-18,24,0),B.PART_STATION_TRAINRUNNING_3);
+ assert.equal(at(18,24,0),B.PART_STATION_TRAINRUNNING_3);
+ assert.equal(at(-19,22,0),B.PART_STATION_TRAINRUNNING_4);
+ assert.equal(at(19,22,0),B.PART_STATION_TRAINRUNNING_4);
+ assert.equal(at(0,23,4),B.PART_STATION_TRAINRUNNING_5);
+ assert.equal(at(-1,23,-4),B.PART_STATION_TRAINRUNNING_5);
+ assert.equal(at(-10,23,4),B.PART_STATION_TRAINWALL_3);
+ assert.equal(at(9,23,-4),B.PART_STATION_TRAINWALL_4);
+ const bogie=stationPartGeometry(BOGIE);
+ assert.ok(bogie.length>=16,'Wheel is shaped instead of being painted');
+ assert.ok(new Set(bogie.map(p=>p.y)).size>=6,'Radial wheel outline has stepped sections');
+ const cab=stationPartGeometry(B.PART_STATION_TRAINRUNNING_3);
+ assert.ok(cab.some(p=>p.alpha),'Cab windscreen is genuinely glazed');
+ const side=stationPartGeometry(B.PART_STATION_TRAINRUNNING_2);
+ assert.ok(side.some(p=>p.material===B.STATION_PLATFORM_ORANGE),'Side livery is legible');
+ let preserved=0;
+ for(const chunk of map.values()){
+  for(let i=0;i<chunk.data.length;i++){
+   if(chunk.data[i]>=B.PART_STATION_TRAINWALL_1&&chunk.data[i]<=B.PART_STATION_TRAINWALL_5||
+    chunk.data[i]>=B.PART_STATION_TRAINRUNNING_1&&chunk.data[i]<=B.PART_STATION_TRAINRUNNING_5){
+    assert.ok(chunk.styles?.[i]&64,'Train module lacks exterior silhouette style bit');
+    preserved++;
+   }
+  }
+ }
+ assert.ok(preserved>100);
 });

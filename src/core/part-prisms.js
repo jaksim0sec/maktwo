@@ -132,6 +132,10 @@ export function partPrisms(id,x,y,z,state={}){
   ];
   else if(family==='passage'||family==='balcony')geometry=geometry.filter(p=>p.w>.72).slice(0,3);
   else if(family==='entrance'||family==='ventilation')geometry=geometry.slice(0,4);
+  // Retain window transparency, front cab glazing, and large body panels at LOD.
+  // Station previews deliberately request exterior faces while the camera is distant.
+  else if(family==='trainWall'||family==='trainRunning')
+   geometry=geometry.filter(p=>p.solid||p.alpha||p.w>.7).slice(0,14);
   else geometry=geometry.slice(0,1);
  }
  const joints=state.panelJoints;
