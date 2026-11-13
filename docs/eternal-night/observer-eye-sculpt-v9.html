@@ -48,9 +48,19 @@ const pointCount=256, ringCount=36;
 // No separate tear-duct bead: leave some of the original skull at the inner corner.
 function medialWeight(x,y){let dx=(x+.151)/.030,dy=(y+.023)/.027;return Math.exp(-(dx*dx+dy*dy)*1.05)}
 function cutShape(p){let [x,y]=p,w=medialWeight(x,y);return [x+.019*w,y+.002*w]}
+// Gently round the two pointed termini without changing the eye's central arches.
+// Both lid surfaces and the carved skull use precisely the same outline.
+function roundedCut(P,t){
+ const p=cutShape(bez(P,t)),h=.0002;
+ const startDx=(cutShape(bez(P,h))[0]-cutShape(bez(P,0))[0])/h;
+ const endDx=(cutShape(bez(P,1))[0]-cutShape(bez(P,1-h))[0])/h;
+ p[0]-=startDx*t*Math.exp(-t/.038);
+ p[0]+=endDx*(1-t)*Math.exp(-(1-t)/.034);
+ return p;
+}
 let contour=[];
-for(let i=0;i<pointCount/2;i++)contour.push(cutShape(bez(UP,i/(pointCount/2))));
-for(let i=0;i<pointCount/2;i++)contour.push(cutShape(bez(LO,1-i/(pointCount/2))));
+for(let i=0;i<pointCount/2;i++)contour.push(roundedCut(UP,i/(pointCount/2)));
+for(let i=0;i<pointCount/2;i++)contour.push(roundedCut(LO,1-i/(pointCount/2)));
 function skull(front){
  let v=[],col=[],faces=[];
  for(let j=0;j<pointCount;j++){
@@ -106,7 +116,7 @@ eye.position.set(0,headY,-.010);subject.add(eye);
 function lid(part,sign){
  let v=[],col=[],faces=[],K=7,M=128;
  for(let j=0;j<=M;j++){
-  let t=j/M,p=cutShape(bez(part,t)),x=p[0],y=p[1],w=Math.pow(Math.sin(Math.PI*t),.85);
+  let t=j/M,p=roundedCut(part,t),x=p[0],y=p[1],w=Math.pow(Math.sin(Math.PI*t),.85);
   for(let k=0;k<K;k++){
    let u=k/(K-1), yy=y+sign*(u-.42)*.025*w;
    let z=lerp(eyeZ(x,y)+.004,frontZ(x,yy)+.008,sstep(.04,.93,u));
