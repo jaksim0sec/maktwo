@@ -8,6 +8,7 @@ export const WORLD_PRESETS=Object.freeze([
  {name:'TextureGallery',seed:9999,mode:'materials',label:'텍스처 전시장'},
  {name:'PartsGallery',seed:9999,mode:'parts',label:'건축 부품 전시장'},
  {name:'EternalNightCityLab',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 도시 실험'},
+ {name:'EternalNightCityV8',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 공중 폐역 v8'},
  {name:'SubwayAssemblyPreview',seed:9999,mode:'station-preview',label:'폐역 · 전동차 조립 예시'},
 ]);
 const placeables=new Set([

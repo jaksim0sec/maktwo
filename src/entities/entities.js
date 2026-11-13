@@ -44,7 +44,9 @@ export class SubwayTrain extends Entity{
   this.train=train;this.stationId=site.id;this.width=train.width;this.height=4;
   this.homeX=this.x;this.homeZ=this.z;this.offset=0;this.speed=0;
   this.doorTarget=0;this.doorOpen=0;this.throttle=false;this.brake=false;
-  this.limit=site.preview?7:10;this.driver=false;this.boardSide=1;
+  const length=site.bounds?(site.axis==='x'?site.bounds.x1-site.bounds.x0:site.bounds.z1-site.bounds.z0):56;
+  const spare=Math.max(0,Math.floor(length/2-(train.end+1)-2));
+  this.limit=Math.min(site.preview?7:10,spare);this.driver=false;this.boardSide=1;
  }
  hurt(){} // Not a combat entity.
  setDoors(open){

@@ -120,3 +120,36 @@ player collision checks. This is a proxy, not a simulated vehicle chassis.
 
 Desktop and mobile visual rendering still needs direct inspection.
 Desktop and mobile visual rendering still needs direct inspection.
+
+## Suspended metro v8 (architectural revision)
+
+Use the **영원한 밤 · 공중 폐역 v8** world preset, or
+`?world=EternalNightCityV8`. The existing `EternalNightCityLab` save
+continues to use its recorded generation version; no save is silently
+regenerated and no existing block ID is modified.
+
+- **Circulation:** core `roadHalfWidth` is `0.025` relative to the core
+  apothem (previously `0.01`). At a 960-cell width, main route total width
+  changes from 9.6 to 24 cells. Older city versions explicitly use `0.01`.
+- **Station elevation:** each new platform rises four cells above v7.
+  Approaches gradually rise from the existing library interchange height to
+  station level and retain track and a side pedestrian deck.
+- **Stations:** paired platforms grow from 13.5 to 16.5 cells in width
+  and are lengthened from 51 to 72 cells, allowing a longer stopping lane.
+  Each station is still one continuous structural object, with enough clearance
+  around the physical train door proxies.
+- **Reference atmosphere:** a faceted elevated vault with scattered skylight
+  gaps, banks of oxidized pipes, hanging wayfinding signs, stained ceramic
+  cladding, worn safety strips, tactile markers, exposed structural ribs,
+  aged seating, drainage grills, decayed fixtures and occasional refuse.
+  Working and broken lamps retain the existing light system.
+- **Exposed structure:** slim lower supports and open-span braces instead of
+  a solid supporting plinth, so the entire station reads as suspended.
+- **Gallery preview:** the original assembly preset remains accessible and
+  receives the roof silhouette, ceiling-aligned fixtures and visible lower
+  trestles. Its saved world key and original player coordinate system stay intact.
+
+Only structures generated as v8 use the raised station composition.
+The architecture is voxel stylization informed by the references, not
+photorealistic reproduction. Physical collision remains a lightweight
+envelope and train doors are animated as separate GPU groups.

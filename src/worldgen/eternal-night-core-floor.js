@@ -28,7 +28,7 @@ export const CORE_FLOOR_DEFAULTS = Object.freeze({
     gardenRadius: 0.026,
     miniShaftOffset: 0.774,
     miniShaftRadius: 0.05,
-    roadHalfWidth: 0.01,
+    roadHalfWidth: 0.025,
     rimWidth: 0.015,
     luxuryFalloff: 0.652,
     noiseCellSize: 0.124,

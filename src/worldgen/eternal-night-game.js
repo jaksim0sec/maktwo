@@ -21,21 +21,28 @@ export const CITY_WIDTH=CORE_FLOOR_DEFAULTS.width;
 export const CITY_SEED=9999;
 export const CITY_BLUEPRINT_VERSION=6;
 export const CITY_STATION_VERSION=7;
+export const CITY_STATION_REDESIGN_VERSION=8;
 export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
 
 export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
   if(cached?.layout.seed===seed&&cached.cityBlueprints===cityBlueprints)return cached;
-  const layout=createFloorLayout({seed,floorY:CITY_BASE_Y});
+  const latest=cityBlueprints===true||cityBlueprints>=CITY_STATION_REDESIGN_VERSION;
+  const layout=createFloorLayout({seed,floorY:CITY_BASE_Y,ratios:latest?{}:{roadHalfWidth:.01}});
   const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints:cityBlueprints!==false,
-    stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION});
+    stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION,
+     raisedStation:latest});
   plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
-  plan.stationLines=[0,1].map(line=>({line,y:plan.stations.find(s=>s.line===line)?.y,
-    end:Math.max(0,...plan.stations.filter(s=>s.line===line).map(s=>
-      Math.abs((line===0?s.x:s.z)-(line===0?layout.centerX:layout.centerZ))+
-      (line===0?s.bounds.x1-s.bounds.x0:s.bounds.z1-s.bounds.z0)/2))}));
+  plan.stationLines=[0,1].map(line=>{
+    const sites=plan.stations.filter(s=>s.line===line);
+    const center=line===0?layout.centerX:layout.centerZ;
+    return {line,y:sites[0]?.y,hubY:plan.stationHub?.levels[line]??sites[0]?.y,
+      stopRadius:sites.length?Math.abs((line===0?sites[0].x:sites[0].z)-center):0,
+      end:Math.max(0,...sites.map(s=>Math.abs((line===0?s.x:s.z)-center)+
+        (line===0?s.bounds.x1-s.bounds.x0:s.bounds.z1-s.bounds.z0)/2))};
+   });
   plan.details=plan.volumes.map(v=>{
     floorEnvironment(v,layout.centerX,layout.centerZ,seed);
     const bands=cityKits(v,seed,layout.districtLuxuryMax);

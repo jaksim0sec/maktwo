@@ -55,16 +55,28 @@ export function stampStationPreview(chunk,seed){
    if(az===16&&x%8===0){for(let y=23;y<=30;y++)set(y,B.STATION_STATION_CREAM)}
    if(az>=13&&x%8===0)set(30,B.STATION_STATION_PIPE);
    if(ax<=25&&az>=10&&ax%13===0)set(28,T.platform[2],z>0?4:0);
-   if(az===10&&x%10===0)set(30,B.FLUORESCENT);
-   if(az===10&&x%10===5)set(30,B.BROKEN_FLUORESCENT);
+   // Ceiling fixtures are mounted just below the new vault rather than floating.
+   const vault=31+Math.round(3*Math.sqrt(Math.max(0,1-(az/19)**2)));
+   if(az===10&&x%10===0)set(vault-1,B.FLUORESCENT);
+   if(az===10&&x%10===5)set(vault-1,B.BROKEN_FLUORESCENT);
+   if(az===15&&x%12===4)set(24,T.platform[2],z>0?4:0);
+   if(az===16&&x%13===7)set(23,B.CRATE);
   }
   if(ax<=30&&az<=18){
-   // Overall station roof, with repeated open central skylights and equipment.
-   if(az>=12&&az<=18){set(31,B.STATION_STATION_SOOT)}
-   else if(x%8!==0||az>3)set(31,B.STATION_STATION_CREAM);
-   if(x%8===0&&az<=18)set(30,B.STATION_STATION_PIPE);
-   if(az===11&&x%6===0)set(29,T.link[1]);
-   if(az===17&&x%7===0)set(28,T.link[2]);
+   // Continuous, stepped barrel vault with narrow daylight tears.
+   const crown=Math.round(3*Math.sqrt(Math.max(0,1-(az/19)**2)));
+   const vault=31+crown,openSky=az<=2&&Math.abs(x)%17<2;
+   if(!openSky)set(vault,az>=12?B.STATION_STATION_SOOT:
+    hash(Math.floor(x/5),Math.floor(z/3),0,seed)>.75?B.STATION_STATION_ALGAE:B.STATION_STATION_CREAM);
+   if(x%8===0&&!openSky)set(vault-1,B.STATION_STATION_PIPE);
+   if(az===11&&x%6===0)set(vault-2,T.link[1]);
+   if(az===17&&x%7===0)set(vault-3,T.link[2]);
+   if(az===14&&x%5===0)set(vault-2,B.STATION_STATION_CABLE);
+  }
+  // Exposed structural trestles keep the station visibly suspended above void.
+  if(ax<=28&&az>=15&&az<=18&&x%10===0&&z%3===0){
+   for(let y=10;y<18;y++)set(y,y>15?B.STATION_STATION_PIPE:B.STATION_STATION_SOOT);
+   set(17,B.PART_STATION_STATIONLINK_2,z>0?4:0);
   }
   // A small 20-tile material swatch wall proves every registered tile is usable.
   // A dedicated rolling-stock inspection row makes all underbody parts inspectable.
