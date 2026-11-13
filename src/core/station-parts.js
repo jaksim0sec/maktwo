@@ -133,16 +133,24 @@ export function stationPartGeometry(id){
    add(0,.24,0,1,.045,1,'PLATFORM_TACTILE',true);
    for(const x of [.08,.28,.48,.68,.88])for(const z of [.14,.54])add(x,.285,z,.06,.018,.06,'PLATFORM_TACTILE');
   }else if(p.variant===2){
-   for(const x of [.06,.88])add(x,0,.46,.06,.95,.08,metal,true);
-   add(.06,.65,.47,.88,.25,.07,'STATION_SOOT');
-   add(.18,.76,.437,.24,.045,.03,'PLATFORM_TACTILE');
-   add(.54,.76,.437,.23,.045,.03,'STATION_CREAM');
-   add(.78,.74,.43,.075,.08,.04,'PLATFORM_STONE');
+   // Station nameboard: hanging dark fascia, line-color band and route markers.
+   for(const x of [.09,.86])add(x,.08,.47,.045,.88,.065,metal,true);
+   add(.07,.66,.485,.87,.23,.055,'STATION_GRILLE');
+   add(.09,.642,.452,.83,.028,.038,'PLATFORM_ORANGE');
+   add(.16,.77,.443,.12,.055,.025,'STATION_CREAM');
+   add(.32,.77,.443,.24,.055,.025,'STATION_CREAM');
+   add(.62,.77,.443,.19,.055,.025,'STATION_CREAM');
+   add(.74,.70,.443,.075,.045,.025,'PLATFORM_TACTILE');
   }else if(p.variant===3){
-   add(.13,0,.13,.74,.73,.70,'STATION_GRILLE',true);
-   add(.2,.68,.18,.60,.09,.57,'STATION_CREAM');
-   add(.43,.76,.19,.14,.11,.10,'TRAIN_SMOKED_GLASS',false,true);
-   add(.83,.17,.44,.14,.61,.13,metal);
+   // Paired ticket-gate pedestals and transparent retractable flaps.
+   for(const x of [.07,.75]){
+    add(x,0,.23,.18,.72,.56,metal,true);
+    add(x,.72,.23,.18,.065,.56,'STATION_CREAM');
+    add(x+.045,.79,.31,.085,.018,.16,'TRAIN_SMOKED_GLASS',false,true);
+   }
+   add(.25,.43,.44,.25,.24,.025,'TRAIN_SMOKED_GLASS',false,true);
+   add(.51,.43,.44,.24,.24,.025,'TRAIN_SMOKED_GLASS',false,true);
+   add(.07,.16,.22,.86,.035,.035,'STATION_GRILLE');
   }else{
    add(.06,.09,.08,.88,.10,.84,'STATION_GRILLE');
    for(const y of [.23,.36,.49,.62])add(.07,y,.09,.86,.035,.82,'STATION_PIPE');
@@ -213,14 +221,22 @@ export function stationPartGeometry(id){
    add(.08,.81,.08,.84,.06,.22,'STATION_GRILLE');
    for(const x of [.14,.84])add(x,.62,.10,.035,.20,.18,metal);
   }else if(p.variant===3){
-   for(const x of [.09,.87])add(x,.39,.42,.045,.48,.09,metal);
-   add(.08,.52,.43,.85,.33,.065,'STATION_SOOT');
-   add(.20,.62,.39,.29,.038,.04,'STATION_CREAM');
-   add(.57,.62,.39,.25,.038,.04,'PLATFORM_TACTILE');
+   // Directional sign, suspended from two thin hangers, not a gray wall.
+   for(const x of [.13,.84])add(x,.72,.445,.035,.22,.06,metal);
+   add(.07,.55,.452,.87,.27,.06,'STATION_GRILLE');
+   add(.07,.55,.435,.87,.036,.033,'PLATFORM_ORANGE');
+   add(.17,.68,.418,.12,.065,.025,'STATION_CREAM');
+   add(.33,.68,.418,.28,.065,.025,'STATION_CREAM');
+   add(.69,.68,.418,.13,.065,.025,'PLATFORM_TACTILE');
   }else{
-   add(0,0,0,1,.25,.48,'PLATFORM_STONE',true);
-   add(0,0,.49,1,.50,.51,'PLATFORM_STONE',true);
-   for(const x of [.035,.91])add(x,.49,.48,.055,.22,.46,'STATION_PIPE');
+   // Three explicit risers instead of two 25 cm vertical jumps.
+   add(0,0,0,1,.16,.33,'PLATFORM_STONE',true);
+   add(0,0,.34,1,.32,.33,'PLATFORM_STONE',true);
+   add(0,0,.68,1,.50,.32,'PLATFORM_STONE',true);
+   for(const x of [.035,.91]){
+    add(x,.18,.33,.055,.51,.64,'STATION_PIPE');
+    add(x,.65,.33,.055,.05,.64,metal);
+   }
   }break;
  }
  }
