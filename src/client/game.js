@@ -6,11 +6,13 @@ import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {CITY_MODE} from '../worldgen/eternal-night-game.js';
 import {screenRay} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
 import {isWallItem} from '../core/mounts.js';
 import {solidBlockOverlap,isSlab,isStairs} from '../core/shapes.js';
 const $=id=>document.getElementById(id);
+const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key)??fallback);return Number.isFinite(value)?Math.max(0,Math.min(100,value)):fallback};
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
@@ -38,6 +40,7 @@ class Game{
  updateModeControls(){
   const p=this.player,mode=$('mode'),flight=$('flight-toggle'),sky=$('sky-brightness-setting');
   if(sky)sky.hidden=!p.creative;
+  const citySky=$('city-sky-setting');if(citySky)citySky.hidden=this.world.mode!==CITY_MODE;
   this.renderer.skyBrightness=p.creative?this.skyBrightness:0;
   mode.textContent=p.creative?'모드 · 크리에이티브':'모드 · 서바이벌';
   mode.setAttribute('aria-pressed',String(p.creative));
@@ -232,6 +235,12 @@ class Game{
    this.renderer.skyBrightness=this.player.creative?this.skyBrightness:0;
    const output=$('sky-brightness-value');if(output)output.textContent=e.target.value+'%';
   });
+  for(const [id,key,field] of [['city-sky-tone','mcweb:city-sky-tone','citySkyTone'],['city-ground-fade','mcweb:city-ground-fade','cityGroundFade']]){
+   const input=$(id),output=$(id+'-value');if(!input)continue;
+   const value=storedPercent(key,field==='citySkyTone'?55:60);
+   input.value=String(value);output.textContent=value+'%';this.renderer[field]=value/100;
+   input.addEventListener('input',()=>{const value=Number(input.value);this.renderer[field]=value/100;output.textContent=value+'%';localStorage.setItem(key,String(value))});
+  }
   bindClick('build-form',()=>this.changeForm());
   bindClick('build-rotate',()=>this.rotateForm());
   this.updateModeControls();
