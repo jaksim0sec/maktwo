@@ -77,25 +77,6 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   cubeTurns??=new Uint8Array(chunk.data.length);
   cubeTurns[idx]=state.facing&3;
  }
- // Vertex AO for greedy voxel surfaces: bounded snapshot reads, no shaders.
- const solidAt=(x,y,z)=>{
-  if(y<0||y>=height)return false;
-  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);
-  const source=(cx||cz)?adjacent.get(`${cx},${cz}`):chunk;
-  if(!source?.data)return false;
-  const index=source.cornerY===undefined?(y*SIZE+((z+SIZE)%SIZE))*SIZE+((x+SIZE)%SIZE):y-source.cornerY;
-  if(index<0||index>=source.data.length)return false;
-  const id=source.data[index];return Boolean(OPAQUE[id]&&!CROSS[id]&&!source.forms?.[index]);
- };
- const cornerAO=(n,sign,u,v,layer,k,j,w,h,q)=>{
-  const p=[0,0,0];p[n]=layer+(n===1?yMin:0)+sign;
-  p[u]=k+(u===1?yMin:0)+(q[u]?w-1:0);
-  p[v]=j+(v===1?yMin:0)+(q[v]?h-1:0);
-  const a=[...p],b=[...p],c=[...p],du=q[u]?1:-1,dv=q[v]?1:-1;
-  a[u]+=du;b[v]+=dv;c[u]+=du;c[v]+=dv;
-  const s1=solidAt(...a),s2=solidAt(...b);
-  return 1-(s1&&s2?3:Number(s1)+Number(s2)+Number(solidAt(...c)))*.085;
- };
  for(let faceIndex=0;faceIndex<FACES.length;faceIndex++){
   const f=FACES[faceIndex];const {d,n,u,v,corners,shade}=f,nu=dims[u],nv=dims[v],sign=d[n];
   const mask=new Int32Array(nu*nv);
@@ -143,10 +124,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
     const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],visualSeed)*.06;
-    const tint=[color[0]*variation,color[1]*variation,color[2]*variation];
-    const packed=4*materialFor(id,faceIndex)+512*(mat>>>14);
-    const values=corners.map(q=>(id===B.GLASS||water?1:cornerAO(n,sign,u,v,layer,k,j,width,height,q))*(id===B.GLASS?1:shade)+packed);
-    for(const i of [0,1,2,0,2,3])dest.push(...verts[i],...tint,values[i]);
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex)+512*(mat>>>14));
     k+=width;
    }
   }

@@ -200,28 +200,22 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
     if(m===23&&(fissure||Math.abs(px-21-4*Math.sin(py*.2))<.7))f*=.47;
     r=.96;g=.98;b=1;
    }else if(m===24||m===34){ // Whitewashed walls, peeling paint and damp mold.
-    const damp=py>19?(py-19)/13*(.12+.14*(1-patch)):0;
-    const peeled=patch<.28&&fine>.45&&Math.sin(px*.33+py*.21)>-.2;
-    f=.93+.065*patch-stain*.55-damp;
-    if(peeled)f*=.76;
+    f=.90+.10*patch-stain;
+    if(fine>.79&&n>.5)f*=.65;
     if(m===34&&patch<.48){f*=.68;r=.74;g=.87;b=.74}
     else{r=1;g=.98;b=.94}
    }else if(m===25||m===37||m===38){ // Grout, stone speckles and wet floors.
-    const chipped=(seamX<2.3||seamY<2.3)&&fine>.75;
-    if(seamX<1||seamY<1)f*=.61;
-    else if(chipped)f*=.79;
-    if(n>.985)f*=.83;
+    if(seamX<1||seamY<1)f*=.59;
+    if(n>.94)f*=.78;
     if(m===37){f*=.77+Math.max(0,Math.sin(px*.27+py*.19))*.24;r=.91;g=.98;b=1}
     if(m===38){f=.93+.065*patch;if(seamX<.85||seamY<.85)f*=.70}
    }else if(m===26){ // Suspended ceiling grid and old water rings.
-    f=.95+.035*patch;
-    if(py>22&&patch<.32)f*=.88;
+    f=.93+.045*patch;
     if(px<1.3||py<1.3)f*=.57;
     const ring=Math.abs(Math.hypot(px-20,py-12)-8);
     if(ring<1.2&&patch<.66)f*=.75;
    }else if(m===27||m===28){ // Brushed steel, scratches and brown rust trails.
-    f=.89+.08*patch+.035*Math.sin(px*2.7);
-    if(Math.abs(px-(8+3*Math.sin(py*.13)))<.85&&py>8)f*=.83;
+    f=.87+.1*patch+.035*Math.sin(px*2.7);
     if(n>.94&&py>6)f*=.55;
     if(m===28){r=1;g=.76;b=.62;f-=stain*.65}
     else{r=.94;g=.98;b=1}
@@ -238,8 +232,7 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
     r=1;g=.96;b=.87;
    }else if(m===32){ // Old façade brick joints.
     const row=Math.floor(py/8),joint=(px+(row%2)*8)%16;
-    if(py%8<1||joint<1)f*=.58;else if(joint<2)f*=1.06;
-    if(patch<.18&&py%8>2)f*=.82;
+    if(py%8<1||joint<1)f*=.55;else if(joint<2)f*=1.08;
     r=.95;g=.93;b=.91;
    }else if(m===33){ // Exposed reinforcing steel lattice.
     f=(px%9<1.6||py%11<1.7)?.60:.89+.08*patch;

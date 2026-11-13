@@ -3,7 +3,7 @@ import {cityPart} from './eternal-night-kits.js';
 import {encodeCityStair,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
 
 const STONE=B.ARCH_STONE_MARBLE;
-const WALL=B.ARCH_BRICK_WHITE;
+const WALL=B.ARCH_TILE_VERTICAL_WHITE;
 const BASE=B.ARCH_STONE_GREY_GRANITE;
 const WOOD=B.ARCH_FLOOR_WOOD;
 const SHELVES=[B.PART_BOOKSHELF_1,B.PART_BOOKSHELF_2,B.PART_BOOKSHELF_3,B.PART_BOOKSHELF_4];
