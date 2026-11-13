@@ -48,6 +48,22 @@ const inside=insidePolygon;
 
 export function* citySpawnCandidates(seed) {
   const plan=createCityPlan(seed);
+  const central=plan.volumes.filter(v=>v.floors.length>=45&&v.floors.some(f=>f.corridors.length));
+  central.sort((a,b)=>{
+    const dist=v=>Math.hypot((v.x0+v.x1)/2-plan.layout.centerX,(v.z0+v.z1)/2-plan.layout.centerZ);
+    return dist(a)-dist(b)||a.id-b.id;
+  });
+  const nearby=central.slice(0,Math.min(6,central.length));
+  const offset=Math.floor(hash(seed,27,51,seed)*nearby.length);
+  for(let i=0;i<nearby.length;i++){
+    const v=nearby[(offset+i)%nearby.length];
+    const mid=Math.floor(v.floors.length*(.44+hash(v.id,13,seed,seed)*.12));
+    for(const index of [mid,mid-1,mid+1]){
+      const f=v.floors[index],spine=f?.corridors[0];if(!spine)continue;
+      const x=Math.floor((spine.x0+spine.x1)/2)+.5,z=Math.floor((spine.z0+spine.z1)/2)+.5;
+      yield {x,y:Math.round(f.y),z};
+    }
+  }
   const entries=plan.walkways.filter(link=>link.kind==='core').map(link=>link.ports[0]);
   for(const entry of entries)for(const depth of [2,3,4]) {
     const x=Math.floor(entry.x-entry.dx*depth)+.5,z=Math.floor(entry.z-entry.dz*depth)+.5;

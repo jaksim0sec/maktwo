@@ -1,11 +1,11 @@
-import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
+import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
-import {screenRay,canvasPoint} from './picking.js';
+import {screenRay} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
 import {isWallItem} from '../core/mounts.js';
 import {solidBlockOverlap,isSlab,isStairs} from '../core/shapes.js';
@@ -239,10 +239,11 @@ class Game{
   document.addEventListener('pointerlockchange',()=>{
    // Esc may release pointer lock. Do not automatically spawn a menu over the scene.
    if(this.input.locked)this.hologram.pointer=null;
+   const crosshair=$('crosshair');if(crosshair){crosshair.style.left='50%';crosshair.style.top='50%'}
    this.updateControlHint();this.updateCameraButton();
   });
   this.canvas.addEventListener('pointermove',event=>{
-   if(event.pointerType==='mouse'&&!this.uiOpen){const pos=canvasPoint(event,this.canvas);for(const id of ['mine-progress']){const el=$(id);if(el){el.style.left=pos.x+'px';if(id==='crosshair')el.style.top=pos.y+'px';else el.style.top=(pos.y+(id==='target'?18:27))+'px'}}}
+   if(event.pointerType==='mouse'&&!this.uiOpen&&!this.input.locked){const crosshair=$('crosshair');if(crosshair){crosshair.style.left=event.clientX+'px';crosshair.style.top=event.clientY+'px'}const progress=$('mine-progress');if(progress){progress.style.left=event.clientX+'px';progress.style.top=(event.clientY+27)+'px'}}
    if(this.panel==='inventory'&&!this.input.locked&&event.pointerType==='mouse'){this.hologram.point(event.clientX,event.clientY,this.canvas.getBoundingClientRect());this.hologram.aim(this.player)}
   });
   // A right-side *tap* selects an inventory card. Dragging either zone keeps
@@ -306,9 +307,9 @@ class Game{
  interaction(dt,input){
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
   this.interactTimer=Math.max(0,this.interactTimer-dt);
-  const p=this.player,d=p.direction(),origin={x:p.x,y:p.y+p.eye,z:p.z};
+  const p=this.player,d=p.direction(),origin={x:p.x,y:cameraEyeY(p),z:p.z};
   const miningMode=input.mine;
-  const aim=input.aim||(this.input.locked?null:this.input.canvasCursor());
+  const aim=this.input.locked?null:(input.aim||this.input.canvasCursor());
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
   this.target=raycast(this.world,origin,ray,7.5,{hitWater:!miningMode&&this.selected>=0,hitDecor:miningMode});
   if(input.use&&this.target&&this.target.id===B.WORKBENCH){

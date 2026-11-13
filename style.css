@@ -52,4 +52,4 @@ body.ui-open #shape-controls{display:none}
  #shape-controls button{min-height:48px;min-width:76px;padding-inline:12px;font-size:13px}
 }
 
-@media(pointer:fine) and (hover:hover){body:not(.ui-open) #crosshair{display:block}}
+@media(pointer:fine) and (hover:hover){body:not(.ui-open) #crosshair{display:block}body:not(.ui-open) #screen{cursor:none}}

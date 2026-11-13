@@ -86,7 +86,8 @@ export function partPrisms(id,x,y,z,state={}){
     if(height>0)geometry.push({x:.06,y:height,z,w:.88,h:.012,d:.055,material:variant===2?106:109,solid:false});
    }
    if(state.rail){
-    const x=state.facing===2||state.facing===6?.875:.065;
+    // Rotation places the same local edge on the outside of either flight.
+    const x=.875;
     const railBase=split?.low||h;
     const railTop=railBase+.60;
     // One post at the tread centre rather than two end posts on every metre.
