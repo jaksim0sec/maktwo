@@ -177,11 +177,21 @@ export function partGeometry(id){
  };
  const lintel=(mat,top=.89)=>put(.03,top,.05,.94,.10,.90,mat);
  const mullion=(x,mat=frame)=>put(x,.16,.48,.055,.68,.08,mat);
+ // Slim, open guard rails with real shoe plates, two distinct metal finishes.
  const rail=(mat=dark,glass=false)=>{
-  for(const x of [.05,.46,.86])put(x,.12,.84,.075,.72,.075,mat);
-  put(.04,.82,.82,.92,.09,.11,mat);
-  if(glass)put(.12,.17,.88,.74,.60,.035,tiles[2],true);
-  else for(const height of [.33,.55])put(.06,height,.85,.88,.045,.06,mat);
+  for(const x of [.075,.47,.855]){
+   put(x,.15,.845,.053,.68,.068,mat);
+   put(x-.018,.12,.822,.089,.054,.113,dark,false,true,{tone:.72});
+  }
+  put(.043,.82,.827,.91,.062,.110,mat);
+  put(.057,.88,.846,.882,.017,.064,silver,false,false);
+  if(glass){
+   put(.13,.19,.879,.74,.585,.026,tiles[2],true);
+   put(.12,.195,.85,.76,.027,.041,dark,false,false,{tone:.76});
+  }else{
+   put(.067,.485,.855,.864,.032,.061,mat);
+   put(.070,.248,.854,.858,.025,.062,dark,false,false,{tone:.84});
+  }
  };
  switch(p.family){
  case 'passage':{
@@ -468,14 +478,16 @@ case 'interior':{
    }
    put(.14,.87,.13,.72,.045,.73,metals[1]);
   }
-  if(v===1){ // Taper-free chair and table with realistically open space.
-   put(.08,.46,.09,.84,.07,.71,mat);
-   put(.105,.43,.09,.79,.025,.69,floors[3]);
-   for(const x of [.13,.78])for(const z of [.18,.69])put(x,.02,z,.07,.43,.08,metals[0]);
-   put(.18,.30,.17,.64,.035,.05,metals[1]);
-   put(.19,.30,.70,.61,.035,.05,metals[1]);
-   put(.16,.52,.72,.69,.33,.073,floors[4]);
-   for(const x of [.18,.79])put(x,.54,.71,.045,.28,.045,metals[0]);
+  if(v===1){ // Desk and chair are independent silhouettes, with open legroom.
+   put(.055,.66,.065,.575,.060,.545,floors[4]);
+   put(.085,.625,.091,.510,.031,.496,metals[0],false,false,{tone:.73});
+   for(const x of [.08,.555])for(const z of [.11,.535])put(x,.055,z,.060,.570,.064,metals[1]);
+   put(.107,.35,.12,.478,.028,.044,metals[0],false,false);
+   put(.675,.425,.607,.27,.061,.274,floors[4]);
+   put(.698,.482,.869,.223,.340,.054,floors[4]);
+   for(const x of [.701,.895])for(const z of [.627,.858])put(x,.055,z,.037,.370,.042,metals[0]);
+   put(.682,.415,.617,.258,.020,.245,floors[3],false,false,{tone:.81});
+   put(.70,.776,.872,.22,.022,.042,metals[3],false,false);
   }
   if(v===2){ // Tube housing, separate reflector, retaining clips and lenses.
    put(.09,.79,.25,.82,.11,.50,dark);
@@ -507,7 +519,9 @@ case 'interior':{
  }
  case 'bookshelf':{
   const timber=floors[4];
-  put(0,0,.20,1,1,.59,timber);
+  // Thin rear backing and front plinth leave real depth between shelves.
+  put(0,.02,.735,1,.94,.05,timber,false,true,{tone:.83});
+  put(0,.01,.14,1,.090,.72,metals[0],false,true,{tone:.75});
   if(v===4){put(0,.04,.08,1,.12,.84,timber);put(0,.72,.08,1,.19,.84,timber);break;}
   const covers=[bricks[1],metals[1],bricks[0],stones[2],bricks[3],floors[2]];
   for(const z of [.09,.80])for(const y of [0,.47,.94])put(0,y,z,1,.056,.10,timber);
@@ -533,6 +547,86 @@ case 'interior':{
   break;
  }
  default:throw Error('Unregistered part family '+p.family);
+ }
+
+ // Material-dependent finish details, baked as static geometry. Avoid decals.
+ switch(p.family){
+ case 'passage':
+  if(v===0)put(.06,.800,.085,.88,.022,.83,metals[0],false,false,{tone:.72});
+  if(v===3)put(.11,.762,.09,.78,.019,.82,metals[0],false,false,{tone:.72});
+  break;
+ case 'entrance':
+  put(.09,.115,.394,.82,.026,.046,dark,false,false,{tone:.72});
+  for(const x of [.086,.825])put(x,.17,.397,.023,.65,.038,metals[3],false,false,{tone:.86});
+  break;
+ case 'stairEntrance':
+  for(const [z,y] of [[.48,.333],[.68,.511]])put(.11,y,z,.78,.022,.075,metals[3],false,false,{tone:.84});
+  for(const x of [.083,.869])put(x,.525,.55,.036,.26,.049,metals[1],false,false,{tone:.76});
+  break;
+ case 'wall':
+  if(v===0||v===4)put(.075,0,.355,.016,1,.035,stones[2],false,false,{tone:.81});
+  break;
+ case 'column':
+  if(v===3){
+   put(.43,0,.119,.14,1,.020,dark,false,false,{tone:.77});
+   put(.43,0,.860,.14,1,.018,dark,false,false,{tone:.77});
+  }else if(v===4){
+   put(.255,.045,.255,.49,.037,.49,stones[2],false,false,{tone:.82});
+   put(.255,.915,.255,.49,.038,.49,stones[2]);
+  }else if(v===1){
+   for(const x of [.24,.73])put(x,.10,.215,.025,.80,.029,metals[1],false,false,{tone:.82});
+  }
+  break;
+ case 'window':
+  put(.085,.042,.392,.83,.018,.042,dark,false,false,{tone:.70});
+  put(.089,.040,.421,.82,.023,.076,metals[3]);
+  break;
+ case 'partition':
+  if(v!==3)put(.06,.055,.391,.88,.035,.059,dark,false,false,{tone:.70});
+  else for(const x of [.14,.84])put(x,.15,.396,.021,.65,.041,metals[3],false,false,{tone:.86});
+  break;
+ case 'door':
+  for(const x of [.16,.807])put(x,.13,.445,.015,.70,.023,dark,false,false,{tone:.70});
+  put(.712,.375,.379,.111,.166,.023,metals[0],false,false,{tone:.75});
+  put(.744,.454,.347,.113,.032,.116,metals[3],false,false);
+  break;
+ case 'staircase':
+  // Rail attachments and the curved-line impression come from the angled cap.
+  for(const x of [.038,.905])for(const z of [.16,.83])
+   put(x,.238,z,.055,.027,.093,dark,false,false,{railSide:x<.5?'left':'right',tone:.72});
+  for(const x of [.046,.919])
+   put(x,.645,.056,.033,.014,.884,metals[3],false,false,{railSide:x<.5?'left':'right',slopeY:.31});
+  break;
+ case 'balcony':
+  put(.065,.128,.812,.86,.027,.046,dark,false,false,{tone:.77});
+  break;
+ case 'ventilation':
+  for(const x of [.166,.813])put(x,.225,.325,.026,.026,.025,metals[3],false,false,{tone:.84});
+  break;
+ case 'sign':
+  if(v!==1)put(.055,.275,.454,.89,.021,.039,dark,false,false,{tone:.78});
+  break;
+ case 'interior':
+  if(v===0){
+   put(.155,.11,.127,.68,.69,.020,dark,false,false,{tone:.74});
+   for(const [y,h] of [[.09,.21],[.365,.23],[.67,.15]])
+    put(.19,y+.015,.088,.62,.022,.018,floors[4],false,false,{tone:.85});
+   put(.11,.027,.20,.78,.037,.58,metals[0],false,true,{tone:.79});
+  }else if(v===2)put(.11,.754,.282,.77,.019,.436,dark,false,false,{tone:.73});
+  else if(v===3){
+   put(.27,.085,.27,.46,.055,.46,stones[2],false,true,{tone:.83});
+   put(.255,.41,.255,.49,.042,.49,stones[0]);
+  }else if(v===4){
+   put(.18,.64,.094,.63,.025,.027,dark,false,false,{tone:.72});
+   put(.18,.898,.14,.64,.033,.68,metals[3],false,false,{tone:.93});
+  }
+  break;
+ case 'bookshelf':
+  if(v===4){
+   for(const x of [.04,.92])put(x,.085,.13,.05,.84,.72,floors[4]);
+   put(.07,.90,.12,.86,.030,.70,metals[0],false,false,{tone:.82});
+  }else put(.04,.89,.105,.92,.035,.75,metals[0],false,false,{tone:.84});
+  break;
  }
  return a;
 }

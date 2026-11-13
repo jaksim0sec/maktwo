@@ -106,9 +106,11 @@ export function partPrisms(id,x,y,z,state={}){
     // One post at the tread centre rather than two end posts on every metre.
     // Its top follows the sloped rail so successive tread segments connect.
     const slope=Math.max(0,Math.min(1,state.stairRise??(split?2*(split.high-split.low):.5)));
-    geometry.push({x,y:railBase-.01,z:.47,w:.055,h:.63+slope*.5,d:.07,material:106,solid:true});
-    geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:slope});
-    geometry.push({x,y:railTop-.19,z:0,w:.03,h:.035,d:1,material:109,solid:false,railSide:'external',slopeY:slope});
+    geometry.push({x:x-.015,y:railBase-.018,z:.447,w:.090,h:.053,d:.111,material:106,solid:true,tone:.73});
+    geometry.push({x,y:railBase-.01,z:.47,w:.051,h:.63+slope*.5,d:.07,material:106,solid:true});
+    geometry.push({x,y:railTop,z:0,w:.055,h:.052,d:1,material:106,solid:true,railSide:'external',slopeY:slope});
+    geometry.push({x:x+.007,y:railTop+.05,z:0,w:.04,h:.014,d:1,material:109,solid:false,railSide:'external',slopeY:slope});
+    geometry.push({x,y:railTop-.19,z:0,w:.028,h:.031,d:1,material:109,solid:false,railSide:'external',slopeY:slope,tone:.82});
    }
   }
  }else if(state.cityBridge&&partById(id)?.family==='passage'){
@@ -117,7 +119,9 @@ export function partPrisms(id,x,y,z,state={}){
   geometry=[
    {x:0,y:0,z:.78,w:1,h:.15,d:.2,material:107,solid:true},
    {x:0,y:.78,z:.86,w:1,h:.065,d:.08,material:106,solid:true},
-   {x:0,y:.43,z:.87,w:1,h:.036,d:.06,material:106,solid:true}
+   {x:0,y:.43,z:.87,w:1,h:.036,d:.06,material:106,solid:true},
+   {x:0,y:.85,z:.856,w:1,h:.015,d:.067,material:109,solid:false},
+   {x:0,y:.16,z:.862,w:1,h:.021,d:.042,material:106,solid:false,tone:.76}
   ];
   if(!state.simple&&state.bridgePost)
    geometry.push({x:.46,y:.11,z:.83,w:.07,h:.75,d:.11,material:106,solid:true});
@@ -169,7 +173,7 @@ export function partPrisms(id,x,y,z,state={}){
    return {x:x+a,z:z+b,lo:y+piece.y+rise,hi:y+piece.y+piece.h+rise};
   });
   pieces.push({vertices:verts,material:piece.material,alpha:piece.alpha,solid:piece.solid,emissive:piece.emissive,
-   structural:piece.structural||false,connected:joined,angle});
+   tone:piece.tone??1,structural:piece.structural||false,connected:joined,angle});
  }
  return pieces;
 }
