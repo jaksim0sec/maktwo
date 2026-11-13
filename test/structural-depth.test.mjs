@@ -49,3 +49,9 @@ test('30 station modules preserve IDs, materials and bounding boxes',()=>{
  assert.ok(stationPartGeometry(B.PART_STATION_TRAININTERIOR_3).length>=18);
  assert.ok(stationPartGeometry(B.PART_STATION_STATIONLINK_5).length>=12);
 });
+
+test('bookshelf retains its mass in low detail despite an open-backed near model',()=>{
+ const shelf=partPrisms(B.PART_BOOKSHELF_1,0,0,0,{simple:true});
+ assert.equal(shelf.length,2);
+ assert.ok(shelf.some(p=>p.vertices.some(v=>v.lo===0&&v.hi===1)));
+});

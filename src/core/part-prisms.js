@@ -128,7 +128,9 @@ export function partPrisms(id,x,y,z,state={}){
  }else if(state.simple){
   const family=partById(id).family;
   if(family==='bookshelf')geometry=[
-   geometry[0],{x:0,y:.46,z:.10,w:1,h:.05,d:.80,material:115,solid:true}
+   // The near model is open-backed; far LOD must retain a readable bookcase mass.
+   {x:0,y:0,z:.20,w:1,h:1,d:.59,material:115,solid:true},
+   {x:0,y:.46,z:.10,w:1,h:.05,d:.80,material:115,solid:true}
   ];
   else if(family==='window')geometry=[
    {x:0,y:0,z:.46,w:1,h:.085,d:.085,material:106,solid:true},
