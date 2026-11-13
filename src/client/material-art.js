@@ -150,7 +150,10 @@ export function sampleDetailedMaterial(group,index,x,y,size=32){
   case 3:{const p=tile(u,v,16,16,seed,.06);const dust=deposits(u,v,seed+12,.25);l=p.light-.13*dust;r=1.02;g=1.015;b=.985;break;}
   default:break;
  }
- // Fine pigment granulation without using harsh thresholded binary pixel noise.
+ // Independent warm/cool deposits give actual pigment variation, not grayscale only.
+ const warm=fbm(u*.17,v*.21,seed+113)-.5;
+ const cool=fbm(u*.31,v*.27,seed+127)-.5;
+ r*=1+.13*warm-.018*cool;g*=1+.022*warm+.028*cool;b*=1-.11*warm+.07*cool;
  l+=.024*(noise(u*1.33,v*1.41,seed+77)-.5);
  return pigment(l,r,g,b);
 }
