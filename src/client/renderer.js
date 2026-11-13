@@ -72,10 +72,15 @@ void main(){
   vec3 sun=normalize(vec3(.42,.86,-.29));
   float facing=max(0.,dot(normal,sun));
   // Weak spill falls off quickly while shaded surfaces retain a cool fill.
+  // Keep sky openings readable below street level without lighting the
+  // basement like an open street. Preserve cool fill even on back faces.
+  float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+6).toFixed(1)},vPos.y);
   float skyFill=daylight*daylight*daylight;
-  ambient=vec3(.105,.122,.147)
-   +vec3(.391,.570,.588)*skyFill
-   +vec3(.47,.39,.24)*facing*smoothstep(.78,1.,daylight);
+  vec3 skyTint=mix(vec3(.075,.097,.113),vec3(.29,.39,.42),outdoorHeight);
+  ambient=vec3(.151,.166,.184)+skyTint*skyFill
+   +vec3(.38,.33,.25)*facing*smoothstep(.80,1.,daylight)*outdoorHeight;
+  // Broad fluorescent spill stays visible without washing out concrete.
+  emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.12,.14,.16)*max(0.,uBrightness-.35);
   if(uDistant)ambient=vec3(.25,.34,.37);
  }
@@ -92,7 +97,9 @@ void main(){
  }
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
  vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
- c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
+ float peak=max(c.r,max(c.g,c.b));
+ if(uCityDaylight&&vEmission<.5)c/=1.+max(0.,peak-.47)*.62;
+ else c/=1.+max(0.,peak-1.)*.6;
  c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);
 }`;

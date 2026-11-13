@@ -110,6 +110,7 @@ export function makeDaylightSnapshot(world,origin){
 export function makeOccluderSnapshot(world,origin,width=LIGHT_WIDTH,height=LIGHT_HEIGHT,depth=LIGHT_DEPTH,skyTop=null){
  const data=new Uint8Array(width*height*depth);
  const [ox,oy,oz]=origin;
+ if(skyTop)data.fill(2); // Unloaded cells cannot connect two otherwise sealed spaces.
  // Only loaded chunks are sampled: never generate terrain for a lighting update.
  for(const chunk of world.chunks.values()){
   const cx=chunk.cx*SIZE,cz=chunk.cz*SIZE;
@@ -132,6 +133,7 @@ export function makeOccluderSnapshot(world,origin,width=LIGHT_WIDTH,height=LIGHT
    const dst=((cz+z-oz)*height+y-oy)*width+cx-ox;
    for(let x=x0;x<x1;x++){
     const idx=src+x,id=chunk.data[idx];
+    if(skyTop)data[dst+x]=0;
     if(id===B.DOOR||id===B.DOOR_TOP)data[dst+x]=Number(world.isLightBlocking(id,cx+x,y,cz+z,0));
     else if(OPAQUE[id]&&!chunk.forms?.[idx])data[dst+x]=1;
     if(skyTop&&SKY_BLOCKER[id])data[dst+x]|=2;
