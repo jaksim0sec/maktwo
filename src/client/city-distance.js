@@ -1,12 +1,14 @@
 import {SIZE} from '../core/chunk.js';
 import {BLOCK as B,block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
+import {libraryRoofHeight} from '../worldgen/eternal-night-library.js';
 import {quad,rgb} from './mesher.js';
 
 const NEAR=44, FAR=256, MAX_BUILDINGS=96;
 const nearSquared=NEAR**2, farSquared=FAR**2;
 const buildingMeshes=new WeakMap();
 const towerMeshes=new WeakMap();
+const libraryMeshes=new WeakMap();
 
 export function distantCityMesh(plan,cx,cz) {
  const x=(cx+.5)*SIZE,z=(cz+.5)*SIZE;
@@ -39,10 +41,39 @@ export function distantCityMesh(plan,cx,cz) {
   }
   pieces.push(mesh);
  }
+ const library=plan.library;
+ if(library&&Math.hypot(library.x-x,library.z-z)<=FAR+library.radius){
+  let mesh=libraryMeshes.get(library);
+  if(!mesh){mesh=librarySilhouette(library);libraryMeshes.set(library,mesh)}
+  pieces.push(mesh);
+ }
  const merged=new Float32Array(pieces.reduce((length,piece)=>length+piece.length,0));
  let offset=0;
  for(const piece of pieces){merged.set(piece,offset);offset+=piece.length}
  return merged;
+}
+
+function librarySilhouette(library){
+ const mesh=[],sides=96,rings=12;
+ const color=rgb(block(B.ARCH_BRICK_WHITE).color);
+ const point=(angle,r,y)=>[library.x+Math.cos(angle)*r,y,library.z+Math.sin(angle)*r];
+ for(let side=0;side<sides;side++){
+  const a=side*2*Math.PI/sides,b=(side+1)*2*Math.PI/sides;
+  const r=library.radius;
+  if(side%24!==0&&side%24!==23)
+   quad(mesh,[point(a,r,library.base-1),point(a,r,library.eaves),point(b,r,library.eaves),point(b,r,library.base-1)],color,.70);
+  for(let ring=0;ring<rings;ring++){
+   const inner=library.roofInner+(r-library.roofInner)*ring/rings;
+   const outer=library.roofInner+(r-library.roofInner)*(ring+1)/rings;
+   const [mx,,mz]=point((a+b)/2,(inner+outer)/2,0);
+   if(library.gardens.some(([gx,gz])=>Math.hypot(gx-mx,gz-mz)<library.gardenRadius+2))continue;
+   const high=libraryRoofHeight(library,inner),low=libraryRoofHeight(library,outer);
+   const face=[point(a,inner,high),point(b,inner,high),point(b,outer,low),point(a,outer,low)];
+   quad(mesh,face,color,.86);
+   quad(mesh,face.toReversed(),color,.52);
+  }
+ }
+ return new Float32Array(mesh);
 }
 
 function buildingSilhouette(plan,v){

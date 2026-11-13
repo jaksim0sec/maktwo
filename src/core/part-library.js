@@ -1,5 +1,5 @@
 // Independently placeable architecture specimens. No full-building assembly.
-// All 65 blocks own their shape, material and creative item; existing IDs stay fixed.
+// Parts own their shape, material and creative item; existing IDs stay fixed.
 import {ARCH_MATERIAL_START} from './architectural-materials.js';
 export const PART_ID_START=116;
 export const PART_FAMILIES=Object.freeze([
@@ -145,6 +145,11 @@ export const PART_FAMILIES=Object.freeze([
       "화분·잡화",
       "설비 캐비닛"
     ]
+  },
+  {
+    key:'bookshelf',
+    label:'도서관 서가',
+    variants:['정돈된 장서','청회색 장서','적갈색 장서','빈 칸이 있는 장서','서가 받침']
   }
 ].map(f=>Object.freeze({...f,variants:Object.freeze(f.variants)})));
 export const PARTS=Object.freeze(PART_FAMILIES.flatMap((family,section)=>family.variants.map((name,variant)=>Object.freeze({
@@ -420,6 +425,25 @@ export function partGeometry(id){
   if(v===2){put(.10,.77,.27,.8,.10,.46,dark);for(const z of [.35,.56])put(.19,.73,z,.63,.06,.08,stones[4],false,false,{emissive:true});}
   if(v===3){put(.25,.02,.25,.50,.42,.50,stones[2]);put(.45,.36,.46,.10,.39,.10,metals[0]);for(const x of [.24,.65])put(x,.55,.40,.12,.21,.12,tiles[2]);}
   if(v===4){put(.19,.03,.17,.62,.86,.66,mat);put(.22,.61,.12,.56,.17,.065,metals[3]);for(const y of [.18,.43])put(.26,y,.10,.48,.035,.05,dark);}
+  break;
+ }
+ case 'bookshelf':{
+  const timber=floors[4];
+  put(0,0,.20,1,1,.59,timber);
+  if(v===4){
+   put(0,.04,.08,1,.12,.84,timber);
+   put(0,.72,.08,1,.19,.84,timber);
+   break;
+  }
+  const spines=[bricks[1],metals[1],bricks[0],stones[2],bricks[3],floors[2]];
+  for(const z of [.10,.79])for(const y of [0,.47,.94])
+   put(0,y,z,1,.06,.11,timber);
+  for(const x of [0,.93])put(x,0,.09,.07,1,.82,timber);
+  for(const z of [.13,.79])for(let row=0;row<2;row++)for(let book=0;book<6;book++){
+   if(v===3&&(book+row)%3===1)continue;
+   const h=.25+((book*3+row+v*2)%5)*.024;
+   put(.09+book*.138,.06+row*.47,z,.104,h,.075,spines[(book*5+row+v)%spines.length],false,false);
+  }
   break;
  }
  default:throw Error('Unregistered part family '+p.family);

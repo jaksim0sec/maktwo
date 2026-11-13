@@ -107,7 +107,10 @@ export function partPrisms(id,x,y,z,state={}){
    geometry.push({x:.46,y:.11,z:.83,w:.07,h:.75,d:.11,material:106,solid:true});
  }else if(state.simple){
   const family=partById(id).family;
-  if(family==='window')geometry=[
+  if(family==='bookshelf')geometry=[
+   geometry[0],{x:0,y:.46,z:.10,w:1,h:.05,d:.80,material:115,solid:true}
+  ];
+  else if(family==='window')geometry=[
    {x:0,y:0,z:.46,w:1,h:.085,d:.085,material:106,solid:true},
    {x:0,y:.085,z:.49,w:1,h:.915,d:.024,material:88,alpha:true,solid:true},
   ];

@@ -9,6 +9,7 @@ import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
 import {encodeCityStair,encodeSplitTread,stairOuterRail,walkwayJunction,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
 import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
+import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 
 export const CITY_MODE='eternal-city-lab';
@@ -24,6 +25,7 @@ export function createCityPlan(seed=CITY_SEED) {
   const layout=createFloorLayout({seed,floorY:CITY_BASE_Y});
   const plan=createDistrictPlan(layout,120,CITY_BUILDING_OPTIONS);
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
+  plan.library=createCoreLibrary(layout,plan.tower);
   plan.details=plan.volumes.map(v=>{
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
     return {kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
@@ -345,6 +347,11 @@ export function stampCityChunk(chunk,seed) {
     for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage);
     for(const {link,part} of plan.pathColumns[index]){
       if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty);
+    }
+    const library=plan.library;
+    if(Math.abs(x-library.x)<=library.radius+4&&Math.abs(z-library.z)<=library.radius+4){
+      const corePath=plan.pathColumns[index].some(({link,part})=>link.kind==='core'&&inside(part.outline,x,z));
+      stampCoreLibrary(library,x,z,put,empty,corePath);
     }
     const tower=plan.tower;
     if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
