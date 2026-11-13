@@ -23,7 +23,7 @@ void main(){vec4 c=texture(uAtlas,vUV);if(c.a<.015)discard;
  if(vCard==uHovered){c.rgb=mix(c.rgb,vec3(.90,.76,.54),.21);c.a=min(1.,c.a*1.1);}
  else if(vCard==uSelected){c.rgb=mix(c.rgb,vec3(.83,.75,.62),.10);}
  outColor=vec4(c.rgb,c.a*uOpacity);}`;
-const ATLAS_W=1024,ATLAS_H=1024,CELL_W=196,CELL_H=235;
+const ATLAS_W=1024,ATLAS_H=1024,CELL_W=196,CELL_H=204;
 // World-rendered spatial panel attached to the viewer. No fixed object remains inside a house.
 export const PANEL_DISTANCE=1.58, PANEL_SCALE=1.12;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -33,7 +33,7 @@ const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 // Every card samples an atlas rectangle with its own world-space aspect ratio.
-// Using fixed 196x235 images stretched all wide buttons and item cards.
+// Using fixed-size images stretched all wide buttons and item cards.
 export function atlasRect(card,index){
  const maxW=CELL_W-12,maxH=CELL_H-12,aspect=card.w/Math.max(.01,card.h);
  const w=Math.min(maxW,maxH*aspect),h=w/aspect;
@@ -41,9 +41,13 @@ export function atlasRect(card,index){
   y:Math.floor(index/5)*CELL_H+6+(maxH-h)/2,w,h};
 }
 function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
- const cards=[],craft=palette==='craft';
+ const cards=[],craft=palette==='craft',storage=palette.startsWith('storage:');
  const add=(id,name,x,y,w,h,role='control')=>cards.push({id,name,x,y,w,h,depth:-.035,role});
- if(compact){
+ if(storage){
+  add('storage:carried','소지품',compact?-.25:-.53,.81,compact?.34:.86,compact?.20:.27,'view');
+  add('storage:stored',craftFilter,compact?.14:.43,.81,compact?.32:.80,compact?.20:.27,'view');
+  add('close','✕',compact?.38:1.06,.81,compact?.14:.27,compact?.14:.27,'close');
+ }else if(compact){
   add('view:inventory','소지품',-.25,.80,.34,.20,'view');
   add('view:craft','제작',.14,.80,.32,.20,'view');
   add('close','✕',.38,.80,.14,.14,'close');
@@ -70,12 +74,12 @@ function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
    x,y:compact?(craft?.12:.06)-row*.36:.15-row*.55,
    w:compact?.41:.46,h:compact?.32:.43,depth:-.07+Math.abs(x)*.035,role:'item'});
  }
- if(!items.length)add('empty',craft?'표시할 제작법이 없습니다':'보유한 아이템이 없습니다',0,-.13,compact?.80:1.60,compact?.25:.40,'empty');
+ if(!items.length)add('empty',storage?'비어 있음':craft?'표시할 제작법이 없습니다':'보유한 아이템이 없습니다',0,-.13,compact?.80:1.60,compact?.25:.40,'empty');
  if(page?.total>1){
   if(compact){add('page:prev','‹ 이전',-.23,-.88,.35,.17,'page');add('page:next',`다음 ${page.index+1}/${page.total} ›`,.21,-.88,.41,.17,'page')}
   else{add('page:prev','‹ 이전',-.48,-.84,.65,.22,'page');add('page:next',`다음 › ${page.index+1}/${page.total}`,.48,-.84,.86,.22,'page')}
  }
- if(cards.length>20)throw Error('Spatial inventory atlas overflow');
+ if(cards.length>25)throw Error('Spatial inventory atlas overflow');
  return cards;
 }
 export {cardGeometry};
@@ -156,7 +160,7 @@ export class Hologram{
   const changed=this.palette!==palette;
   this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.craftFilter=craftFilter;
   this.cards=cardGeometry(palette,items,this.compact,page,craftFilter);
-  if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(palette==='craft'?'view:craft':'view:inventory');
+  if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(palette.startsWith('storage:')?palette:palette==='craft'?'view:craft':'view:inventory');
   this.dirty=true;this.buildGeometry();
  }
  moveFocus(direction){
@@ -205,7 +209,7 @@ export class Hologram{
   const textFit=(value,maxWidth,size,min=12)=>{let n=size;ctx.font=font(n,true);while(ctx.measureText(String(value)).width>maxWidth&&n>min){n--;ctx.font=font(n,true)}return n};
   this.cards.forEach((card,i)=>{
    const {x,y,w,h}=atlasRect(card,i),cx=x+w*.5,cy=y+h*.5;
-   const active=card.id==='view:inventory'?this.palette!=='craft':
+   const active=card.id.startsWith('storage:')?card.id===this.palette:card.id==='view:inventory'?this.palette!=='craft':
     card.id==='view:craft'?this.palette==='craft':
     card.id.startsWith('tab:')?card.id===`tab:${this.palette}`:
     card.id.startsWith('filter:')?card.id===`filter:${this.craftFilter}`:false;
@@ -244,6 +248,7 @@ export class Hologram{
    const status=this.palette==='craft'?(ready?`제작 가능 ×${card.recipe?.count||1}`:
     card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':
     card.missing>0?`재료 ${card.missing}개 부족`:'제작 불가'):
+    this.palette.startsWith('storage:')?`${card.count}개 · ${this.palette==='storage:carried'?'넣기':'꺼내기'}`:
     card.count===Infinity?'무제한':`소지 ${card.count||0}`;
    ctx.fillStyle=ready?'#bed7aa':'#aeb8b4';
    const size=textFit(status,w-20,Math.min(18,h*.115));ctx.font=font(size);
