@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.29-train-silhouette';
+const CACHE_NAME='maktwo-shell-v1.15.30-train-assembly';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
@@ -12,9 +12,9 @@ const APP_FILES=[
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/inventory.js','./src/core/crafting.js','./src/core/physics.js',
  './src/core/scale.js','./src/core/part-library.js','./src/core/station-parts.js','./src/core/station-materials.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
- './src/worldgen/generators.js','./src/worldgen/station-preview.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
+ './src/worldgen/generators.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
  './src/worldgen/eternal-night-game.js','./src/worldgen/eternal-night-core-floor.js','./src/worldgen/eternal-night-districts.js',
- './src/worldgen/eternal-night-buildings.js','./src/worldgen/eternal-night-blueprints.js','./src/worldgen/eternal-night-walkways.js','./src/worldgen/eternal-night-kits.js',
+ './src/worldgen/eternal-night-buildings.js','./src/worldgen/eternal-night-blueprints.js','./src/worldgen/eternal-night-stations.js','./src/worldgen/eternal-night-walkways.js','./src/worldgen/eternal-night-kits.js',
  './src/worldgen/eternal-night-precincts.js','./src/worldgen/eternal-night-decay.js','./src/worldgen/eternal-night-facade.js','./src/worldgen/eternal-night-interiors.js','./src/worldgen/eternal-night-stairs.js','./src/worldgen/eternal-night-tower.js','./src/worldgen/eternal-night-library.js'
 ];
 // Install a complete and versioned app snapshot. NEVER mutate it at runtime.

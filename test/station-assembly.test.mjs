@@ -8,6 +8,7 @@ import {partById,partGeometry,PARTS} from '../src/core/part-library.js';
 import {shapeBoxes} from '../src/core/shapes.js';
 import {materialFor,makeTextureLayers,MATERIALS} from '../src/client/textures.js';
 import {stampStationPreview,STATION_PREVIEW_SPAWN} from '../src/worldgen/station-preview.js';
+import {createStationTrain,stampStationTrainColumn} from '../src/worldgen/station-train.js';
 import {WORLD_PRESETS,PALETTES} from '../src/core/catalog.js';
 
 const chunks=()=>{const map=new Map();
@@ -72,15 +73,15 @@ test('sliding door, glazing, rails, seats and hanging handles have honest physic
  assert.notDeepEqual(doorL,doorR);
  assert.ok(stationPartGeometry(B.PART_STATION_TRAININTERIOR_3).length>=12);
 });
-test('preview contains all twenty tiles and twenty-five train and station parts',()=>{
+test('preview contains all twenty tiles and thirty train and station parts',()=>{
  const {map,at}=chunks(),ids=new Set();
  for(const c of map.values())for(const id of c.data)if(id)ids.add(id);
  for(const m of STATION_MATERIALS)assert.ok(ids.has(m.id),'missing tile '+m.key);
  for(const p of STATION_PARTS)assert.ok(ids.has(p.id),'missing component '+p.key);
- assert.equal(at(0,21,2),B.PART_STATION_TRACK_3);
+ assert.equal(at(0,21,1),B.PART_STATION_TRACK_3);
  assert.equal(at(0,22,0),B.STATION_TRAIN_RUBBER);
  assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,10)));
- assert.ok([B.PART_STATION_TRAINWALL_3,B.PART_STATION_TRAINWALL_4].includes(at(-10,23,4)));
+ assert.equal(at(-13,23,2),B.PART_STATION_TRAINWALL_3);
  assert.ok([B.PART_STATION_TRAININTERIOR_2,B.PART_STATION_TRAININTERIOR_3,B.AIR].includes(at(0,23,0)));
  assert.equal(at(0,24,STATION_PREVIEW_SPAWN.z|0),B.AIR);
  assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,STATION_PREVIEW_SPAWN.z|0)));
@@ -92,18 +93,27 @@ test('preview contains all twenty tiles and twenty-five train and station parts'
 test('the station train has recognizable wheels, two cabs, door pairs, side skirts and gangways',()=>{
  const {map,at}=chunks();
  const BOGIE=B.PART_STATION_TRAINRUNNING_1;
- for(const z of [-4,4])for(const x of [-15,-14,-4,-3,3,4,14,15]){
+ for(const z of [-1,1])for(const x of [-15,-4,4,15]){
   assert.equal(at(x,21,z),BOGIE,`missing wheel at ${x},${z}`);
-  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2,`missing underbody side sill at ${x},${z}`);
+  assert.equal(at(x,22,z),B.STATION_TRAIN_RUBBER);
  }
+ for(const z of [-2,2])for(const x of [-15,-4,4,15])
+  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2,`missing underbody side sill at ${x},${z}`);
  assert.equal(at(-18,24,0),B.PART_STATION_TRAINRUNNING_3);
  assert.equal(at(18,24,0),B.PART_STATION_TRAINRUNNING_3);
  assert.equal(at(-19,22,0),B.PART_STATION_TRAINRUNNING_4);
  assert.equal(at(19,22,0),B.PART_STATION_TRAINRUNNING_4);
- assert.equal(at(0,23,4),B.PART_STATION_TRAINRUNNING_5);
- assert.equal(at(-1,23,-4),B.PART_STATION_TRAINRUNNING_5);
- assert.equal(at(-10,23,4),B.PART_STATION_TRAINWALL_3);
- assert.equal(at(9,23,-4),B.PART_STATION_TRAINWALL_4);
+ assert.equal(at(0,23,2),B.PART_STATION_TRAINRUNNING_5);
+ assert.equal(at(-1,23,-2),B.PART_STATION_TRAINRUNNING_5);
+ for(const z of [-2,2])for(const [left,right] of [[-13,-12],[-7,-6],[6,7],[12,13]]){
+  assert.equal(at(left,23,z),B.PART_STATION_TRAINWALL_3);
+  assert.equal(at(right,23,z),B.PART_STATION_TRAINWALL_4);
+  assert.equal(at(left,24,z),B.PART_STATION_TRAINWALL_3);
+ }
+ assert.equal(at(0,21,0),B.PART_STATION_TRAINRUNNING_4,'inter-car coupling below gangway floor');
+ assert.equal(at(0,22,3),B.STATION_PLATFORM_TACTILE,'platform joins the train side without a track-sized gap');
+ assert.equal(at(0,25,0),B.PART_STATION_TRAINWALL_5,'connected roof over the gangway');
+ assert.equal(at(0,26,0),B.AIR,'no isolated roof ribs');
  const bogie=stationPartGeometry(BOGIE);
  assert.ok(bogie.length>=16,'Wheel is shaped instead of being painted');
  assert.ok(new Set(bogie.map(p=>p.y)).size>=6,'Radial wheel outline has stepped sections');
@@ -122,4 +132,17 @@ test('the station train has recognizable wheels, two cabs, door pairs, side skir
   }
  }
  assert.ok(preserved>100);
+});
+
+test('train assembly also composes cars across chunks when oriented north-south',()=>{
+ const train=createStationTrain({x:9,z:18,cars:3,axis:'z'});
+ const seen=new Map(),putAt=(x,z)=>(y,id,turn)=>seen.set(`${x},${y},${z}`,{id,turn});
+ for(let z=train.z+train.start-1;z<=train.z+train.end+1;z++)for(let x=4;x<=14;x++)
+  stampStationTrainColumn(train,x,z,putAt(x,z));
+ const id=(x,y,z)=>seen.get(`${x},${y},${z}`)?.id;
+ assert.equal(train.carriages.length,3);
+ assert.equal(id(10,21,train.z+train.carriages[0].bogies[0]),B.PART_STATION_TRAINRUNNING_1);
+ assert.equal(id(11,23,train.z+train.carriages[0].doors[0][0]),B.PART_STATION_TRAINWALL_3);
+ assert.equal(id(9,23,train.z+train.carriages[0].to+2),undefined,'the center of each gangway remains open');
+ assert.equal(id(9,25,train.z+train.carriages[0].to+2),B.PART_STATION_TRAINWALL_5);
 });

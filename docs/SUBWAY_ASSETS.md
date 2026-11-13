@@ -53,22 +53,26 @@ Open the game and select **폐역 · 전동차 조립 예시** in the local-worl
 or open it with `?world=SubwayAssemblyPreview`.
 World mode: `station-preview`, seed `9999`, default spawn `(1.5,24,10.5)`.
 
-A 37-cell train faces along X between two opposite platforms. Ballast and rails
+A two-car, 37-cell long, 5-cell wide train faces along X between two opposite
+platforms. Ballast and the two continuous single-rail strips
 occupy Y=20–21; carriage floor and platform deck both top out at Y=23.
-Train shell, windows, sliding leaves and seats are built in layers Y=23–26.
+Train shell, windows, sliding leaves and seats are built in layers Y=23–25.
 The station has grouted wall tiles, warning strips, skylight slits, operable and
 broken fluorescent tube **fixtures** (lighting preserved from existing system),
 ticket gates, vents, pipes, signage, and an end stair/access connection.
 Twenty tile swatches are available at X=-30. An additional line of five
 rolling-stock pieces sits at X=-28 (Z=-5..-1).
 
-**Carriage silhouette revision:** wheels are placed on both sides below the
-floor at Y=21, below uninterrupted side skirts at Y=22. Raised body sides,
-door and window modules extend through Y=23–24. A solid roof caps the
-assembly at Y=25, with raised ribs at Y=26. Both ends of the train carry
-an actual modeled cab windscreen and exposed coupler, and the center
-has a dark concertina gangway. These are separate detailed buildable
-parts, not painted-on wheel circles.
+**Assembly plan:** `station-train.js` defines car bounds, paired sliding doors,
+two bogies per car, cab ends and articulated gaps before stamping any blocks.
+The same column assembler accepts X or Z orientation and an arbitrary car count.
+Wheels sit under the uninterrupted side skirts at Y=21; floor and platform meet
+at Y=23, with the tactile edge immediately beside the carriage. Body sides,
+door pairs and windows occupy Y=23–24. A continuous shaped roof cassette caps
+each car at Y=25. The middle gangway keeps a clear walking center under its
+roof and has a coupler beneath the floor. Cab noses and end couplers remain
+distinct buildable parts. No random column condition substitutes one module
+for another at the car boundary.
 
 Station preview exterior vehicle parts set the existing exterior style bit,
 and the simplified mesh retains its main solid frame and translucent

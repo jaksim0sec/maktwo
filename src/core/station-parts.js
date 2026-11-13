@@ -106,10 +106,8 @@ export function stationPartGeometry(id){
   }
   if(p.variant===2){
    add(.05,.01,.12,.90,.12,.77,'TRACK_BALLAST',true);
-   for(const z of [.18,.76]){
-    add(0,.22,z,1,.085,.10,'TRACK_RAIL',true);
-    add(0,.16,z+.02,1,.06,.06,'TRACK_GREASE',true);
-   }
+   add(0,.22,.45,1,.085,.10,'TRACK_RAIL',true);
+   add(0,.16,.47,1,.06,.06,'TRACK_GREASE',true);
    add(.05,.13,.10,.90,.07,.83,'TRACK_SLEEPER',true);break;
   }
   if(p.variant===3){
