@@ -1,4 +1,5 @@
 export const SIZE=16,HEIGHT=64;
+export const MESH_NEIGHBORS=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
 // Generated turns occupy a different byte range than the legacy variant codes.
 export const TURN_STYLE=32;
 export const EXTERIOR_STYLE=64;

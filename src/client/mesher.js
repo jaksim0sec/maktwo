@@ -1,10 +1,12 @@
-import {SIZE, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
+import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
 import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
+import {fenceJoints,fencePrisms} from '../core/fence-joints.js';
+import {panelJoints,panelNeighbor,panelKind} from '../core/panel-joints.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
@@ -26,14 +28,15 @@ const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path'
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
-function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false,cityBridge=false,bridgePost=false,splitTread=null){
- const key=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)
+function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false,cityBridge=false,bridgePost=false,splitTread=null,joints=null){
+ const baseKey=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)
   |(simple?1<<13:0)|((stairRise===undefined?0:Math.round(stairRise*4)+1)<<14)
   |(cityStair?1<<18:0)|(cityStair?(Math.round(treadHeight*4)-1)<<19:0)|(rail?1<<22:0)
   |(cityBridge?1<<23:0)|(bridgePost?1<<24:0)|((splitTread?splitTread.index+1:0)<<25);
+ const key=joints?`${baseKey}:${joints.left.direction}:${joints.right.direction}:${+joints.left.joined}${+joints.right.joined}${+joints.bottom}${+joints.top}`:baseKey;
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
- for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost,splitTread})||[]){
+ for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost,splitTread,panelJoints:joints})||[]){
   const color=piece.emissive?[.97,.90,.78]:COLORS[piece.material],target=piece.alpha?transparent:opaque;
   for(const face of prismFaces(piece,true)){
    const n=prismNormal(face);if(!n)continue;
@@ -58,7 +61,7 @@ export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){con
 // Cross plants remain individual crossed quads. No changes to storage or world rules.
 export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,yMin=0,yMax=chunk.data.length/(SIZE*SIZE),detailY}={}){
  const height=chunk.data.length/(SIZE*SIZE),dims=[SIZE,yMax-yMin,SIZE];
- const adjacent=new Map(neighbors.map(([dx,dz,data,forms,styles])=>[`${dx},${dz}`,{data,forms,styles}]));
+ const adjacent=new Map(neighbors.map(([dx,dz,data,forms,styles,cornerY])=>[`${dx},${dz}`,{data,forms,styles,cornerY}]));
  const stateAt=(x,y,z)=>states?.get(`${x},${y},${z}`);
  const opaque=[],transparent=[],ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,forms=chunk.forms;
  // Store top-face UV turns in the existing material field. Only chunks with
@@ -150,6 +153,20 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
   const style=chunk.styles?.[idx]||0,variant=style&TURN_STYLE?0:style;
   const state=style&TURN_STYLE?{facing:style&7,...authored}:variant?{variant,...authored}:authored;
+  const neighbor=(dx,dy,dz)=>{
+   const nx=x+dx,nz=z+dz,ny=y+dy;
+   const cx=Math.floor(nx/SIZE),cz=Math.floor(nz/SIZE);
+   const data=cx||cz?adjacent.get(`${cx},${cz}`):chunk;
+   const k=data?.cornerY===undefined?(ny*SIZE+(nz+SIZE)%SIZE)*SIZE+(nx+SIZE)%SIZE:ny-data.cornerY;
+   const style=data?.styles?.[k]||0;
+   const authored=states.size?stateAt(wx+dx,ny,wz+dz):undefined;
+   return {id:data?.data?.[k]||B.AIR,style,form:data?.forms?.[k]||0,
+    state:authored??(style&TURN_STYLE?{facing:style&7}:undefined)};
+  };
+  const joints=panelKind(id)?panelJoints(id,state,(dx,dy,dz)=>{
+   const other=neighbor(dx,dy,dz);
+   return panelNeighbor(other.id,other.state,other.form);
+  }):null;
   if(BLOCKS[id].render==='part'){
    const simple=detailY!==undefined&&(detailY===null||y<detailY-4||y>=detailY+12);
    if(simple&&!(style&EXTERIOR_STYLE)&&!authored&&!(style&CITY_STAIR_STYLE))continue;
@@ -175,23 +192,23 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
    const cityGenerated=Boolean(style&CITY_STAIR_STYLE),family=partById(id)?.family;
    const cityStair=cityGenerated&&family==='staircase',cityBridge=cityGenerated&&family==='passage';
    const treadHeight=cityStair?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:1;
-   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),cityBridge,cityBridge&&Boolean(style&8),split);
+   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),cityBridge,cityBridge&&Boolean(style&8),split,joints);
    emitPart(opaque,solid,wx,y,wz);emitPart(transparent,glass,wx,y,wz);
    continue;
   }
-  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,state,transparent);continue}
+  if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,joints?{...state,panelJoints:joints}:state,transparent);continue}
   if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent);continue}
   const start=opaque.length;
-  if(id===B.FENCE&&(variant===6||variant===7)){
-   const alongX=variant===6;
-   metalRailing(opaque,wx,y,wz,(nextY)=>{
-    const next=alongX?x+1:z+1,edge=next>=SIZE;
-    const other=edge?adjacent.get(alongX?'1,0':'0,1'):chunk;
-    if(!other?.data||!other?.styles||nextY<0||nextY>=height)return false;
-    const k=alongX?(nextY*SIZE+z)*SIZE+(next%SIZE):(nextY*SIZE+(next%SIZE))*SIZE+x;
-    return other.data[k]===B.FENCE&&other.styles[k]===variant;
-   },alongX?'x':'z');
-  }else if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.FENCE||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);
+  if(id===B.FENCE){
+   const metal=variant===6||variant===7;
+   const joints=fenceJoints((dx,dy,dz)=>neighbor(dx,dy,dz).id);
+   const color=rgb(metal?'#41484b':'#937755');
+   for(const piece of fencePrisms(wx,y,wz,joints,metal))for(const face of prismFaces(piece)){
+    for(let i=1;i<face.length-1;i++)for(const j of [0,i,i+1])opaque.push(...face[j],...color,.87);
+   }
+   continue;
+  }
+  if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);
   else if(id!==B.FLOWER&&BLOCKS[id].render!=='cross')fixture(opaque,id,wx,y,wz);
   else flowerMesh(opaque,wx,y,wz,visualSeed,id);
   if(state?.facing){
@@ -218,16 +235,41 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
 // Existing callers may pass a loaded world; only already-loaded voxel data is read.
 export function meshChunk(world,chunk){
  const neighbors=[];
- for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
+ for(const [dx,dz] of MESH_NEIGHBORS){
   const neighbor=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
   if(neighbor)neighbors.push([dx,dz,neighbor.data,neighbor.forms,neighbor.styles]);
  }
  return meshChunkData(chunk,{neighbors,states:world.blockStates,visualSeed:world.seed});
 }
 
+const fixtureMeshes=new Map();
+const ringPoints=Array.from({length:12},(_,i)=>[Math.cos(i*Math.PI/6),Math.sin(i*Math.PI/6)]);
+function fixtureRing(dest,x,y,z,inner,outer,low,high,color,shade){
+ for(let i=0;i<ringPoints.length;i++){
+  const a=ringPoints[i],b=ringPoints[(i+1)%ringPoints.length];
+  const at=([dx,dz],r,h)=>[x+.5+dx*r,y+h,z+.5+dz*r];
+  if(inner)quad(dest,[at(a,outer,low),at(b,outer,low),at(b,inner,low),at(a,inner,low)],color,shade);
+  else for(const v of [at(a,outer,low),at(b,outer,low),at(a,0,low)])dest.push(...v,...color,shade);
+  quad(dest,[at(a,outer,low),at(a,outer,high),at(b,outer,high),at(b,outer,low)],color,shade);
+  if(inner)quad(dest,[at(a,inner,low),at(b,inner,low),at(b,inner,high),at(a,inner,high)],color,shade);
+ }
+}
+
 // Small low-poly practical lights. Negative vertex shade tags emissive surfaces
 // without adding another vertex attribute or increasing the chunk buffer stride.
 export function fixture(dest,id,x,y,z){
+ if(id===B.FLUORESCENT||id===B.BROKEN_FLUORESCENT||id===B.ROUND_FLUORESCENT){
+  let mesh=fixtureMeshes.get(id);
+  if(!mesh){
+   const vertices=[];
+   fluorescentMesh(vertices,id);
+   mesh=new Float32Array(vertices);
+   fixtureMeshes.set(id,mesh);
+  }
+  emitPart(dest,mesh,x,y,z);
+  return;
+ }
+
  const shape=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
  if(id===B.TORCH){
   shape(.458,.04,.458,.084,.45,.084,'#806550');
@@ -239,12 +281,6 @@ export function fixture(dest,id,x,y,z){
   for(const dx of [.3,.64])for(const dz of [.3,.64])shape(dx,.2,dz,.06,.44,.06,'#766b59');
   shape(.28,.63,.28,.44,.09,.44,'#766b59');
   shape(.45,.72,.45,.10,.11,.10,'#766b59');
- }else if(id===B.FLUORESCENT||id===B.BROKEN_FLUORESCENT){
-  const lit=id===B.FLUORESCENT;
-  shape(.10,.80,.25,.80,.10,.50,'#5f666a');
-  shape(.14,.78,.29,.72,.055,.42,lit?'#afbcc5':'#555b5e');
-  for(const z of [.36,.57])shape(.19,.76,z,.62,.038,.065,lit?'#eff6f1':'#899094',lit?-1.20:1);
-  if(!lit)shape(.59,.72,.49,.20,.045,.05,'#4e5355');
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');
@@ -252,6 +288,24 @@ export function fixture(dest,id,x,y,z){
   shape(.37,.34,.37,.26,.32,.26,'#f8ae65',-1.5);
   shape(.45,.59,.45,.10,.13,.10,'#ffe0a3',-1.7);
  }
+}
+
+function fluorescentMesh(dest,id){
+ if(id===B.ROUND_FLUORESCENT){
+  fixtureRing(dest,0,0,0,0,.37,.86,1,rgb('#d2d5d5'),.86);
+  fixtureRing(dest,0,0,0,.24,.32,.76,.84,rgb('#e4f3fb'),-1.12);
+  cube(dest,.44,.78,.76,.12,.07,.11,rgb('#858d91'));
+  return;
+ }
+ const lit=id===B.FLUORESCENT;
+ const box=(x,y,z,w,h,d,color,shade)=>cube(dest,x,y,z,w,h,d,rgb(color),shade);
+ box(.10,.87,.24,.80,.13,.52,'#747d82');
+ box(.14,.82,.27,.72,.06,.46,lit?'#b6c0c5':'#555b5e');
+ for(const z of [.36,.57]){
+  for(const x of [.12,.80])box(x,.775,z-.012,.08,.08,.09,'#8e9699');
+  box(.20,.76,z,.60,.038,.065,lit?'#eff8ff':'#899094',lit?-1.20:1);
+ }
+ if(!lit)box(.59,.72,.49,.20,.045,.05,'#4e5355');
 }
 
 // The door's full two-block model is emitted once from the lower cell.
@@ -414,7 +468,7 @@ export function shapeMesh(dest,id,x,y,z,state,glassDest=dest){
  const diagonal=isPanel(id)?diagonalPanel(id,state):null;
  if(diagonal){
   for(let index=0;index<diagonal.length;index++){
-   const glass=(id===B.WINDOW_NS||id===B.WINDOW_EW)&&index===0;
+   const glass=diagonal[index].glass;
    const paint=glass?rgb('#a9bdc5'):COLORS[id],out=glass?glassDest:dest;
    for(const face of diagonal[index].faces){
     const shade=FACES[face.material].shade+4*materialFor(glass?B.DIRTY_GLASS:id,face.material);

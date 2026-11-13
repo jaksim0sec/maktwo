@@ -51,7 +51,8 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
  const bayOffset=(wrap(angle+bayWidth/2,bayWidth)-bayWidth/2)*r;
  const cardinalDoor=minor<4.5;
  const diagonalDoor=Math.abs(dx-dz)<4||Math.abs(dx+dz)<4;
- const roofY=Math.floor(libraryRoofHeight(library,r));
+ const roof=libraryRoofHeight(library,r);
+ const roofY=Math.floor(roof);
  const wall=r>=radius-2&&r<=radius;
  const doorwayTop=cardinalDoor?4+Math.sqrt(4.5**2-minor**2):0;
  const closeToGarden=garden<gardenRadius+2;
@@ -70,6 +71,11 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
  const progress=(along-inner)/(outer-inner);
  const surface=lowerFlight?lower+(base-lower)*progress:lower+(upper-lower)*progress;
 
+ const exposedX=Math.hypot(dx+Math.sign(dx),dz)>radius;
+ const exposedZ=Math.hypot(dx,dz+Math.sign(dz))>radius;
+ const bevel=exposedX&&exposedZ&&Math.abs(dx)>1&&Math.abs(dz)>1
+  ?(dx>0?(dz>0?3:6):(dz>0?4:5)):0;
+
  if(wall){
   for(let y=base-1;y<=roofY;y++){
    const door=y>=base&&y<base+doorwayTop;
@@ -79,7 +85,7 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
     &&windowY<5+Math.sqrt(2.25**2-archOffset**2);
    const bridgeDoor=corePath&&y>=lower-3&&y<=lower+6;
    if(door||window||bridgeDoor)continue;
-   put(y,y===roofY||y===base-1||wrap(y-base,17)===8?STONE:WALL);
+   put(y,y===roofY||y===base-1||wrap(y-base,17)===8?STONE:WALL,undefined,false,0,bevel);
   }
  }
 
@@ -87,8 +93,14 @@ export function stampCoreLibrary(library,x,z,put,empty,corePath){
  if(r>=roofInner&&r<=radius&&garden>=gardenRadius+1.25){
   const oculusRim=garden<gardenRadius+2.6;
   const trim=oculusRim||r>radius-2.5||r<roofInner+1.5||Math.abs(bayOffset)<.62;
-  put(roofY,trim?STONE:WALL);
-  if(oculusRim)put(roofY+1,STONE);
+  const directionX=Math.abs(dx)>=Math.abs(dz);
+  const low=libraryRoofHeight(library,r-.5),high=libraryRoofHeight(library,r+.5);
+  const grade=low-high;
+  const form=grade>.55&&grade<1.45
+   ?(directionX?(dx>0?10:8):(dz>0?9:7))
+   :roof-roofY<.48?1:0;
+  put(roofY,trim?STONE:WALL,undefined,false,0,form);
+  if(oculusRim)put(roofY+1,STONE,undefined,false,0,1);
   // Close steep exterior risers in the vault's outer courses.
   const lowerRoof=Math.floor(libraryRoofHeight(library,r+.8));
   for(let y=lowerRoof+1;y<roofY;y++)put(y,trim?STONE:WALL);

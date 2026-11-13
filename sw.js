@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.1-core-library';
+const CACHE_NAME='maktwo-shell-v1.15.1-joined-architecture';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
@@ -8,7 +8,7 @@ const APP_FILES=[
  './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/architecture-texture-sampler.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
  './src/client/city-distance.js','./src/client/renderer.js','./src/client/mesher.js','./src/client/mesh.worker.js',
  './src/client/light.worker.js','./src/core/blocks.js','./src/core/chunk.js',
- './src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
+ './src/core/panel-joints.js','./src/core/fence-joints.js','./src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/inventory.js','./src/core/crafting.js','./src/core/physics.js',
  './src/core/scale.js','./src/core/part-library.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',

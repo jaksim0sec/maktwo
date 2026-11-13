@@ -1,6 +1,7 @@
 // Common oriented geometry for construction parts. Rendering, picking and
 // physical overlap use the same clipped prisms, including 45-degree rotations.
 import {partById,partGeometry} from './part-library.js';
+import {panelPoint} from './panel-joints.js';
 const EPS=1e-8;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -17,11 +18,12 @@ function clip(poly,axis,limit,keepAbove){
  }
  return out;
 }
-function footprint(piece,angle){
+function footprint(piece,angle,joints){
  const c=Math.cos(angle),s=Math.sin(angle);
  const points=[[piece.x,piece.z],[piece.x+piece.w,piece.z],
   [piece.x+piece.w,piece.z+piece.d],[piece.x,piece.z+piece.d]];
  let out=points.map(([x,z])=>{
+  if(joints)return [...panelPoint(x,z,joints,piece.x<.5),z];
   const a=x-.5,b=z-.5;return [.5+a*c-b*s,.5+a*s+b*c,z];
  });
  for(const [axis,limit,above] of [[0,0,true],[0,1,false],[1,0,true],[1,1,false]]){
@@ -84,15 +86,15 @@ export function partPrisms(id,x,y,z,state={}){
     if(height>0)geometry.push({x:.06,y:height,z,w:.88,h:.012,d:.055,material:variant===2?106:109,solid:false});
    }
    if(state.rail){
-    const x=state.facing===2||state.facing===6?.065:.875;
-    const railBase=split?.low??h;
+    const x=state.facing===2||state.facing===6?.875:.065;
+    const railBase=split?.low||h;
     const railTop=railBase+.60;
     // One post at the tread centre rather than two end posts on every metre.
     // Its top follows the sloped rail so successive tread segments connect.
     const slope=Math.max(0,Math.min(1,state.stairRise??(split?2*(split.high-split.low):.5)));
     geometry.push({x,y:railBase-.01,z:.47,w:.055,h:.63+slope*.5,d:.07,material:106,solid:true});
     geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:slope});
-    geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:slope});
+    geometry.push({x,y:railTop-.19,z:0,w:.03,h:.035,d:1,material:109,solid:false,railSide:'external',slopeY:slope});
    }
   }
  }else if(state.cityBridge&&partById(id)?.family==='passage'){
@@ -118,10 +120,31 @@ export function partPrisms(id,x,y,z,state={}){
   else if(family==='entrance'||family==='ventilation')geometry=geometry.slice(0,4);
   else geometry=geometry.slice(0,1);
  }
+ const joints=state.panelJoints;
+ if(joints){
+  const window=partById(id).family==='window',material=geometry[0]?.material??106;
+  geometry=geometry.slice();
+  if(window){
+   if(joints.left.joined)geometry.push({x:0,y:0,z:.459,w:.11,h:1,d:.082,material,solid:true});
+   if(joints.right.joined)geometry.push({x:.89,y:0,z:.459,w:.11,h:1,d:.082,material,solid:true});
+   const left=joints.left.joined?0:.071,right=joints.right.joined?1:.929;
+   if(joints.bottom)geometry.push({x:left,y:0,z:.455,w:right-left,h:.14,d:.082,material,solid:true});
+   if(joints.top)geometry.push({x:left,y:.86,z:.455,w:right-left,h:.14,d:.082,material,solid:true});
+  }else{
+   if(joints.left.joined)geometry.push({...geometry[0],x:0,w:.08});
+   if(joints.right.joined)geometry.push({...geometry[0],x:.92,w:.08});
+  }
+  // Keep both halves convex at a diagonal-to-straight corner.
+  geometry=geometry.flatMap(piece=>{
+   const end=piece.x+piece.w;
+   return piece.x<.5&&end>.5
+    ?[{...piece,w:.5-piece.x},{...piece,x:.5,w:end-.5}]:[piece];
+  });
+ }
  for(let piece of geometry){
   if(piece.railSide&&joined[piece.railSide])continue;
   if(piece.slopeY&&state.stairRise!==undefined)piece={...piece,z:0,d:1,slopeY:state.stairRise};
-  const points=footprint(piece,angle);
+  const points=footprint(piece,angle,state.panelJoints);
   if(points.length<3)continue;
   const verts=points.map(([a,b,sourceZ])=>{
    const rise=(piece.slopeY||0)*(sourceZ-piece.z)/piece.d;

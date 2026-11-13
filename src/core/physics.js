@@ -4,8 +4,9 @@ import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
 import {FORMED,hitFormed} from './construction.js';
 import {partById} from './part-library.js';
 import {partPrisms,partRaycast} from './part-prisms.js';
+import {fencePrisms} from './fence-joints.js';
 import {hitMount} from './mounts.js';
-import {solidBlockOverlap,fenceBoxes,shapeBoxes,isStairs,isSlab,isPanel,diagonalPanel} from './shapes.js';
+import {solidBlockOverlap,shapeBoxes,isStairs,isSlab,isPanel,diagonalPanel} from './shapes.js';
 export const GRAVITY=toVoxels(24);
 export const AUTO_STEP_HEIGHT=1.0;
 const STEP_GRANULARITY=.125;
@@ -88,13 +89,16 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
   if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
    if(FORMED[cell.form])hit=hitFormed(FORMED[cell.form],x,y,z,origin,direction);
    else if(partById(id))hit=partRaycast(partPrisms(id,x,y,z,world.getShapeState?.(x,y,z)||{}),origin,direction,maxDistance);
-   else if(isDoor(id)){
+   else if(id===B.FENCE){
+    const state=world.getShapeState?.(x,y,z);
+    hit=partRaycast(fencePrisms(x,y,z,state?.fenceJoints||[],state?.variant===6||state?.variant===7),origin,direction,maxDistance);
+   }else if(isDoor(id)){
     const baseY=id===B.DOOR_TOP?y-1:y;
     hit=intersectDoor(origin,direction,x,baseY,z,world.getDoorState?.(x,y,z));
    }else{
     const state=isStairs(id)||isSlab(id)||id===B.CHAIR||isPanel(id)?world.getShapeState?.(x,y,z):undefined;
     const diagonal=isPanel(id)?diagonalPanel(id,state):null;
-    const boxes=diagonal?null:id===B.FENCE?fenceBoxes(x,y,z):shapeBoxes(id,x,y,z,state);
+    const boxes=diagonal?null:shapeBoxes(id,x,y,z,state);
     if(diagonal){
      for(const part of diagonal){
       const next=hitFormed(part,x,y,z,origin,direction);

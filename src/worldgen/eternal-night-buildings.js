@@ -91,7 +91,10 @@ export function designShopModule(v,unit,random) {
 export function designBuilding(volume, unit, random) {
   const risers=stairRisers(volume,unit);
   if (!risers) return false;
-  const stair=stairModule(unit), half=risers/2;
+  const stair=stairModule(unit);
+  const storeyHeight=risers*stair.rise;
+  const treadCount=volume.highRise&&unit===1.5?storeyHeight*4:risers;
+  const half=treadCount/2;
   const turn=volume.x1-volume.x0>volume.z1-volume.z0;
   const cx=(volume.x0+volume.x1)/2, cz=(volume.z0+volume.z1)/2;
   const hw=(turn?volume.z1-volume.z0:volume.x1-volume.x0)/2;
@@ -108,14 +111,13 @@ export function designBuilding(volume, unit, random) {
   // Keep the stair core beside the spine on wider sites; let the spine share a landing on narrow sites.
   const su=Math.min(stairStart,hw-2*stair.width-unit*.15), eu=su+2*stair.width;
   // Align the two half-block treads to the voxel grid in the playable city.
-  if(volume.highRise)stair.run=.5;
+  if(volume.highRise){stair.run=.5;stair.rise=storeyHeight/treadCount;}
   const axisOrigin=turn?cx:cz;
   const nearTarget=(half*stair.run+stair.landing)/2;
   const near=volume.highRise?Math.round(axisOrigin+nearTarget)-axisOrigin:nearTarget;
   const far=near-half*stair.run;
   const shaft=rect(su,far-stair.landing,eu,near,'stair');
   const atrium=mall ? rect(-hw*.68,-hd*.62,-passage-unit,hd*.62,'atrium') : null;
-  const storeyHeight=risers*stair.rise;
   const count=Math.round((volume.y1-volume.y0)/storeyHeight);
   const entryLevel=volume.support===null && count>=2 ? 1 : 0;
   const floors=[], stairs=[], ports=[];
@@ -250,7 +252,7 @@ export function designBuilding(volume, unit, random) {
     stairs.push({fromY:y,toY:floor.top,flights,landing:{...landing,y:midY},upperLanding:{...upperLanding,y:floor.top},
       rails:[rail(su+stair.width,near,far,y,midY),rail(eu,far,near,midY,floor.top)],
       get treads() {
-        return Array.from({length:risers},(_,i)=>{
+        return Array.from({length:treadCount},(_,i)=>{
           const second=i>=half, n=i%half, offset=second?far+n*stair.run:near-(n+1)*stair.run;
           const u=su+(second?stair.width:0);
           return {...rect(u,offset,u+stair.width,offset+stair.run,'tread'),

@@ -1,19 +1,21 @@
-import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
+import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {CITY_MODE,CITY_HEIGHT,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {stairConnections,stairRailRise} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
+import {fenceJoints} from './fence-joints.js';
+import {panelJoints,panelNeighbor,panelKind} from './panel-joints.js';
 import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
  constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0}const forms=this.forms.get(k);
- if(forms){c.forms=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
+ if(forms){c.forms??=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
- c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;this.markDirty(cx-1,cz);this.markDirty(cx+1,cz);this.markDirty(cx,cz-1);this.markDirty(cx,cz+1);this.events.emit('chunk-load',c)}return c}
+ c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
  partFacing(x,y,z){
@@ -37,6 +39,13 @@ export class World{
    delete state.treadHeight;delete state.rail;
   }
   const id=this.get(x,y,z,false);
+  if(id===B.FENCE)state.fenceJoints=fenceJoints((dx,dy,dz)=>this.get(Math.floor(x)+dx,y0+dy,Math.floor(z)+dz,false));
+  if(panelKind(id))state.panelJoints=panelJoints(id,state,(dx,dy,dz)=>{
+   const nx=Math.floor(x)+dx,ny=y0+dy,nz=Math.floor(z)+dz;
+   const other=this.get(nx,ny,nz,false);
+   const authored=this.blockStates.get(this.stateKey(nx,ny,nz));
+   return panelNeighbor(other,authored??{facing:this.partFacing(nx,ny,nz)},this.getForm(nx,ny,nz));
+  });
   if(partById(id)?.family==='staircase'){
    const neighbor=(dx,dz,dy=0)=>{
     const nx=Math.floor(x)+dx,nz=Math.floor(z)+dz;
@@ -59,9 +68,7 @@ export class World{
    upper:Boolean(state.upper),...(state.panelTurn!==undefined?{panelTurn:state.panelTurn&3}:{})});
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),lx=Math.floor(x)-cx*SIZE,lz=Math.floor(z)-cz*SIZE;
   this.markDirty(cx,cz);
-  // Rails in the adjacent chunk depend on the updated orientation.
-  if(lx===0)this.markDirty(cx-1,cz);if(lx===SIZE-1)this.markDirty(cx+1,cz);
-  if(lz===0)this.markDirty(cx,cz-1);if(lz===SIZE-1)this.markDirty(cx,cz+1);
+  this.markMeshBorder(cx,cz,lx,lz);
   this.lightRevision++;return true;
  }
  getDoorState(x,y,z){const yBase=this.get(x,y,z,false)===B.DOOR_TOP?Math.floor(y)-1:Math.floor(y);return {...this.getShapeState(x,yBase,z),open:false,...this.blockStates.get(this.stateKey(x,yBase,z))}}
@@ -162,8 +169,14 @@ export class World{
   if(block(oldId).light||block(id).light||isDoor(oldId)||isDoor(id)||(block(oldId).opaque&&!oldForm)!==(block(id).opaque&&!form))
    this.lightRevision++;
   if(record){const k=key(cx,cz),idx=Chunk.index(lx,y,lz);let edits=this.edits.get(k);if(!edits)this.edits.set(k,edits=new Map());edits.set(idx,id)}
-  if(lx===0)this.markDirty(cx-1,cz);if(lx===15)this.markDirty(cx+1,cz);if(lz===0)this.markDirty(cx,cz-1);if(lz===15)this.markDirty(cx,cz+1);
+  this.markMeshBorder(cx,cz,lx,lz);
   this.events.emit('block-change',{x,y,z,id});if(simulate){this.schedule(x,y,z);for(const [dx,dy,dz] of [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]])this.schedule(x+dx,y+dy,z+dz)}return true}
+ markMeshBorder(cx,cz,x,z){
+  const dx=x===0?-1:x===SIZE-1?1:0,dz=z===0?-1:z===SIZE-1?1:0;
+  if(dx)this.markDirty(cx+dx,cz);
+  if(dz)this.markDirty(cx,cz+dz);
+  if(dx&&dz)this.markDirty(cx+dx,cz+dz);
+ }
  markDirty(cx,cz){const c=this.chunks.get(key(cx,cz));if(c){c.dirty=true;c.revision++}}
  schedule(x,y,z){if(y<1||y>=this.height)return;const k=`${x|0},${y|0},${z|0}`;if(!this.queued.has(k)){this.queued.add(k);this.queue.push([x|0,y|0,z|0,k])}}
  tick(){
@@ -213,7 +226,7 @@ export class World{
  }
  snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,time:this.time,edits,states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
- stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
+ stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  spawn(){
   if(this.mode===CITY_MODE){
    let fallback;

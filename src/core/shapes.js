@@ -2,6 +2,8 @@ import {FORMED,formedOverlap} from './construction.js';
 import {block,BLOCK as B,itemId} from './blocks.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {partById} from './part-library.js';
+import {fencePrisms} from './fence-joints.js';
+import {panelPoint} from './panel-joints.js';
 import {partPrisms,prismAabb,partOverlaps} from './part-prisms.js';
 export const isStairs=id=>id===B.STONE_STAIRS||id===B.WOOD_STAIRS||id===B.CONCRETE_STAIRS;
 export const isSlab=id=>id===B.STONE_SLAB||id===B.WOOD_SLAB||id===B.CONCRETE_SLAB||id===B.UPPER_STAIR_TREAD||id===B.FLOOR_FINISH||id===B.CEILING_FINISH;
@@ -89,9 +91,9 @@ function clipFootprint(points,axis,limit,sign){
  }
  return output;
 }
-function diagonalPart({x,y,z,w,h,d},turn){
+function diagonalPart({x,y,z,w,h,d},turn,joints,left){
  const sign=turn===1?1:-1;
- let footprint=[[x,z],[x+w,z],[x+w,z+d],[x,z+d]].map(([a,b])=>[
+ let footprint=[[x,z],[x+w,z],[x+w,z+d],[x,z+d]].map(([a,b])=>joints?panelPoint(a,b,joints,left):[
   .5+(a-.5)+(b-.5)*Math.SQRT1_2*sign,
   .5-(a-.5)*sign+(b-.5)*Math.SQRT1_2,
  ]);
@@ -117,9 +119,28 @@ function diagonalPart({x,y,z,w,h,d},turn){
 }
 export function diagonalPanel(id,state){
  const turn=state?.panelTurn&3;
- if(!(turn&1))return null;
- const base=itemId(id),key=base*4+turn;
- if(!diagonalPanels.has(key))diagonalPanels.set(key,shapeBoxes(base,0,0,0).map(box=>diagonalPart(box,turn)));
+ const joints=state?.panelJoints;
+ if(!(turn&1)&&!joints)return null;
+ const base=itemId(id),variant=state?.variant||0;
+ const key=joints?`${base}:${variant}:${joints.left.direction}:${joints.right.direction}:${+joints.top}:${+joints.bottom}`:base*32+variant*4+turn;
+ if(!diagonalPanels.has(key)){
+  const boxes=shapeBoxes(base,0,0,0,{variant});
+  const pieces=boxes.flatMap((box,index)=>{
+   const glass=base===B.WINDOW_NS&&index===0;
+   if(!joints)return [{...diagonalPart(box,turn),glass}];
+   if(base===B.WINDOW_NS&&((index===3&&joints.top)||(index===4&&joints.bottom))){
+    box={...box,y:index===3?.93:0,h:.07};
+   }
+   if(glass){
+    const bottom=joints.bottom?.06:box.y,top=joints.top?.94:box.y+box.h;
+    box={...box,y:bottom,h:top-bottom};
+   }
+   const end=box.x+box.w;
+   const halves=box.x<.5&&end>.5?[{...box,w:.5-box.x},{...box,x:.5,w:end-.5}]:[box];
+   return halves.map(piece=>({...diagonalPart(piece,turn,joints,piece.x<.5),glass}));
+  });
+  diagonalPanels.set(key,pieces);
+ }
  return diagonalPanels.get(key);
 }
 function overlapsPanel(parts,x,y,z,body,epsilon){
@@ -152,6 +173,9 @@ export function solidBlockOverlap(world,x,y,z,id,body,epsilon=1e-5,form=world.ge
  const diagonal=isPanel(id)?diagonalPanel(id,state):null;
  if(diagonal)return overlapsPanel(diagonal,x,y,z,body,epsilon);
  const boxes=shapeBoxes(id,x,y,z,state);if(boxes)return boxes.some(b=>bodyOverlapsBox(body,b,epsilon));
- if(id===B.FENCE)return fenceBoxes(x,y,z).some(b=>bodyOverlapsBox(body,b,epsilon));
+ if(id===B.FENCE){
+  const state=world.getShapeState?.(x,y,z);
+  return partOverlaps(fencePrisms(x,y,z,state?.fenceJoints||[],state?.variant===6||state?.variant===7),body,epsilon);
+ }
  return bodyOverlapsBox(body,{x,y,z,w:1,h:1,d:1},epsilon);
 }

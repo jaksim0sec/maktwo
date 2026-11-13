@@ -1,5 +1,5 @@
 import {block as itemBlock} from '../core/blocks.js';
-import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE} from '../core/chunk.js';import {clamp} from '../util/math.js';
+import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {distantCityMesh} from './city-distance.js';
@@ -143,7 +143,7 @@ export class Renderer{
   const revision=chunk.revision,token=this.worldToken;
   const task={world,key,chunk,revision,token,yMin,yMax,detailY};
   const neighbors=[];
-  for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
+  for(const [dx,dz] of MESH_NEIGHBORS){
    const c=world.getChunk(chunk.cx+dx,chunk.cz+dz,false);
    if(c)neighbors.push([dx,dz,c.data,c.forms,c.styles]);
   }
@@ -153,7 +153,20 @@ export class Renderer{
   const offset=Math.max(0,(yMin??0)-1)*SIZE*SIZE,end=Math.min(chunk.height,(yMax??chunk.height)+1)*SIZE*SIZE;
   const copy=(a)=>{const data=new Uint8Array(a.subarray(offset,end));buffers.push(data.buffer);return data.buffer};
   this.inflight.set(key,task);
-  this.worker.postMessage({key,revision,token,yMin,yMax,detailY,offset,height:chunk.height,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighbors.map(([dx,dz,data,forms,styles])=>[dx,dz,copy(data),forms&&copy(forms),styles&&copy(styles)]),doorStates:states},buffers);
+  const neighborBuffers=neighbors.map(([dx,dz,data,forms,styles])=>{
+   if(!dx||!dz)return [dx,dz,copy(data),forms&&copy(forms),styles&&copy(styles)];
+   // Only one XZ column of a diagonal chunk can meet this chunk.
+   const corner=(dz<0?SIZE-1:0)*SIZE+(dx<0?SIZE-1:0);
+   const copyCorner=array=>{
+    if(!array)return undefined;
+    const strip=new Uint8Array((end-offset)/(SIZE*SIZE));
+    for(let i=0;i<strip.length;i++)strip[i]=array[offset+i*SIZE*SIZE+corner];
+    buffers.push(strip.buffer);
+    return strip.buffer;
+   };
+   return [dx,dz,copyCorner(data),copyCorner(forms),copyCorner(styles),offset/(SIZE*SIZE)];
+  });
+  this.worker.postMessage({key,revision,token,yMin,yMax,detailY,offset,height:chunk.height,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighborBuffers,doorStates:states},buffers);
  }
  sync(world,player){
   if(this.world!==world)this.resetWorld(world);

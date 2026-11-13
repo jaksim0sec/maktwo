@@ -15,7 +15,10 @@ self.onmessage=({data:job})=>{
   chunk.forms=restore(job.forms);
   chunk.styles=restore(job.styles);
   chunk.mounts=job.mounts;
-  const neighbors=job.neighbors.map(([dx,dz,buffer,forms,styles])=>[dx,dz,restore(buffer),restore(forms),restore(styles)]);
+  const neighbors=job.neighbors.map(([dx,dz,buffer,forms,styles,cornerY])=>{
+   const read=cornerY===undefined?restore:value=>value?new Uint8Array(value):undefined;
+   return [dx,dz,read(buffer),read(forms),read(styles),cornerY];
+  });
   const states=new Map(job.doorStates||[]);
   const mesh=meshChunkData(chunk,{neighbors,states,visualSeed:job.seed,yMin:job.yMin,yMax:job.yMax,detailY:job.detailY});
   self.postMessage({key:job.key,revision:job.revision,token:job.token,opaque:mesh.opaque,transparent:mesh.transparent},[mesh.opaque.buffer,mesh.transparent.buffer]);
