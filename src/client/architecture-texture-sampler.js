@@ -18,7 +18,9 @@ export function sampleArchitectureTexture(index,x,y,size=32){
   const j=joint(u,v,dimensions[0],dimensions[1]);
   const tile=noise(Math.floor(u/dimensions[0]),Math.floor(v/dimensions[1]),index+31);
   f=.96+.09*(tile-.5)+.026*(n-.5);
-  if(j.edge)f*=.58;else if(j.rim)f*=.96;
+  if(j.edge)f*=.62;else if(j.rim)f*=.93;
+  if(j.rim&&fine>.78&&patch<.48)f*=.79;
+  if(v>23&&large<.24)f*=.90;
   if(style===1){r=.96;g=.99;b=1;}
   if(style===2)f+=.04*Math.sin(u*.23+v*.14);
   if(style===3){f+=.17*(tile-.5);r=.97;b=1.015;}
@@ -43,6 +45,7 @@ export function sampleArchitectureTexture(index,x,y,size=32){
   f=.9+.13*(patch-.5)+.05*(n-.5);
   if(style===0){
    if(u<.85||v<.85)f*=.75;
+   if(v>22&&patch<.4)f*=.83;
    if(noise(Math.floor(u/8),Math.floor(v/8),index+71)>.83&&Math.hypot(u%8-4,v%8-4)<1)f*=.66;
    if(n<.045)f*=.77;
   }else if(style===1){if(n>.72)f*=1.11;else if(n<.19)f*=.76;}
@@ -53,7 +56,8 @@ export function sampleArchitectureTexture(index,x,y,size=32){
   const dims=[[16,8],[16,8],[16,10],[16,5],[16,8]][style];
   const j=joint(u,v,dims[0],dims[1],dims[0]/2);
   f=.87+.14*patch+.055*(fine-.5);
-  if(j.edge)f*=style===4?.84:style===3?.76:.56;
+  if(j.edge)f*=style===4?.84:style===3?.76:.58;
+  if(j.rim&&fine>.84&&patch<.31)f*=.81;
   else if(j.rim)f*=1.04;
   if(style===0){g=.94;b=.89;}
   if(style===2)f=.94+.06*patch-(j.edge?.16:0);
