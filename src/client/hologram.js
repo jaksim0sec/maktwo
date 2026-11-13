@@ -33,24 +33,49 @@ const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
+// Every card samples an atlas rectangle with its own world-space aspect ratio.
+// Using fixed 196x235 images stretched all wide buttons and item cards.
+export function atlasRect(card,index){
+ const maxW=CELL_W-12,maxH=CELL_H-12,aspect=card.w/Math.max(.01,card.h);
+ const w=Math.min(maxW,maxH*aspect),h=w/aspect;
+ return {x:(index%5)*CELL_W+6+(maxW-w)/2,
+  y:Math.floor(index/5)*CELL_H+6+(maxH-h)/2,w,h};
+}
 function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
  const cards=[],craft=palette==='craft';
  const add=(id,name,x,y,w,h,role='control')=>cards.push({id,name,x,y,w,h,depth:-.035,role});
- add('view:inventory','내 가방',-.53,.81,.86,.27,'view');
- add('view:craft','제작하기',.43,.81,.80,.27,'view');
- add('close','✕',1.06,.81,.27,.27,'close');
- const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능'],['hand','맨손']]:
-  [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
- const space=craft?.63:.46;
- filters.forEach(([id,name],i)=>add(id,name,(i-(filters.length-1)/2)*space,.50,space-.055,.19,'filter'));
+ if(compact){
+  add('view:inventory','내 가방',-.25,.80,.34,.20,'view');
+  add('view:craft','제작하기',.14,.80,.32,.20,'view');
+  add('close','✕',.38,.80,.14,.14,'close');
+  const filters=craft?[['filter:all','전체'],['filter:available','제작 가능'],['hand','맨손']]:
+   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
+  filters.forEach(([id,name],i)=>{
+   const row=craft?0:Math.floor(i/3),col=craft?i:i%3,total=craft?3:row===0?3:2;
+   add(id,name,(col-(total-1)/2)*.29,craft?.49:row===0?.53:.34,.27,.15,'filter');
+  });
+ }else{
+  add('view:inventory','내 가방',-.53,.81,.86,.27,'view');
+  add('view:craft','제작하기',.43,.81,.80,.27,'view');
+  add('close','✕',1.06,.81,.27,.27,'close');
+  const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능'],['hand','맨손']]:
+   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
+  const step=craft?.63:.46;
+  filters.forEach(([id,name],i)=>add(id,name,(i-(filters.length-1)/2)*step,.50,step-.055,.19,'filter'));
+ }
  for(let i=0;i<items.length;i++){
-  const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5)),item=items[i],x=compact?(col-1)*.46:(col-2)*.51;
+  const col=compact?i%2:i%5,row=Math.floor(i/(compact?2:5)),item=items[i];
+  const x=compact?(col-.5)*.45:(col-2)*.51;
   cards.push({id:`item:${i}`,name:item.name,color:item.color,blockId:item.id,count:item.count,
    craftable:item.craftable,recipe:item.recipe,missing:item.missing,
-   x,y:.15-row*(compact?.49:.55),w:compact?.43:.46,h:.43,depth:-.07+Math.abs(x)*.035,role:'item'});
+   x,y:compact?(craft?.12:.06)-row*.36:.15-row*.55,
+   w:compact?.41:.46,h:compact?.32:.43,depth:-.07+Math.abs(x)*.035,role:'item'});
  }
- if(!items.length)add('empty',craft?'표시할 제작법이 없습니다':'보유한 아이템이 없습니다',0,-.14,1.6,.4,'empty');
- if(page?.total>1){add('page:prev','‹ 이전',-.48,-.86,.65,.22,'page');add('page:next',`다음 › ${page.index+1}/${page.total}`,.48,-.86,.84,.22,'page')}
+ if(!items.length)add('empty',craft?'표시할 제작법이 없습니다':'보유한 아이템이 없습니다',0,-.13,compact?.80:1.60,compact?.25:.40,'empty');
+ if(page?.total>1){
+  if(compact){add('page:prev','‹ 이전',-.23,-.88,.35,.17,'page');add('page:next',`다음 ${page.index+1}/${page.total} ›`,.21,-.88,.41,.17,'page')}
+  else{add('page:prev','‹ 이전',-.48,-.84,.65,.22,'page');add('page:next',`다음 › ${page.index+1}/${page.total}`,.48,-.84,.86,.22,'page')}
+ }
  if(cards.length>20)throw Error('Spatial inventory atlas overflow');
  return cards;
 }
@@ -93,18 +118,18 @@ export function followAnchor(anchor,player,dt=Infinity){
  if(horizontal>.0001){anchor.right=[-anchor.forward[2]/horizontal,0,anchor.forward[0]/horizontal];anchor.up=[-anchor.forward[1]*anchor.forward[0]/horizontal,horizontal,-anchor.forward[1]*anchor.forward[2]/horizontal]}else{anchor.right=right;anchor.up=up}
  return true;
 }
-export function spatialHit(anchor,cards,camera,ray){
+export function spatialHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
  if(!anchor||!cards?.length)return null;
  const origin=[camera.x,camera.y+camera.eye+(camera.visualStepOffset||0),camera.z];
  let best=Infinity,result=null;
  for(let i=0;i<cards.length;i++){
-  const card=cards[i],center=point(anchor.center,anchor.right,anchor.up,card.x*PANEL_SCALE,card.y*PANEL_SCALE,card.depth*PANEL_SCALE,anchor.forward);
+  const card=cards[i],center=point(anchor.center,anchor.right,anchor.up,card.x*scale,card.y*scale,card.depth*scale,anchor.forward);
   const denominator=dot(ray,anchor.forward);
   if(denominator<=1e-5)continue;
   const distance=dot(sub(center,origin),anchor.forward)/denominator;
   if(distance<=.05||distance>6||distance>=best)continue;
   const hit=sub(add(origin,ray,distance),center);
-  if(Math.abs(dot(hit,anchor.right))<=card.w*PANEL_SCALE*.5&&Math.abs(dot(hit,anchor.up))<=card.h*PANEL_SCALE*.5){best=distance;result={id:card.id,index:i,distance}}
+  if(Math.abs(dot(hit,anchor.right))<=card.w*scale*.5&&Math.abs(dot(hit,anchor.up))<=card.h*scale*.5){best=distance;result={id:card.id,index:i,distance}}
  }
  return result;
 }
@@ -124,7 +149,7 @@ export class Hologram{
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
- open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
+ open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.scale=this.compact?Math.min(PANEL_SCALE,PANEL_DISTANCE*Math.tan(75*Math.PI/360)*(canvas.clientWidth/Math.max(1,canvas.clientHeight))*.90/.45):PANEL_SCALE;this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}
@@ -154,9 +179,10 @@ export class Hologram{
  focusedId(){return this.focusId}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
-   const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;
-   const v0=1-((row+1)*CELL_H-3)/ATLAS_H,v1=1-(row*CELL_H+3)/ATLAS_H;
-   const halfW=card.w*PANEL_SCALE*.5,halfH=card.h*PANEL_SCALE*.5,c=point(a.center,a.right,a.up,card.x*PANEL_SCALE,card.y*PANEL_SCALE,card.depth*PANEL_SCALE,a.forward);
+   const rect=atlasRect(card,i),u0=rect.x/ATLAS_W,u1=(rect.x+rect.w)/ATLAS_W;
+   const v0=1-(rect.y+rect.h)/ATLAS_H,v1=1-rect.y/ATLAS_H;
+   const scale=this.scale??PANEL_SCALE;
+   const halfW=card.w*scale*.5,halfH=card.h*scale*.5,c=point(a.center,a.right,a.up,card.x*scale,card.y*scale,card.depth*scale,a.forward);
    const quad=[[ -halfW,halfH,u0,v1],[halfW,halfH,u1,v1],[halfW,-halfH,u1,v0],[-halfW,halfH,u0,v1],[halfW,-halfH,u1,v0],[-halfW,-halfH,u0,v0]];
    for(const [x,y,u,v] of quad)vertices.push(...point(c,a.right,a.up,x,y,0,a.forward),u,v,i);
   });
@@ -165,7 +191,7 @@ export class Hologram{
  point(clientX,clientY,rect){this.keyboardMode=false;this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
  aim(player){if(!this.opened)return null;
   if(this.keyboardMode){const index=this.cards.findIndex(c=>c.id===this.focusId);this.hover=index<0?null:{id:this.focusId,index};return this.focusId}
-  const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
+  const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray,this.scale??PANEL_SCALE);this.hover=found;return found?.id||null}
  // Pick synchronously using the same camera projection as the rendered cards.
  // Never act on a hover result cached before the most recent pointer movement.
  pickAt(player,clientX,clientY,rect,{center=false}={}){
@@ -177,40 +203,48 @@ export class Hologram{
  click(){return this.keyboardMode?this.focusId:this.hover?.id||null}
  drawAtlas(){
   const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
-  const fitted=(value,width,size=30)=>{
-   ctx.font=font(size,true);
-   while(ctx.measureText(String(value)).width>width&&size>16){size-=2;ctx.font=font(size,true)}
+  const textFit=(value,maxWidth,size,min=12)=>{
+   let n=size;ctx.font=font(n,true);
+   while(ctx.measureText(String(value)).width>maxWidth&&n>min){n-=1;ctx.font=font(n,true)}
+   return n;
   };
   this.cards.forEach((card,i)=>{
-   const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;
-   const active=card.id==='view:inventory'?this.palette!=='craft':card.id==='view:craft'?this.palette==='craft':
+   const {x,y,w,h}=atlasRect(card,i),cx=x+w*.5;
+   const active=card.id==='view:inventory'?this.palette!=='craft':
+    card.id==='view:craft'?this.palette==='craft':
     card.id.startsWith('tab:')?card.id===`tab:${this.palette}`:
     card.id.startsWith('filter:')?card.id===`filter:${this.craftFilter}`:false;
    const focused=this.keyboardMode&&this.focusId===card.id;
    const ready=card.role==='item'&&this.palette==='craft'&&card.craftable;
-   rounded(ctx,x+5,y+8,w-10,h-16,16,ready?'#213b32ef':active?'#454139ef':'#202a2fee',
+   ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+   rounded(ctx,x+2,y+2,w-4,h-4,Math.min(16,h*.17),
+    ready?'#213b32ef':active?'#454139ef':'#202a2fee',
     focused?'#ffe1ae':ready?'#6fba91':active?'#e1b982':'#67696766');
    if(card.role!=='item'){
     ctx.fillStyle=card.role==='close'?'#f6cfbd':active||focused?'#ffe1b7':'#d8dfdc';
-    fitted(card.name,w-22,card.role==='close'?50:card.role==='view'?35:28);
-    ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9,w-18);ctx.textAlign='left';return;
+    const fontsize=textFit(card.name,w-12,card.role==='close'?Math.min(58,h*.57):Math.min(29,h*.43));
+    ctx.textAlign='center';ctx.fillText(card.name,cx,y+h*.5+fontsize*.34,w-12);
+    ctx.textAlign='left';ctx.restore();return;
    }
    if(this.palette==='craft'&&card.recipe){
-    const cells=recipeGrid(card.recipe),left=x+w/2-43,top=y+20,step=29;
+    const cells=recipeGrid(card.recipe),step=Math.min(25,h*.16),side=step-2,baseX=cx-step*1.5,baseY=y+h*.055;
     for(let k=0;k<9;k++){
-     const px=left+k%3*step,py=top+Math.floor(k/3)*step;
-     ctx.fillStyle='rgba(5,11,13,.55)';ctx.fillRect(px,py,27,27);
-     if(cells[k])drawItemIcon(ctx,cells[k],px+2,py+2,23);
+     const px=baseX+k%3*step,py=baseY+Math.floor(k/3)*step;
+     ctx.fillStyle='rgba(5,11,13,.55)';ctx.fillRect(px,py,side,side);
+     if(cells[k])drawItemIcon(ctx,cells[k],px+1,py+1,side-2);
     }
-    if(ready){ctx.font=font(20,true);ctx.fillStyle='#8de6b6';ctx.textAlign='center';ctx.fillText('제작 가능',x+w/2,y+122);ctx.textAlign='left'}
-   }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+21,96);
-   ctx.textAlign='center';fitted(card.name,176,29);ctx.fillStyle='#f2f4f0';ctx.fillText(card.name,x+w/2,y+163,177);
-   ctx.font=font(20,true);
-   const state=this.palette==='craft'?(ready?`선택하면 제작 ×${card.recipe?.count||1}`:
+   }else{
+    const size=Math.min(78,h*.46);drawItemIcon(ctx,card.blockId,cx-size*.5,y+h*.06,size);
+   }
+   ctx.textAlign='center';const titleSize=textFit(card.name,w-14,Math.min(26,h*.15));
+   ctx.fillStyle='#f2f4f0';ctx.fillText(card.name,cx,y+h*.76+titleSize*.24,w-14);
+   const status=this.palette==='craft'?(ready?`제작 가능 ×${card.recipe?.count||1}`:
     card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':
     card.missing>0?`재료 ${card.missing}개 부족`:'제작 불가'):
     card.count===Infinity?'무제한':`보유 ${card.count||0}`;
-   ctx.fillStyle=ready?'#9de1b5':'#b9c1bb';ctx.fillText(state,x+w/2,y+191,180);ctx.textAlign='left';
+   ctx.fillStyle=ready?'#9de1b5':'#b9c1bb';
+   const size=textFit(status,w-12,Math.min(19,h*.12));
+   ctx.fillText(status,cx,y+h*.92+size*.18,w-12);ctx.textAlign='left';ctx.restore();
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;

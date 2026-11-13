@@ -7,8 +7,10 @@ import {BLOCK as B} from '../src/core/blocks.js';
 test('electricity survival declines smoothly away from the core tower',()=>{
  const distances=[0,60,150,300,450,650];
  const p=distances.map(lightProbability);
- assert.ok(p.every((v,i)=>i===0||v<p[i-1]));
- assert.ok(p[0]>.80&&p.at(-1)<.16);
+ assert.ok(p.every((v,i)=>i===0||v<=p[i-1]));
+ assert.ok(p[0]>.90&&p.at(-1)<=.006);
+ assert.ok(lightProbability(60)<.51&&lightProbability(150)<.23);
+ assert.ok(lightProbability(300)<.01&&lightProbability(450)<=.006);
  assert.ok(decayPressure(450,.8,11,19,9999)>decayPressure(40,.2,11,4,9999));
 });
 test('fixture outcome is stable and follows the same probability for identical coordinates',()=>{
@@ -17,7 +19,7 @@ test('fixture outcome is stable and follows the same probability for identical c
   center+=Number(survivingFixture(B.FLUORESCENT,i,i%20,i*13,371,lightProbability(0))===B.FLUORESCENT);
   outer+=Number(survivingFixture(B.FLUORESCENT,i,i%20,i*13,371,lightProbability(650))===B.FLUORESCENT);
  }
- assert.ok(center>outer*3);
+ assert.ok(center>outer*20);
  assert.equal(survivingFixture(B.FLUORESCENT,12,27,32,371,.5),
   survivingFixture(B.FLUORESCENT,12,27,32,371,.5));
 });

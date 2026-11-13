@@ -1,11 +1,13 @@
 import {hash,clamp} from '../util/math.js';
 
 // Coherent, deterministic city decay. Evaluated once per building/floor, not in a shader.
-export const CITY_DECAY=Object.freeze({lightFloor:.055,lightCore:.82,lightScale:215,damageBase:.10,damageRadial:.49,damageAltitude:.20});
+export const CITY_DECAY=Object.freeze({lightFloor:.005,lightCore:.94,lightLogStrength:.38,lightScale:26,damageBase:.10,damageRadial:.49,damageAltitude:.20});
 export const smooth01=t=>{const v=clamp(t,0,1);return v*v*(3-2*v)};
 export const lightProbability=distance=>{
- const t=Math.max(0,distance)/CITY_DECAY.lightScale;
- return CITY_DECAY.lightFloor+CITY_DECAY.lightCore/(1+t*t);
+ // Negative logarithmic attenuation, clamped to a tiny surviving-light floor.
+ // Compute it only when a city plan is built (and for rare skybridge fittings).
+ return Math.max(CITY_DECAY.lightFloor,CITY_DECAY.lightCore-
+  CITY_DECAY.lightLogStrength*Math.log1p(Math.max(0,distance)/CITY_DECAY.lightScale));
 };
 export const decayPressure=(distance,fraction,buildingId,level,seed)=>{
  const radial=1-lightProbability(distance);

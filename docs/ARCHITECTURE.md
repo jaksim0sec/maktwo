@@ -45,7 +45,7 @@ The city has no per-frame random lighting decisions. The generator evaluates
 a center-tower distance `d = hypot(x-centerX, z-centerZ)` **once per building**,
 then precomputes each floor's age and illumination probability:
 
-- `p_lit(d) = 0.055 + 0.82 / (1 + (d / 215)^2)`
+- `p_lit(d) = max(0.005, 0.94 - 0.38 ln(1 + d / 26))`
 - `damage(d,h) = clamp(0.10 + 0.49(1-p_lit(d)) + 0.20 smoothstep(h) + 0.12 (stratumHash - 0.5), 0, 0.92)`
 - `p_fixture = p_lit(d) * (1 - 0.22 damage)`, where `h = floorIndex / max(1, floorCount-1)`.
 
