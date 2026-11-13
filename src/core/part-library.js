@@ -564,7 +564,7 @@ case 'interior':{
   for(const x of [.083,.869])put(x,.525,.55,.036,.26,.049,metals[1],false,false,{tone:.76});
   break;
  case 'wall':
-  if(v===0||v===4)put(.075,0,.355,.016,1,.035,stones[2],false,false,{tone:.81});
+  // Keep continuous wall finish unornamented; repeated strips read as decals.
   break;
  case 'column':
   if(v===3){
@@ -604,7 +604,7 @@ case 'interior':{
   for(const x of [.166,.813])put(x,.225,.325,.026,.026,.025,metals[3],false,false,{tone:.84});
   break;
  case 'sign':
-  if(v!==1)put(.055,.275,.454,.89,.021,.039,dark,false,false,{tone:.78});
+  // Original sign face already has real trim; do not add another fake band.
   break;
  case 'interior':
   if(v===0){
