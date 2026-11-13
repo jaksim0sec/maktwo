@@ -107,6 +107,30 @@ void main(){
  color+=vec3(.21,.22,.23)*stars*(1.-uClarity);
  frag=vec4(color,1.);
 }`;
+// Depth-aware blur is only enabled by ?farblur=1; near geometry is left sharp.
+const DISTANCE_BLUR_FRAG=`#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D uScene;uniform sampler2D uDepth;
+uniform vec2 uPixel;uniform vec2 uClip;
+out vec4 frag;
+float eyeDepth(float d){return uClip.x*uClip.y/(uClip.y-d*(uClip.y-uClip.x));}
+void main(){
+ vec3 center=texture(uScene,uv).rgb;
+ float depth=texture(uDepth,uv).r;
+ if(depth>=.999999){frag=vec4(center,1.);return;}
+ float amount=smoothstep(30.,110.,eyeDepth(depth));
+ if(amount<=.001){frag=vec4(center,1.);return;}
+ vec2 stepSize=uPixel*(1.75*amount);
+ vec3 accum=center*4.;float weight=4.;
+ for(int i=0;i<4;i++){
+  vec2 offset=i==0?vec2(stepSize.x,0.):i==1?vec2(-stepSize.x,0.):i==2?vec2(0.,stepSize.y):vec2(0.,-stepSize.y);
+  vec2 at=clamp(uv+offset,vec2(0.),vec2(1.));
+  float nearbyDepth=texture(uDepth,at).r;
+  if(nearbyDepth>=.999999||eyeDepth(nearbyDepth)>27.){accum+=texture(uScene,at).rgb;weight+=1.;}
+ }
+ frag=vec4(mix(center,accum/weight,amount*.85),1.);
+}`;
 function shader(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 function program(gl){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,VERT));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,FRAG));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
 function matMultiply(a,b){const o=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++)for(let k=0;k<4;k++)o[j*4+i]+=a[k*4+i]*b[j*4+k];return o}
@@ -117,6 +141,18 @@ export class Renderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyBrightness=0;this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
  // Keep the experimental long-distance impostors opt-in; original city renderer is the default.
   this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')==='1';
+ // Only an explicit test URL allocates the extra shader/framebuffer.
+ this.distanceBlurEnabled=new URLSearchParams(globalThis.location?.search).get('farblur')==='1';
+ this.distanceBlurTarget=null;this.distanceBlurProgram=null;this.distanceBlurUniforms=null;
+ if(this.distanceBlurEnabled)try{
+  const p=gl.createProgram();
+  gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,SKY_VERT));
+  gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,DISTANCE_BLUR_FRAG));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
+  this.distanceBlurProgram=p;
+  this.distanceBlurUniforms={scene:gl.getUniformLocation(p,'uScene'),depth:gl.getUniformLocation(p,'uDepth'),pixel:gl.getUniformLocation(p,'uPixel'),clip:gl.getUniformLocation(p,'uClip')};
+ }catch(error){console.warn('Far blur disabled: shader unavailable',error);this.distanceBlurEnabled=false}
  this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
  this.meshes=new Map();this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
@@ -147,6 +183,36 @@ export class Renderer{
   this.lightWorker.onerror=(error)=>{console.warn('Light Worker unavailable',error.message);this.lightWorker.terminate();this.lightWorker=null;this.lightBusy=false};
  }}catch(error){console.warn('Light Worker unavailable',error)}
  gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.039,.040,.046,1)}
+ prepareDistanceBlur(width,height){
+  const gl=this.gl,old=this.distanceBlurTarget;
+  if(old&&old.width===width&&old.height===height)return true;
+  if(old){gl.deleteFramebuffer(old.fbo);gl.deleteTexture(old.color);gl.deleteTexture(old.depth);this.distanceBlurTarget=null}
+  const fbo=gl.createFramebuffer(),color=gl.createTexture(),depth=gl.createTexture();
+  const setup=texture=>{gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)};
+  try{
+   gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+   setup(color);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
+   setup(depth);gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,width,height,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,depth,0);
+   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('incomplete framebuffer');
+   this.distanceBlurTarget={fbo,color,depth,width,height};return true;
+  }catch(error){
+   console.warn('Far blur disabled: render target unavailable',error);
+   gl.deleteFramebuffer(fbo);gl.deleteTexture(color);gl.deleteTexture(depth);
+   this.distanceBlurEnabled=false;return false;
+  }finally{gl.bindFramebuffer(gl.FRAMEBUFFER,null)}
+ }
+ applyDistanceBlur(width,height,nearPlane,farPlane){
+  const gl=this.gl,t=this.distanceBlurTarget,u=this.distanceBlurUniforms;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,width,height);
+  gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.distanceBlurProgram);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.color);gl.uniform1i(u.scene,0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,t.depth);gl.uniform1i(u.depth,1);
+  gl.uniform2f(u.pixel,1/width,1/height);gl.uniform2f(u.clip,nearPlane,farPlane);
+  gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);gl.bindVertexArray(null);
+  gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
+ }
  upload(data){const gl=this.gl,vao=gl.createVertexArray(),vbo=gl.createBuffer();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,28,24);gl.bindVertexArray(null);return{vao,vbo,count:data.length/7}}
  replace(old,data){if(old)this.dispose(old);return this.upload(data)}
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
@@ -310,6 +376,8 @@ export class Renderer{
   this.walkPhase+=walkingSpeed*dt*2.2;
   const walkSway=Math.sin(this.walkPhase)*this.walkAmount*.012;
   const city=world.mode===CITY_MODE,farLook=city&&this.farEnabled;
+  const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
+  if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
   const fog=[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
@@ -353,6 +421,7 @@ export class Renderer{
 
   const data=this.dynamicData(entities,effects,performance.now()*.001);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
+  if(blurActive)this.applyDistanceBlur(width,height,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:260);
   if(this.hologram?.render(vp,performance.now()*.001))this.lastDrawCalls++;
   player.visualStepOffset=dampStepOffset(player.visualStepOffset,dt);
  }
