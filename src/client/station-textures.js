@@ -65,41 +65,39 @@ export function sampleStationTexture(kind,x,y,size=32){
   f=.84+.21*grain-(v>19?.11+.14*(1-patch):0);
   if(chips<.28&&n>.36){g=1.13;r=.84;b=.89;f*=.73}
   if(seam(v,16,1))f*=.62;break;
- case 10: { // Thin horizontal folded carriage skin, 6px step with scratches.
-  const fold=mod(v,6);
-  f=fold===0?.50:fold===1?.79:fold===2?1.05:.91;
-  if(seam(u+Math.floor(v*.32),23,1)&&n>.36)f*=.70;
-  if(chips<.23&&n>.66)f*=.84;break;
- }
- case 11: // Dusty off-white painted train panels, edge seams and paint chips.
-  f=.95+.07*(patch-.5);
-  if(seam(u,31,1)||seam(v,31,1))f*=.77;
-  if(chips>.86&&n>.72)f*=.65;
-  break;
- case 12: { // Stainless sliding door surface, rubber seals and handle scratches.
-  f=.96+.035*Math.sin(u*2.5);
-  if(u<2||u>29)f*=.42;
-  else if(u<4||u>27)f*=.70;
-  if(v>20&&n>.91)f*=.75;
+ case 10: { // Light sheet metal ribbing, not black repeated stripes.
+  const fold=mod(v,8);
+  f=.925+.075*(grain-.5)+(fold<.6?-.14:fold<1.6?-.05:fold<2.4?.065:0);
+  if(chips<.11&&n>.87)f*=.89;
   break;
  }
- case 13: { // Old smoked glass, greenish reflectance and dusty streaks.
-  f=.88+.08*(grain-.5)+.12*Math.max(0,Math.sin((u+v*.43)*.23));
-  if(Math.abs(v-(u*.3+4))<2)f*=1.1;
-  if(n>.96)f*=.73;
-  r=.90;g=1.01;b=1.05;break;
- }
- case 14: { // Seat upholstery, woven vinyl, split seams and worn center.
-  f=.90+.13*grain;
-  if(seam(u,8,1)&&n<.9)f*=.70;
-  if(seam(v,5,1)&&n<.9)f*=.88;
-  if(u>9&&u<23&&v>12&&v<25&&patch<.52)f*=.76;
+ case 11: // Painted enamel should remain a broad, quiet surface.
+  f=.96+.075*(grain-.5)+.04*(patch-.5);
+  if(v>27&&chips<.22)f*=.93;
+  if(n>.993)f*=.90;
+  break;
+ case 12: { // Brushed stainless steel, with very light directional scuffs.
+  f=.96+.038*(grain-.5)+.018*Math.sin(u*1.8);
+  if(v>28&&chips<.25)f*=.91;
   break;
  }
- case 15: // Non-slip rubber floor with raised stipple dots.
-  f=mod(u,4)===1&&mod(v,4)===1?1.06:.78+.13*grain;
-  if(seam(v,16,1))f*=.61;
+ case 13: { // Smoked glass has no dark painted diagonal.
+  f=.95+.045*(grain-.5);
+  if(v>26&&chips<.30)f*=.92;
+  r=.93;g=1.01;b=1.055;
   break;
+ }
+ case 14: { // Fine vinyl weave; real cushion seams are part geometry.
+  f=.96+.085*(grain-.5)+.026*(n-.5);
+  if(v>27&&patch<.24)f*=.92;
+  r=.965;g=1.025;b=1.025;
+  break;
+ }
+ case 15: { // Matte rubber floor, without an oversized black grid.
+  f=.93+.09*(grain-.5)+.035*(n-.5);
+  if(chips<.13&&n>.86)f*=.90;
+  break;
+ }
  case 16: { // Electrical trunking: lid seam, fixing bolts and dirt.
   f=.85+.11*grain;
   if(seam(v,12,1))f*=.46;

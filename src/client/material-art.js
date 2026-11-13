@@ -32,14 +32,17 @@ function deposits(u,v,seed,gravity=.2){
  const streak=noise(u*.28+1.8*w,v*.045,seed+63)*.7+noise(u*.11,v*.16,seed+64)*.3;
  return clamp(cluster*.8+sm(.55,.78,streak)*gravity*.55);
 }
-function fracture(u,v,seed){
- // Locally branched cracks, instead of a repeated sin() stripe across the full tile.
- const a=[[2,8],[7,10],[11,13],[14,13],[17,17],[19,23],[25,27],[29,29]];
- const b=[[14,13],[17,9],[22,7],[26,3]];
- const c=[[19,23],[14,27],[12,31]];
- const warp=(noise(u*.22,v*.18,seed+3)-.5)*1.15;
- const d=Math.min(nearestLine(u+warp,v,a),nearestLine(u+warp,v,b),nearestLine(u+warp,v,c));
- return 1-sm(.27,.95,d);
+function fracture(u,v,seed,w=16,h=16){
+ // Rare, discontinuous glaze hairlines inside individual cells, not repeated Y graffiti.
+ const col=Math.floor(u/w),row=Math.floor(v/h);
+ const chance=hash(col,row,seed+37);
+ if(chance>.24)return 0;
+ const lx=mod(u,w),ly=mod(v,h),t=ly/h;
+ const phase=hash(col+5,row-7,seed+38)*6.283;
+ const center=w*(.24+.49*t)+Math.sin(t*4+phase)*.66+(noise(lx*.23,ly*.26,seed+39)-.5)*1.15;
+ const taper=sm(.09,.26,t)*(1-sm(.79,.94,t));
+ const interrupted=sm(.32,.48,noise(lx*.21,ly*.20,seed+40));
+ return (1-sm(.21,.73,Math.abs(lx-center)))*taper*interrupted*.63;
 }
 function tile(u,v,w,h,seed,erosion=.12){
  const px=mod(u,w),py=mod(v,h),cx=Math.floor(u/w),cy=Math.floor(v/h),texel=hash(cx,cy,seed);
@@ -110,7 +113,7 @@ function floorwear(u,v,seed){
  return clamp(.68*abrasion+.32*skids);
 }
 const BASE=new Set([22,23,24,25,26,27,28,29,32,34,37,38]);
-const ARCH=new Set([0,2,9,11,14,27,29]);
+const ARCH=new Set([0,2,4,9,11,14,27,29]);
 const STATION=new Set([4,5,6,7,8,9,19]);
 export const hasDetailedMaterial=(group,index)=>group==='base'?BASE.has(index):group==='architecture'?ARCH.has(index):group==='station'?STATION.has(index):group==='extra'?index>=0&&index<4:false;
 
@@ -123,16 +126,17 @@ export function sampleDetailedMaterial(group,index,x,y,size=32){
   case 22:case 23:{const p=concrete(u,v,seed,index===23?'damaged':'plain');l=p.l;r=.98-.035*p.dirt;g=.99;b=1.015+.03*p.pits;break;}
   case 24:case 34:{const p=plaster(u,v,seed,index===34);l=p.l;r=1-.21*p.moldGrowth+.03*p.flaking;g=.985+.025*p.moldGrowth;b=.955-.19*p.moldGrowth;break;}
   case 25:case 37:case 38:{const t=ceramic(u,v,index===38?8:16,index===38?8:16,seed,index===37?.72:.38);const wear=floorwear(u,v,seed);l=t.l-.10*wear;r=1-.035*t.wash;g=.99+.035*(1-wear);b=1.01+.04*t.wash; if(index===37)l-=.10*deposits(u,v,seed+55,.48);break;}
-  case 26:{const t=tile(u,v,16,16,seed,.07),water=deposits(u,v,seed+30,.6),rings=Math.abs(Math.hypot(u-18,v-14)-6.7);l=t.light-.22*water-.13*(1-sm(.3,1.3,rings));r=.99;g=1;b=1.02;break;}
+  case 26:{const t=tile(u,v,16,16,seed,.045),dust=deposits(u,v,seed+30,.16);l=t.light-.08*dust;r=1;g=1;b=1.015;break;}
   case 27:case 28:{const p=metal(u,v,seed,index===28);l=p.l;r=.96+.19*p.corrosion;g=1-.16*p.corrosion;b=1.025-.22*p.corrosion;break;}
   case 29:{const grime=deposits(u,v,seed,.22),finger=sm(.69,.82,noise(u*.19,v*.22,seed+35));l=.99-.22*grime-.10*finger;r=.94;g=1.015;b=1.035;break;}
   case 32:{const p=brick(u,v,16,8,seed),stain=deposits(u,v,seed+16,.25);l=p.light+(.20*(p.brickHash-.5))-.15*stain;r=1.05+.07*(p.brickHash-.5);g=.94-.06*stain;b=.9-.04*stain;break;}
   default:break;
  }else if(group==='architecture')switch(index){
   case 0:case 2:{const p=ceramic(u,v,index===0?8:16,index===0?16:16,seed,.22);l=p.l;r=1.02-.025*p.wash;g=1.015;b=.98+.03*p.wash;break;}
+  case 4:{const p=ceramic(u,v,16,8,seed,.23),crack=fracture(u,v,seed,16,8);l=p.l-.17*crack;r=1.005;g=1.01;b=.985;break;}
   case 9:{const p=stone(u,v,seed,'marble');l=p.l;r=.99-.055*p.vein;g=1.0-.015*p.vein;b=1.01+.025*p.vein;break;}
   case 11:{const p=plaster(u,v,seed,false);l=.97+.55*(p.l-.95);r=1.015;g=1;b=.97;break;}
-  case 14:{const p=concrete(u,v,seed,'plain');const patch=sm(.46,.68,fbm(u*.15,v*.14,seed+60));const border=sm(.37,.48,patch)-sm(.83,.94,patch);l=p.l-.15*patch-.055*border;r=1;g=.995;b=.985;break;}
+  case 14:{const p=concrete(u,v,seed,'plain');const patch=sm(.57,.76,fbm(u*.15,v*.14,seed+60));l=p.l-.075*patch-.025*deposits(u,v,seed+62,.24);r=1;g=.995;b=.985;break;}
   case 27:{const t=tile(u,v,16,16,seed,.08),wear=floorwear(u,v,seed);l=t.light-.17*wear-.12*deposits(u,v,seed+9,.20);r=1.015-.055*wear;g=.97;b=.95;break;}
   case 29:{const row=Math.floor(v/8),pos=mod(v,8),p=grain(u,v,seed+row*13);const joint=edge(pos,.65,.45);const worn=sm(.63,.82,fbm(u*.17,v*.24,seed+28));l=.88+.22*p-.36*joint-.12*worn;r=1.05;g=.95-.055*worn;b=.88;break;}
   default:break;
@@ -140,7 +144,7 @@ export function sampleDetailedMaterial(group,index,x,y,size=32){
   case 4:{const p=ceramic(u,v,16,8,seed,.60),wear=floorwear(u,v,seed);l=p.l-.15*wear;r=.975;g=1;b=.99;break;}
   case 5:{const cellX=mod(u,8)-4,cellY=mod(v,8)-4,d=Math.hypot(cellX,cellY),relief=1-sm(1.5,3.1,d),rim=sm(2.1,3.9,d)*(1-sm(4.2,5.2,d));l=.80+.26*relief-.10*rim-.08*floorwear(u,v,seed);r=1.045;g=1;b=.88;break;}
   case 6:{const stripe=mod(u+v*.85,16),paint=stripe<7.7,wear=floorwear(u,v,seed),chips=sm(.55,.72,fbm(u*.37,v*.28,seed+22));l=(paint?.98:.69)-.27*wear*(.4+.6*chips);r=1.07;g=.99;b=.80;break;}
-  case 7:case 8:case 19:{const p=ceramic(u,v,16,index===8?16:8,seed,index===19?.95:index===8?.62:.51);const f=index===8?fracture(u,v,seed):0;const soot=index===19?deposits(u+1.8,v,seed+35,.48):0;l=p.l-.33*f-.33*soot;r=index===8?.91:1.01;g=index===8?1.025:1.0;b=index===8?1.075:.96;break;}
+  case 7:case 8:case 19:{const p=ceramic(u,v,16,index===8?16:8,seed,index===19?.95:index===8?.62:.51);const f=index===8?fracture(u,v,seed):0;const soot=index===19?deposits(u+1.8,v,seed+35,.48):0;l=p.l-.20*f-.33*soot;r=index===8?.91:1.01;g=index===8?1.025:1.0;b=index===8?1.075:.96;break;}
   case 9:{const p=concrete(u,v,seed,'plain'),moss=deposits(u,v,seed+11,.45);l=p.l-.29*moss;r=1-.21*moss;g=.985+.07*moss;b=.98-.16*moss;break;}
   default:break;
  }else if(group==='extra')switch(index){
