@@ -1,8 +1,8 @@
-import {BLOCK as B,BLOCKS} from '../core/blocks.js';
+import {BLOCK as B,BLOCKS,RETIRED_BLOCK_IDS} from '../core/blocks.js';
 import {SIZE,HEIGHT} from '../core/chunk.js';
 
 // Each full-size textured cube or glass block appears exactly once.
-export const GALLERY_BLOCK_IDS=Object.freeze(BLOCKS.filter(b=>b.id!==B.BEDROCK&&
+export const GALLERY_BLOCK_IDS=Object.freeze(BLOCKS.filter(b=>!RETIRED_BLOCK_IDS.has(b.id)&&b.id!==B.BEDROCK&&
  (b.render==='cube'||b.render==='glass')).map(b=>b.id));
 export const GALLERY_COLUMNS=10,GALLERY_SPACING=3,GALLERY_ORIGIN=4,GALLERY_Y=23;
 export function galleryCoordinate(i){return {x:GALLERY_ORIGIN+(i%GALLERY_COLUMNS)*GALLERY_SPACING,
