@@ -2,8 +2,8 @@ import {BLOCK as B} from './blocks.js';
 import {raycast} from './physics.js';
 
 export const weapons=Object.freeze({
- [B.IRON_BLADE]:{damage:7,length:.94,reach:1.68,windup:.16,swing:.22,recover:.30,hands:1},
- [B.STEEL_BAR]:{damage:11,length:1.24,reach:2.00,windup:.26,swing:.28,recover:.42,hands:2}
+ [B.WOOD_CLUB]:{damage:5,length:1.02,reach:1.76,windup:.27,swing:.25,recover:.32,hands:1,back:1.73,follow:1.08},
+ [B.STEEL_BAR]:{damage:11,length:2.30,reach:2.87,windup:.44,swing:.32,recover:.47,hands:2,back:2.16,follow:1.24}
 });
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const ease=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
@@ -33,15 +33,19 @@ export class Combat{
   const a=this.attack;
   if(!a)return null;
   const {spec,time,side,contact}=a;
-  const travel=ease((time-spec.windup)/spec.swing);
   const charge=ease(time/spec.windup);
-  const recovering=time>=spec.windup+spec.swing||contact!==null;
-  const recovery=ease((time-(contact?contact.time+.065:spec.windup+spec.swing))/spec.recover);
-  const weight=recovering?1-recovery:charge;
-  return {side,id:a.id,weight,arc:(contact?.arc??(.74-1.48*travel))*side,
-   extension:(contact?.extension??(.40+.60*Math.sin(travel*Math.PI)))*weight,
-   yaw:a.yaw,pitch:a.pitch,contact:contact?.distance};
+  const release=(contact?.time??spec.windup+spec.swing)+(contact ? .065 : 0);
+  const settle=1-ease((time-release)/spec.recover);
+  const travel=ease((time-spec.windup)/spec.swing);
+  const arc=time<spec.windup?.27+(spec.back-.27)*charge:
+   contact?.arc??spec.back-(spec.back+spec.follow)*travel;
+  const pull=time<spec.windup?charge:1-ease(travel/.43);
+  const drive=contact?.extension??Math.sin(Math.PI*travel);
+  const recoil=contact?Math.sin(Math.PI*clamp((time-contact.time)/.13,0,1)):0;
+  return {side,id:a.id,weight:charge*settle,arc:(.27+(arc-.27)*settle)*side,
+   pull:pull*settle,extension:drive*settle,recoil,yaw:a.yaw,pitch:a.pitch};
  }
+
  tick(dt,world,entities,player,eyeY,effects){
   const a=this.attack;if(!a)return;
   const old=a.time;a.time+=dt;
@@ -49,8 +53,17 @@ export class Combat{
   if(a.time>=(a.contact?a.contact.time+.065:spec.windup+spec.swing)+spec.recover){this.cancel();return}
   if(a.contact||a.time<spec.windup||old>=spec.windup+spec.swing)return;
   const origin={x:player.x,y:eyeY-.18,z:player.z};
-  const progress=ease((a.time-spec.windup)/spec.swing);
-  const arc=.74-1.48*progress;
+  const start=clamp((old-spec.windup)/spec.swing,0,1);
+  const end=clamp((a.time-spec.windup)/spec.swing,0,1);
+  const samples=Math.max(1,Math.ceil((ease(end)-ease(start))*(spec.back+spec.follow)/.085));
+  for(let i=1;i<=samples;i++){
+   const progress=ease(start+(end-start)*i/samples);
+   if(this.strike(a,world,entities,player,origin,progress,effects))break;
+  }
+ }
+ strike(a,world,entities,player,origin,progress,effects){
+  const {spec}=a;
+  const arc=spec.back-(spec.back+spec.follow)*progress;
   const [x,y,z]=weaponBasis(player.yaw+a.yaw-arc*a.side,player.pitch+a.pitch).forward;
   const ray={x,y,z};
   const reach=spec.reach*(.84+.16*Math.sin(progress*Math.PI));
@@ -63,5 +76,6 @@ export class Combat{
   a.contact={time:a.time,arc,distance,extension:clamp((distance-spec.length)/.62,0,.85)};
   if(hit)hit.entity.hurt(spec.damage,player);
   effects.burst(origin.x+x*distance,origin.y+y*distance,origin.z+z*distance,hit?'#aa8c79':'#9b9b93',4);
+  return true;
  }
 }

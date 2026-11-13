@@ -553,7 +553,7 @@ export class Renderer{
   let yaw=baseYaw,pitch=player.pitch;
   if(swing){
    const {forward,right,up}=weaponBasis(baseYaw,pitch);
-   const shift=eye.map((_,i)=>forward[i]*swing.extension*.19-right[i]*swing.arc*swing.weight*.077-up[i]*swing.weight*.034);
+   const shift=eye.map((_,i)=>forward[i]*(swing.extension*.21-swing.pull*.11-swing.recoil*.085)+right[i]*swing.arc*.055-up[i]*swing.weight*.036);
    const length=Math.hypot(...shift);
    if(length>.001){
     const ray={x:shift[0]/length,y:shift[1]/length,z:shift[2]/length},origin={x:eye[0],y:eye[1],z:eye[2]};
@@ -562,8 +562,8 @@ export class Renderer{
     const available=Math.max(0,Math.min(1,(limit-.09)/length));
     for(let i=0;i<3;i++)eye[i]+=shift[i]*available;
    }
-   yaw+=swing.arc*swing.weight*.11;
-   pitch-=swing.extension*.079;
+   yaw-=swing.arc*swing.weight*.23;
+   pitch+=swing.pull*.061-swing.extension*.10+swing.recoil*.032;
   }
   const [camX,camY,camZ]=eye.map(toMeters);
   const vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));

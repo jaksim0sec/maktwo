@@ -10,8 +10,8 @@ const make=(name,id,count,station,pattern,key,label)=>{
  return Object.freeze({name,id,count,station,pattern:Object.freeze(pattern),key:Object.freeze(key),needs:Object.freeze(needs),label});
 };
 export const RECIPES=Object.freeze([
- make('iron_blade',B.IRON_BLADE,1,'hand',['O','P'],{O:B.ORE,P:B.PLANKS},'고철 단검'),
- make('steel_bar',B.STEEL_BAR,1,'bench',['  O',' O ','O  '],{O:B.ORE},'철제 봉'),
+ make('wood_club',B.WOOD_CLUB,1,'hand',['W','P'],{W:B.WOOD,P:B.PLANKS},'부러진 나무막대'),
+ make('steel_bar',B.STEEL_BAR,1,'bench',['  O',' O ','O  '],{O:B.ORE},'긴 철파이프'),
  make('planks',B.PLANKS,4,'hand',['W'],{W:B.WOOD},'나무 판자 ×4'),
  make('torch',B.TORCH,4,'hand',['P','P'],{P:B.PLANKS},'랜턴 ×4'),
  make('workbench',B.WORKBENCH,1,'hand',['PP','PP'],{P:B.PLANKS},'작업대'),
