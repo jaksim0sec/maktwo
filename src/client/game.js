@@ -1,4 +1,5 @@
-import {WorldManager} from '../core/world.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
+import {WorldManager} from '../core/world.js';
+import {loadWorldSlots,addWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
@@ -13,7 +14,7 @@ const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name));for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world'))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));if(this.world.mode==='parts')this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));const savedPlayer=loadPlayerState(localStorage,this.world.name,this.world.height);if(savedPlayer)Object.assign(this.player,savedPlayer);if(this.world.mode==='parts'&&!savedPlayer)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  bindWorld(){
   this.stopMountEvents?.();
@@ -205,7 +206,9 @@ class Game{
   bindClick('resume',()=>this.requestGameFocus());
   bindClick('help-btn',()=>this.togglePanel('help'));
   bindClick('close-help',()=>this.requestGameFocus());
-  bindClick('save',()=>{this.world.save();this.survivalInventory.save();this.status('월드·소지품 저장 완료')});
+  bindClick('save',()=>{if(this.saveGameState())this.status('게임 · 소지품 저장 완료')});
+   bindClick('new-game',()=>this.createGame());
+   bindClick('load-world',()=>this.loadSelectedGame());
   bindClick('water-repair',()=>{
    const count=this.world.drainPlacedWater(this.player.x,this.player.y,this.player.z,24);
    this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
@@ -219,8 +222,7 @@ class Game{
   bindClick('build-form',()=>this.changeForm());
   bindClick('build-rotate',()=>this.rotateForm());
   this.updateModeControls();
-  const selectWorld=$('world');selectWorld.replaceChildren(...this.worldPresets.filter(preset=>preset.mode==='eternal-city-lab').map(preset=>{const option=document.createElement('option');option.value=preset.name;option.textContent=preset.label;return option}));
-  selectWorld.value=this.world.name;selectWorld.addEventListener('change',e=>this.travel(e.target.value));
+  this.refreshWorldChoices();
   const partSelect=$('part-family-select');if(partSelect){partSelect.replaceChildren(...PART_FAMILIES.map((family,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=family.label+' · 5종';return option}));partSelect.value='0';partSelect.addEventListener('change',e=>{
    if(this.world.mode!=='parts')return;
    const pos=partGallerySpawn(Number(e.target.value));Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.player.yaw=0;this.player.pitch=0;
@@ -285,9 +287,9 @@ class Game{
    if(e.code==='KeyF')this.toggleFlight();
    if(e.code==='KeyR')this.changeForm();
    if(e.code==='KeyT')this.rotateForm();
-   if(e.code==='KeyP'){this.world.save();this.survivalInventory.save()}
+   if(e.code==='KeyP')this.saveGameState()
   });
-  window.addEventListener('beforeunload',()=>{this.world.save();this.survivalInventory.save()});
+  window.addEventListener('beforeunload',()=>{this.saveGameState()});
  }
  select(i,{toggle=true}={}){
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
@@ -303,7 +305,42 @@ class Game{
  renderStatusRing(id,value,max){const el=$(id);if(!el)return;const rounded=Math.ceil(Math.max(0,Math.min(max,value)));if(el.getAttribute('aria-valuenow')===String(rounded))return;el.setAttribute('aria-valuenow',String(rounded));el.querySelector('.ring-fill').setAttribute('stroke-dasharray',`${Math.max(0,Math.min(100,value/max*100))} 100`);el.querySelector('.ring-value').textContent=String(rounded)}
  status(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2100)}
  updatePartGalleryControls(){const panel=$('part-gallery-controls');if(panel)panel.hidden=this.world.mode!=='parts';}
- travel(name){this.survivalInventory.save();this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.player.yaw=0;this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.status('월드 이동: '+worldLabel(name))}
+ saveGameState(){
+  try{
+   if(!this.world.save())throw Error('Unavailable world storage');
+   if(this.survivalInventory.save()===false)throw Error('Unavailable inventory storage');
+   savePlayerState(localStorage,this.world.name,this.player);
+   localStorage.setItem(ACTIVE_WORLD_KEY,this.world.name);return true;
+  }catch(error){
+   console.warn('[MakTwo] Local game save failed',error);
+   this.status('저장 실패 · 브라우저 저장 공간 확인');return false;
+  }
+ }
+ refreshWorldChoices(){
+  const menu=$('world');if(!menu)return;
+  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode==='eternal-city-lab').map(w=>{
+   const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
+  }));
+  menu.value=this.world.name;
+ }
+ createGame(){
+  try{
+   if(!this.saveGameState())return;
+   const rand=new Uint32Array(1);
+   if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(rand);
+   else rand[0]=Math.floor(Math.random()*0x100000000);
+   const nonce=Date.now().toString()+String(Math.floor(Math.random()*1000)).padStart(3,'0');
+   const slot=addWorldSlot(localStorage,rand[0]|0,nonce);
+   this.worldPresets.push(slot);this.manager.add(slot.name,slot.seed,slot.mode);
+   if(this.travel(slot.name)){this.refreshWorldChoices();this.requestGameFocus();}
+  }catch(error){console.warn('[MakTwo] New game failed',error);this.status('새 게임 생성 실패 · 로컬 저장 공간 확인')}
+ }
+ loadSelectedGame(){
+  const name=$('world')?.value;
+  if(!name||!this.manager.worlds.has(name)){this.status('불러올 게임을 선택해 주세요');return}
+  if(name===this.world.name||this.travel(name))this.requestGameFocus();
+ }
+ travel(name){if(!this.saveGameState())return false;this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
  interaction(dt,input){
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
   this.interactTimer=Math.max(0,this.interactTimer-dt);

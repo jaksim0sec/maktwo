@@ -11,7 +11,10 @@ function populate(layout, grid, partitioned, {unit,buildingDensity,highRise}) {
     id:volumes.length, x0:left+x*step, x1:left+(x+w)*step, z0:top+z*step, z1:top+(z+d)*step,
     y0,type,section,support,luxury:weight,gx:x,gz:z,gw:w,gd:d,highRise,
   });
-  const height = (v,desired) => {
+  // Maintain original floor pitch and stair clearance while slightly reducing skyline.
+ const HEIGHT_FACTOR=.92;
+ const height = (v,desired) => {
+   desired=Math.max(1,Math.round(desired*HEIGHT_FACTOR));
     const risers=stairRisers(v,unit);
     if (!risers) return false;
     const pitch=risers*unit/4;
@@ -64,7 +67,7 @@ function populate(layout, grid, partitioned, {unit,buildingDensity,highRise}) {
             const floors=landmark?70+Math.floor(random(17)*11):highRise?Math.min(69,base+Math.floor((7+44*tier)*random(16)**2)):base;
             if(height(candidate,floors) && designBuilding(candidate,unit,random)){
               root=candidate;
-              if(landmark&&root.floors.length>=70)landmarks.add(section.district);
+              if(landmark&&root.floors.length>=Math.round(70*HEIGHT_FACTOR))landmarks.add(section.district);
             }
             break;
           }
