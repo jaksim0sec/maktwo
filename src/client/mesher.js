@@ -298,23 +298,48 @@ export function fixture(dest,id,x,y,z){
   shape(.13,.81,.13,.74,.035,.74,'#a28c6e');
   shape(.17,.849,.17,.66,.016,.66,'#8b775a');
  }else if(isBed(id)){
+  // Two saved cells, one joined mattress; layers are readable without a texture.
   const frame=itemId(id)===B.BED,foot=isBedFoot(id),base=frame?.26:.025;
   const start=foot?0:.055,end=foot?.945:1;
   if(frame){
-   for(const leg of [.12,.78])shape(leg,.02,foot?.82:.065,.10,.25,.11,'#605044');
-   shape(.08,.19,start,.84,.095,end-start,'#78604b');
-   if(!foot)shape(.08,.16,.025,.84,.52,.075,'#6f5947');
+   for(const leg of [.115,.79])shape(leg,.025,foot?.79:.065,.095,.265,.108,'#55473d');
+   for(const side of [.072,.863])shape(side,.185,start,.061,.092,end-start,'#695344');
+   shape(.10,.177,start,.80,.065,end-start,'#826c54');
+   if(!foot){
+    shape(.08,.162,.034,.84,.49,.062,'#745d4b');
+    shape(.11,.585,.025,.78,.056,.076,'#94745d');
+   }else{
+    shape(.10,.20,.882,.80,.215,.066,'#715b4b');
+    shape(.13,.382,.877,.74,.032,.075,'#9b7d66');
+   }
   }
-  shape(.105,base,start,.79,.15,end-start,'#a49c88');
-  shape(.107,base+.13,foot?0:.59,.786,.045,foot?.91:.41,frame?'#687975':'#777568');
-  shape(.12,base+.065,start,.76,.014,end-start,'#877e70');
-  if(!foot)shape(.19,base+.15,.14,.62,.075,.32,'#c0b9a6');
+  shape(.105,base,start,.79,.109,end-start,'#b0aa9a');
+  shape(.112,base+.104,start,.776,.023,end-start,'#d1c7b5');
+  for(const side of [.106,.879])shape(side,base+.029,start,.013,.082,end-start,'#80776c');
+  if(foot){
+   shape(.127,base+.128,.035,.744,.036,.87,'#77817c');
+   shape(.13,base+.160,.052,.739,.012,.793,'#8d9990');
+   shape(.125,base+.157,.846,.749,.020,.042,'#616b68');
+  }else{
+   shape(.127,base+.128,.565,.744,.039,.424,'#798782');
+   shape(.132,base+.165,.576,.734,.012,.035,'#bac1b5');
+   shape(.185,base+.132,.126,.63,.044,.329,'#d4c7b8');
+   shape(.205,base+.175,.157,.59,.013,.267,'#e0d6c6');
+  }
  }else if(id===B.TORCH||id===B.LANTERN){
-  shape(.31,.12,.31,.38,.09,.38,'#746858');
-  shape(.36,.22,.36,.28,.38,.28,'#ffd19a',-1.5);
-  for(const dx of [.3,.64])for(const dz of [.3,.64])shape(dx,.2,dz,.06,.44,.06,'#766b59');
-  shape(.28,.63,.28,.44,.09,.44,'#766b59');
-  shape(.45,.72,.45,.10,.11,.10,'#766b59');
+  // Compact warm emitter behind a metal cage, not a glowing square cabinet.
+  shape(.33,.115,.33,.34,.071,.34,'#63584b');
+  shape(.365,.182,.365,.27,.046,.27,'#9f8e72');
+  shape(.390,.229,.390,.22,.345,.22,'#f8c88b',-1.28);
+  for(const dx of [.342,.618])for(const dz of [.342,.618])
+   shape(dx,.212,dz,.040,.404,.040,'#716656');
+  for(const y of [.218,.598]){
+   shape(.34,y,.336,.32,.032,.040,'#5c524a');
+   shape(.34,y,.618,.32,.032,.040,'#5c524a');
+  }
+  shape(.314,.62,.314,.372,.073,.372,'#766554');
+  shape(.353,.689,.353,.295,.045,.295,'#594e43');
+  shape(.467,.734,.465,.068,.071,.072,'#8c7a63');
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');
@@ -469,6 +494,9 @@ export function gardenMesh(dest,id,x,y,z){
   part(.07,.71,.07,.86,.07,.86,'#614d3a');
   for(const dx of [.11,.72])for(const dz of [.11,.72])part(dx,0,dz,.17,.76,.17,'#8d6b4b',10);
   for(let zRow=0;zRow<3;zRow++)part(.18,.990,.20+zRow*.24,.63,.005,.012,'#735944');
+  part(.12,.63,.11,.76,.071,.13,'#4e4236');
+  part(.21,.664,.094,.24,.030,.029,'#a89173');
+  part(.55,.664,.094,.24,.030,.029,'#a89173');
   return;
  }
  if(id===B.PATH){
