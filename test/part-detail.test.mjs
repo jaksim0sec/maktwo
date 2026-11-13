@@ -11,7 +11,7 @@ import {shapeBoxes} from '../src/core/shapes.js';
 
 const part=(family,variant=0)=>PARTS.find(p=>p.family===family&&p.variant===variant);
 const worlds=()=>new World({mode:'parts',seed:9999});
-test('all 65 part models remain separately placeable with physically clipped 45 degree geometry',()=>{
+test('all 70 part models remain separately placeable with physically clipped 45 degree geometry',()=>{
  assert.equal(PART_FAMILIES.length,14);
  assert.equal(PARTS.length,70);
  for(const item of PARTS){

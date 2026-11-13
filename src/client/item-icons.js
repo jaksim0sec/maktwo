@@ -35,6 +35,12 @@ export function drawShapeIcon(ctx,id){
  // Reuse the component proportions from the world mesh, not a generic cube.
  if(id===B.WORKBENCH)boxes=[{x:.045,y:.77,z:.045,w:.91,h:.22,d:.91},...[.11,.72].flatMap(x=>[.11,.72].map(z=>({x,y:0,z,w:.17,h:.76,d:.17})))];
  if(id===B.FENCE)boxes=[{x:.405,y:0,z:.405,w:.19,h:1.04,d:.19},...[.35,.72].flatMap(y=>[{x:.08,y,z:.442,w:.84,h:.13,d:.116},{x:.442,y,z:.08,w:.116,h:.13,d:.84}])];
+ if(id===B.CRATE)boxes=[
+  {x:.085,y:.06,z:.085,w:.83,h:.75,d:.83,material:B.PLANKS},
+  ...[.10,.34,.58].flatMap(y=>[.074,.86].map(z=>({x:.12,y,z,w:.76,h:.18,d:.032,material:B.WOOD}))),
+  ...[.074,.864].flatMap(x=>[.10,.84].map(z=>({x,y:.08,z,w:.04,h:.71,d:.065,material:B.METAL_PANEL}))),
+  {x:.13,y:.81,z:.13,w:.74,h:.035,d:.74,material:B.PLANKS}
+ ];
  if(id===B.PATH)boxes=[{x:.06,y:.013,z:.06,w:.88,h:.035,d:.88}];
  if(id===B.GLOW_MUSHROOM)boxes=[{x:.45,y:.025,z:.45,w:.10,h:.23,d:.10},{x:.31,y:.235,z:.31,w:.38,h:.12,d:.38}];
  if(id===B.DOOR)boxes=[{x:.05,y:0,z:.42,w:.90,h:.94,d:.12}];
