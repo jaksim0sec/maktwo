@@ -1,7 +1,31 @@
+import {BLOCK as B} from '../core/blocks.js';
 import {weapons,weaponBasis} from '../core/combat.js';
-import {cube,rgb} from './mesher.js';
+import {cube,quad,rgb} from './mesher.js';
 
-const leather=rgb('#564a40'),skin=rgb('#a58d79'),steel=rgb('#8b9491'),wood=rgb('#957655'),grain=rgb('#674d38'),splinter=rgb('#bc9c72'),bar=rgb('#646b6d'),rust=rgb('#755746');
+const steel=rgb('#8b9491'),wood=rgb('#957655'),grain=rgb('#674d38');
+const endGrain=rgb('#b49269'),bar=rgb('#646b6d'),rust=rgb('#755746');
+
+function woodenClub(length){
+ const mesh=[],sides=12;
+ const rings=[[0,.041],[.19,.043],[length*.64,.057],[length-.09,.064],[length,.052]];
+ const points=rings.map(([z,r],ring)=>Array.from({length:sides},(_,i)=>{
+  const angle=i*2*Math.PI/sides;
+  const radius=r*(1+.055*Math.sin(i*4.3));
+  return [Math.cos(angle)*radius,Math.sin(angle)*radius,z+(ring===4?.018*Math.sin(i*2.7):0)];
+ }));
+ for(let ring=1;ring<points.length;ring++)for(let i=0;i<sides;i++){
+  const j=(i+1)%sides;
+  quad(mesh,[points[ring-1][i],points[ring-1][j],points[ring][j],points[ring][i]],
+   i===2||i===8?grain:wood,.80+.19*Math.sin(i*2*Math.PI/sides));
+ }
+ for(const ring of [0,points.length-1])for(let i=0;i<sides;i++){
+  const a=points[ring][i],b=points[ring][(i+1)%sides],center=[0,0,rings[ring][0]];
+  quad(mesh,ring?[center,a,b,b]:[center,b,a,a],endGrain,.84);
+ }
+ return mesh;
+}
+const club=woodenClub(weapons[B.WOOD_CLUB].length);
+
 export function weaponView(combat,eye,yaw,pitch,time,walk,wallDistance){
  const vertices=[],base=weaponBasis(yaw,pitch),attack=combat.pose();
  for(const side of [1,-1]){
@@ -30,23 +54,13 @@ export function weaponView(combat,eye,yaw,pitch,time,walk,wallDistance){
   for(let i=0;i<3;i++)center[i]-=aim.forward[i]*retract;
   const piece=(x,y,z,w,h,d,color)=>cube(vertices,x,y,z,w,h,d,color,.90);
   const begin=vertices.length;
-  const grip=(x,z)=>{
-   piece(x-.067,-.067,z,.134,.134,.16,skin);
-   piece(x-.077,-.104,z-.15,.154,.13,.19,leather);
-  };
-  piece(-.033,-.029,-.18,.066,.058,.29,leather);
   if(spec.hands===2){
    piece(-.041,-.036,.10,.082,.072,spec.length-.10,bar);
    for(const z of [.58,1.52,2.10])piece(-.043,-.038,z,.086,.076,.075,rust);
    piece(-.046,-.039,spec.length-.04,.092,.078,.065,steel);
-   grip(-side*.055,.29);
   }else{
-   piece(-.052,-.042,.08,.105,.084,spec.length-.19,wood);
-   piece(-.049,.042,.12,.018,.008,spec.length-.26,grain);
-   piece(.016,-.032,spec.length-.11,.036,.060,.13,splinter);
-   piece(-.039,-.027,spec.length-.11,.051,.053,.075,wood);
+   for(const value of club)vertices.push(value);
   }
-  grip(side*.038,-.055);
   for(let i=begin;i<vertices.length;i+=7){
    const x=vertices[i],y=vertices[i+1],z=vertices[i+2];
    // The camera looks down -Z. Reverse the local X axis to preserve winding.
