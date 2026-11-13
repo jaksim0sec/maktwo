@@ -94,6 +94,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,
         small?0:TYPES[program],section,null,layout.floorY,local);
       v.program=small?'shops':program;
       v.phase=random(94);
+      v.moreBridges=cityBlueprints;
       if(small) {
         const frontage=[[0,-1],[1,0],[0,1],[-1,0]].findIndex(([dx,dz])=>
           a+dx>=0&&a+dx<size&&b+dz>=0&&b+dz<size&&lanes[(b+dz)*size+a+dx]);

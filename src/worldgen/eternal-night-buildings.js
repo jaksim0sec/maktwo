@@ -125,6 +125,8 @@ export function designBuilding(volume, unit, random) {
   const floors=[], stairs=[], ports=[];
   const highRise=volume.highRise;
   const skyLevels=new Set(highRise?[12,26,46,69,94,129,171,220,275,337,407,482,560,635].map(y=>Math.round((y+((volume.precinct??0)%5-2)*1.25)/storeyHeight)).filter(i=>i>0&&i<count):[]);
+  const extraBridgeLevels=new Set(volume.moreBridges?[35,81,149]
+    .map(y=>Math.round(y/storeyHeight)).filter(level=>level>1&&level<count-1):[]);
   const capX=Math.max(0,hw-Math.max(eu+unit,4*unit));
   const capZ=Math.max(0,Math.min(hd-near-2*unit,atrium?hd*.30:Infinity));
   const retreat=Math.min(capX*(highRise?.82:1),capZ*(highRise?.58:1),hw*(highRise?.17+.16*random(72):.09+.12*random(72)),(highRise?7:3)*unit);
@@ -258,7 +260,7 @@ export function designBuilding(volume, unit, random) {
     if(hasAtrium)holes.push(atrium);
     if(shape.voidRect&&(level>0||shape.blueprint==='ring'))holes.push(shape.voidRect);
     floors.push({...shape,band,key,program,level,y,top:y+storeyHeight,holes,doors:[]});
-    if (level!==entryLevel && level!==0 && !skyLevels.has(level)) continue;
+    if (level!==entryLevel && level!==0 && !skyLevels.has(level) && !extraBridgeLevels.has(level)) continue;
     const slots=shape.ports??[
       {u:0,v:-shape.frontDepth,dx:0,dz:-1,edge:0},
       {u:0,v:shape.backDepth,dx:0,dz:1,edge:shape.rearEdge},

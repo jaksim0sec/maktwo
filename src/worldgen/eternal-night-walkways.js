@@ -15,6 +15,29 @@ function octilinear(a,b) {
   return [[a,[a[0]+x,a[1],a[2]+z],b],[a,[b[0]-x,a[1],b[2]-z],b]].map(dedup);
 }
 
+function bridgePaths(start,s,t,end) {
+  const [ax,y,az]=s,[bx,,bz]=t;
+  const diagonal=Math.min(Math.abs(bx-ax),Math.abs(bz-az));
+  const x=Math.sign(bx-ax)*diagonal/2,z=Math.sign(bz-az)*diagonal/2;
+  const paths=[...octilinear(s,t),[s,[bx,y,az],t],[s,[ax,y,bz],t],
+    [s,[ax+x,y,az+z],[bx-x,y,bz-z],t]];
+  const ranked=[];
+  for(const candidate of paths){
+    const path=dedup(candidate);
+    let bends=0,length=0,valid=true;
+    const points=[start,...path,end];
+    for(let i=1;i<points.length-1;i++){
+      const a=points[i-1],b=points[i],c=points[i+1];
+      const dx=b[0]-a[0],dz=b[2]-a[2],ex=c[0]-b[0],ez=c[2]-b[2];
+      if(dx*ex+dz*ez<-EPS){valid=false;break;}
+      if(Math.abs(dx*ez-dz*ex)>EPS)bends++;
+      length+=distance(b,c);
+    }
+    if(valid&&path.length>=2)ranked.push({path,score:length+bends*2.5});
+  }
+  return ranked.sort((a,b)=>a.score-b.score).map(({path})=>path);
+}
+
 function distanceToSegment(a,b,x,z) {
   const dx=b[0]-a[0],dz=b[2]-a[2];
   const t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[2])*dz)/(dx*dx+dz*dz||1)));
@@ -48,7 +71,7 @@ function openPort(port,buildings) {
   buildings[port.building].floors[port.level].doors.push(port);
 }
 
-function makeWalkway(kind,ports,points,width,unit) {
+function makeWalkway(kind,ports,points,width,unit,angular=false) {
   const segments=[];
   const stairs=stairModule(unit);
   for(let i=1;i<points.length;i++) {
@@ -69,7 +92,9 @@ function makeWalkway(kind,ports,points,width,unit) {
     segments.push(shape);
   }
   const joints=distance(points[0],points.at(-1))<EPS?points.slice(0,-1):points.slice(1,-1);
-  const landings=joints.map(([x,y,z])=>({y,outline:DIR.map(([dx,dz])=>{
+  const bevel=Math.SQRT2-1;
+  const corners=[[1,bevel],[bevel,1],[-bevel,1],[-1,bevel],[-1,-bevel],[-bevel,-1],[bevel,-1],[1,-bevel]];
+  const landings=joints.map(([x,y,z])=>({y,outline:angular?corners.map(([dx,dz])=>[x+dx*width/2,z+dz*width/2]):DIR.map(([dx,dz])=>{
     const scale=width/(2*Math.hypot(dx,dz));
     return [x+dx*scale,z+dz*scale];
   })}));
@@ -84,7 +109,7 @@ export function segmentY(segment,x,z) {
   return from[1]+Math.sign(to[1]-from[1])*count*rise;
 }
 
-export function designWalkways(layout,grid,buildings,occupied,unit,highRise=false) {
+export function designWalkways(layout,grid,buildings,occupied,unit,highRise=false,angular=false) {
   const roots=buildings.filter(b=>b.support===null);
   const {left,top,step,size}=grid;
   const bridges=[],walkways=[];
@@ -265,7 +290,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   }
 
   // Only inspect ports in nearby buckets. Route an initial flat landing out of both doors.
-  const limit=Math.max(step*(highRise?4.2:3),unit*12), buckets=new Map();
+  const limit=Math.max(step*(angular?4.7:highRise?4.2:3),unit*12), buckets=new Map();
   const bucket=(x,z)=>`${Math.floor(x/limit)},${Math.floor(z/limit)}`;
   const bridgePorts=highRise?roots.flatMap(b=>b.ports.filter(p=>p.level>0&&p.y+4<layout.floorTop)):publicPorts;
   for(const p of bridgePorts) {
@@ -294,7 +319,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     if(used.has(a)||used.has(b)||connected.has(pair)||(degrees.get(aKey)||0)>=capacity||(degrees.get(bKey)||0)>=capacity)continue;
     const start=portPoint(a),end=portPoint(b),s=stub(a,Math.max(unit*1.1,margin+.02)),t=stub(b,Math.max(unit*1.1,margin+.02));
     if(!clearDeck(start,s,a.building)||!clearDeck(t,end,b.building))continue;
-    for(const path of octilinear(s,t)) {
+    for(const path of angular?bridgePaths(start,s,t,end):octilinear(s,t)) {
       if(path.length<2)continue;
       // Put the level change in the longest span. Bends stay level with a landing.
       let ramp=1;
@@ -302,7 +327,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
       const points=[start,...path.map(([x,,z],i)=>[x,i<ramp?a.y:b.y,z]),end];
       if(points.slice(1).some((p,i)=>!clearExisting(points[i],p) ||
         (i>0&&i<points.length-2&&!clearDeck(points[i],p))))continue;
-      const link=makeWalkway('bridge',[a,b],points,width,unit);
+      const link=makeWalkway('bridge',[a,b],points,width,unit,angular);
       if(!link)continue;
       if(highRise) {
         const siteKey=a.building+':'+b.building;

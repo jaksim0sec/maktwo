@@ -327,7 +327,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   const partitioned=partition(layout,grid);
   const {volumes,occupied,roofLinks,precincts,lanes}=highRise?
     populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints:options.cityBlueprints},fract):populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
-  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise);
+  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise,highRise&&options.cityBlueprints!==false);
   for(const link of roofLinks){link.id=walkways.length;walkways.push(link);}
   if(highRise)assignPrecinctLuxury(layout,volumes,walkways);
   const columns=Array.from({length:cells},()=>[]);
