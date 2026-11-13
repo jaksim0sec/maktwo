@@ -7,7 +7,7 @@ const endGrain=rgb('#b49269'),bar=rgb('#646b6d'),rust=rgb('#755746');
 
 function woodenClub(length){
  const mesh=[],sides=12;
- const rings=[[0,.041],[.19,.043],[length*.64,.057],[length-.09,.064],[length,.052]];
+ const rings=[[-.17,.041],[.19,.043],[length*.64,.057],[length-.09,.064],[length,.052]];
  const points=rings.map(([z,r],ring)=>Array.from({length:sides},(_,i)=>{
   const angle=i*2*Math.PI/sides;
   const radius=r*(1+.055*Math.sin(i*4.3));
@@ -33,14 +33,16 @@ export function weaponView(combat,eye,yaw,pitch,time,walk,wallDistance){
   if(!id)continue;
   const spec=weapons[id],active=attack?.side===side,weight=active?attack.weight:0;
   const yieldHand=attack&&!active?attack.weight:0;
-  const angle=active?attack.arc:side*.27;
+  // Angle across the lower corner so the shaft reads at full length.
+  const idleAngle=-side*.38;
+  const angle=active?idleAngle+(attack.arc-idleAngle)*weight:idleAngle;
   const pull=active?attack.pull:0,recoil=active?attack.recoil:0;
   const aim=weaponBasis(yaw+(attack?.yaw??0)*weight-angle,
-   pitch+.69*(1-weight)+pull*.33+(attack?.pitch??0)*weight);
+   pitch+.39*(1-weight)+pull*.33+(attack?.pitch??0)*weight);
   const swing=active?attack.extension:0;
-  const center=eye.map((v,i)=>v+base.forward[i]*(.59+.20*swing-.57*pull-.10*recoil)+
-   base.right[i]*side*(.35+.12*yieldHand-.19*weight+.27*pull)+
-   base.up[i]*(-.29-.11*yieldHand+.07*swing+.17*pull+Math.sin(time*8)*walk*.013));
+  const center=eye.map((v,i)=>v+base.forward[i]*(.26+.32*weight+.20*swing-.57*pull-.10*recoil)+
+   base.right[i]*side*(.50+.12*yieldHand-.34*weight+.27*pull)+
+   base.up[i]*(-.43+.14*weight-.11*yieldHand+.07*swing+.17*pull+Math.sin(time*8)*walk*.013));
   const offset=center.map((v,i)=>v-eye[i]),distance=Math.hypot(...offset);
   const shoulder={x:offset[0]/distance,y:offset[1]/distance,z:offset[2]/distance};
   const gripRoom=wallDistance(eye,shoulder,distance+.06);
@@ -48,14 +50,14 @@ export function weaponView(combat,eye,yaw,pitch,time,walk,wallDistance){
   for(let i=0;i<3;i++)center[i]=eye[i]+offset[i]*gripScale;
   const [dx,dy,dz]=aim.forward;
   const room=wallDistance(center,{x:dx,y:dy,z:dz},spec.length+.15);
-  // Pull the entire weapon back along its axis instead of drawing a blade
+  // Pull the entire weapon back along its axis to avoid drawing it
   // through the wall (also applies to the idle pose).
   const retract=Math.max(0,spec.length+.13-room);
   for(let i=0;i<3;i++)center[i]-=aim.forward[i]*retract;
   const piece=(x,y,z,w,h,d,color)=>cube(vertices,x,y,z,w,h,d,color,.90);
   const begin=vertices.length;
   if(spec.hands===2){
-   piece(-.041,-.036,.10,.082,.072,spec.length-.10,bar);
+   piece(-.041,-.036,-.22,.082,.072,spec.length+.22,bar);
    for(const z of [.58,1.52,2.10])piece(-.043,-.038,z,.086,.076,.075,rust);
    piece(-.046,-.039,spec.length-.04,.092,.078,.065,steel);
   }else{
