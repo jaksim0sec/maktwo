@@ -39,15 +39,17 @@ export function stationPartGeometry(id){
   add(.03,0,.465,.94,.11,.065,skin,true);
   add(.03,.92,.465,.94,.08,.065,skin,true);
   if(p.variant===0){
-   add(.06,.13,.477,.88,.76,.045,skin,true);
-   for(const y of [.26,.50,.74])add(.055,y,.452,.89,.025,.04,metal);
-   add(.08,.15,.447,.06,.69,.025,enamel);
+   add(.06,.13,.477,.88,.76,.045,enamel,true);
+   add(.055,.25,.449,.89,.025,.04,metal);
+   add(.055,.67,.449,.89,.018,.04,skin);
+   add(.055,.76,.448,.89,.015,.045,metal);
   }else if(p.variant===1){
-   add(.05,.12,.48,.90,.20,.055,enamel,true);
-   add(.105,.37,.48,.79,.45,.018,glass,false,true);
-   for(const y of [.34,.82])add(.08,y,.446,.84,.038,.085,metal);
-   for(const x of [.075,.885])add(x,.35,.446,.04,.51,.087,metal);
-   add(.20,.87,.44,.59,.025,.09,enamel);
+   add(.05,.12,.48,.90,.21,.055,enamel,true);
+   add(.095,.37,.48,.81,.45,.018,glass,false,true);
+   for(const y of [.345,.82])add(.075,y,.444,.85,.034,.084,metal);
+   for(const x of [.078,.887])add(x,.35,.445,.036,.50,.082,metal);
+   add(.09,.89,.445,.82,.025,.085,enamel);
+   add(.12,.32,.444,.76,.020,.09,metal);
   }else{
    // Dedicated two-leaf sliding door: seam, track, recessed window and pull.
    const left=p.variant===2;
@@ -63,25 +65,28 @@ export function stationPartGeometry(id){
   break;
  }
  case 'trainInterior':{
-  if(p.variant===0){ // Actual bench seat, feet and separate reclining back.
-   for(const x of [.05,.68])add(x,.05,.22,.085,.32,.54,metal,true);
-   add(.04,.37,.16,.88,.115,.69,'TRAIN_SEAT',true);
-   add(.04,.48,.70,.88,.41,.115,'TRAIN_SEAT',true);
-   add(.09,.47,.12,.77,.032,.09,metal);
-   for(const x of [.43,.89])add(x,.48,.20,.025,.35,.55,metal);
-   add(.07,.86,.70,.83,.045,.13,metal);
+  if(p.variant===0){ // Three separate vinyl cushions on a common steel support.
+   for(const x of [.07,.82])add(x,.06,.23,.075,.31,.53,metal,true);
+   add(.05,.34,.19,.90,.075,.60,metal,true);
+   for(let j=0;j<3;j++){
+    const x=.065+j*.295;
+    add(x,.405,.20,.265,.105,.49,'TRAIN_SEAT',true);
+    add(x,.515,.705,.265,.335,.11,'TRAIN_SEAT',true);
+   }
+   add(.07,.85,.69,.84,.04,.14,metal);
+   add(.09,.43,.15,.82,.025,.07,metal);
   }else if(p.variant===1){
    add(.47,0,.47,.062,1,.062,metal,true);
    add(.38,.92,.45,.24,.035,.10,metal);
    for(const y of [.23,.73])add(.425,y,.42,.15,.035,.14,metal);
-  }else if(p.variant===2){ // Real hollow hanging straps, not painted rectangles.
-   add(.06,.94,.43,.88,.045,.13,metal);
+  }else if(p.variant===2){ // Roof-mounted suspended grips, thinner than the old frame.
+   add(.06,.94,.43,.88,.043,.13,metal);
    for(const x of [.16,.47,.78]){
-    add(x,.71,.48,.042,.22,.05,metal);
-    add(x-.035,.62,.465,.112,.035,.08,metal);
-    add(x-.035,.55,.465,.032,.12,.08,'TRAIN_RUBBER');
-    add(x+.045,.55,.465,.032,.12,.08,'TRAIN_RUBBER');
-    add(x-.035,.54,.465,.11,.028,.08,'TRAIN_RUBBER');
+    add(x+.032,.76,.485,.025,.18,.045,metal);
+    add(x,.70,.465,.090,.067,.08,'TRAIN_RUBBER');
+    add(x,.58,.465,.025,.12,.08,'TRAIN_RUBBER');
+    add(x+.065,.58,.465,.025,.12,.08,'TRAIN_RUBBER');
+    add(x,.565,.465,.09,.031,.08,'TRAIN_RUBBER');
    }
   }else if(p.variant===3){
    for(const x of [.08,.88])add(x,.50,.80,.035,.39,.05,metal);
