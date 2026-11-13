@@ -7,7 +7,7 @@ import {shapeBoxes} from '../src/core/shapes.js';
 import {meshChunk} from '../src/client/mesher.js';
 import {partPosition} from '../src/worldgen/part-gallery.js';
 
-test('13 part families have five true independent block types',()=>{
+test('14 part families have five distinct placeable models',()=>{
  assert.equal(PART_FAMILIES.length,14);assert.equal(PARTS.length,70);
  const signatures=new Set();
  for(const part of PARTS){
@@ -24,7 +24,7 @@ test('13 part families have five true independent block types',()=>{
    assert.ok(b.material>=86&&b.material<=115);
   }
  }
- assert.equal(signatures.size,65,'shape variants must differ');
+ assert.equal(signatures.size,70,'all 70 shape variants must differ after renovation');
 });
 test('vents, signs, balconies and stairs render as separate clickable primitives',()=>{
  const w=new World({mode:'parts',seed:9999});
