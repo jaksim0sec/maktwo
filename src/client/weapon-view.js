@@ -40,7 +40,7 @@ export function weaponView(combat,eye,yaw,pitch,time,walk,wallDistance){
   const aim=weaponBasis(yaw+(attack?.yaw??0)*weight-angle,
    pitch+.39*(1-weight)+pull*.33+(attack?.pitch??0)*weight);
   const swing=active?attack.extension:0;
-  const center=eye.map((v,i)=>v+base.forward[i]*(.26+.32*weight+.20*swing-.57*pull-.10*recoil)+
+  const center=eye.map((v,i)=>v+base.forward[i]*(.06+.52*weight+.20*swing-.57*pull-.10*recoil)+
    base.right[i]*side*(.50+.12*yieldHand-.34*weight+.27*pull)+
    base.up[i]*(-.43+.14*weight-.11*yieldHand+.07*swing+.17*pull+Math.sin(time*8)*walk*.013));
   const offset=center.map((v,i)=>v-eye[i]),distance=Math.hypot(...offset);
