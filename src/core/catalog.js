@@ -1,4 +1,4 @@
-import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId} from './blocks.js';
+import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId,RETIRED_BLOCK_IDS} from './blocks.js';
 import {RECIPES} from './crafting.js';
 import {CITY_MODE,CITY_SEED} from '../worldgen/eternal-night-game.js';
 import {PART_ID_START} from './part-library.js';
@@ -16,9 +16,9 @@ export const WORLD_PRESETS=Object.freeze([
 ]);
 const placeables=new Set([
  B.WOOD_CLUB,B.STEEL_BAR,...LIGHTBAR,B.FLUORESCENT,B.ROUND_FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.CRATE,B.BED,B.MATTRESS,B.FLOWER_POT,
- B.FLOWER,B.GLOW_MUSHROOM,B.REEDS,B.HEATHER,B.BLUE_FLOWER,B.FIREFLY_GRASS,
+ B.FLOWER,B.GLOW_MUSHROOM,B.REEDS,B.FIREFLY_GRASS,
 ]);
-const visible=BLOCKS.filter(({id})=>id!==B.AIR&&id!==B.BEDROCK&&id!==B.DOOR_TOP&&id!==B.PORTAL&&itemId(id)===id).map(({id})=>id);
+const visible=BLOCKS.filter(({id})=>!RETIRED_BLOCK_IDS.has(id)&&id!==B.AIR&&id!==B.BEDROCK&&id!==B.DOOR_TOP&&id!==B.PORTAL&&itemId(id)===id).map(({id})=>id);
 export const isPlaceableItem=id=>placeables.has(id);
 export const CREATIVE_ITEMS=Object.freeze(visible);
 export const PALETTES=Object.freeze({
