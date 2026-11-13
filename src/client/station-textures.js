@@ -14,21 +14,18 @@ export function sampleStationTexture(kind,x,y,size=32){
  let f=.90+.13*(patch-.5)+.055*(n-.5),r=1,g=1,b=1;
  switch(kind){
  case 0: { // Chipped ballast stones, dark gaps and occasional pale mineral.
-  const cx=u>>2,cy=v>>2,q=noise(cx,cy,19),edge=mod(u,4)===0||mod(v,4)===0;
-  f=edge?.42+q*.14:.73+q*.33;
-  if(n>.89)f*=1.11;break;
+  const dx=mod(u,5)-2,dy=mod(v+2*(Math.floor(u/5)&1),5)-2;
+  const rock=noise(Math.floor(u/5),Math.floor(v/5),19);
+  f=dx*dx+dy*dy<4.8?.77+rock*.25:.46+grain*.19;
+  f+=(n-.5)*.08;break;
  }
- case 1: // Deep black oil running along the ends of old timber ties.
-  f=.78+.16*grain+.07*Math.sin(v*1.18+Math.sin(u*.32));
-  if(seam(u,12,1))f*=.55;
-  if(v>23&&chips<.27)f*=.73;
-  if((u===7||u===25)&&(v===4||v===28))f*=.58;
+ case 1: // Stained longitudinal timber with narrow grain, without tile seams.
+  f=.78+.16*grain+.06*Math.sin(v*1.18+Math.sin(u*.32));
+  if(v<4||v>27)f*=.73;
   break;
- case 2: // Running-rail crown, broad specular band, narrow oxidized edge.
-  f=.73+.20*patch+((u>12&&u<18)? .20:0);
-  if(line(u,6)||line(u,27))f*=.54;
-  if(n>.985)f*=.72;
-  break;
+ case 2: // The raised crown itself provides the continuous bright edge.
+  f=.96+.035*(n-.5)+.035*Math.sin(v*.67);
+  r=1.02;g=1;b=.94;break;
  case 3: // Steel darkened by oily grease beneath running rail.
   f=.66+.24*grain;if(v>19&&patch<.5)f*=.67;
   if(seam(v,7,1))f*=.79;break;

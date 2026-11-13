@@ -14,7 +14,7 @@ import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
  constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false);this.chunks.set(k,c);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms??=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
  c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);this.events.emit('chunk-load',c)}return c}
@@ -158,7 +158,9 @@ export class World{
   const lx=x-cx*SIZE,lz=z-cz*SIZE,idx=Chunk.index(lx,y,lz),oldId=c.data[idx],oldForm=c.forms?.[idx]||0;
   if(oldId===id&&oldForm===form)return false;
   const oldBedFacing=oldId!==id&&isBed(oldId)?this.getShapeState(x,y,z).facing:null;
-  c.set(lx,y,lz,id);if(c.styles)c.styles[idx]=0;
+  c.set(lx,y,lz,id);
+  if(this.trainColliders?.length)this.trainObstacleRevision=(this.trainObstacleRevision??0)+1;
+  if(c.styles)c.styles[idx]=0;
   if(oldForm!==form){
    if(!c.forms)c.forms=new Uint8Array(c.data.length);
    c.forms[idx]=form;
@@ -241,7 +243,7 @@ export class World{
  }
  snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,time:this.time,edits,states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
- stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
+ stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  spawn(){
   if(this.mode===CITY_MODE){
    let fallback;

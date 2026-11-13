@@ -292,6 +292,50 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     add(makeWalkway('tower',towerPorts,corners,Math.min(width,r),unit));
   }
 
+  for(const site of grid.stations??[]){
+    site.exits=[];
+    const xAxis=site.axis==='x';
+    const aCenter=xAxis?site.x:site.z,cCenter=xAxis?site.z:site.x;
+    const halfLength=xAxis?(site.bounds.x1-site.bounds.x0)/2:(site.bounds.z1-site.bounds.z0)/2;
+    const halfWidth=xAxis?(site.bounds.z1-site.bounds.z0)/2:(site.bounds.x1-site.bounds.x0)/2;
+    const coord=(a,c,y)=>xAxis?[a,y,c]:[c,y,a];
+    const stationWidth=width+.45;
+    for(const side of [-1,1]){
+      const candidates=[];
+      for(const root of roots)for(const p of root.ports){
+        if(used.has(p)||Math.abs(p.y-site.y)>unit*9)continue;
+        const a=xAxis?p.x:p.z,c=xAxis?p.z:p.x;
+        const outward=xAxis?p.dz:p.dx;
+        if((c-cCenter)*side<halfWidth+2||Math.abs(a-aCenter)>halfLength+36||outward*side>0)continue;
+        const align=Math.max(aCenter-halfLength+7,Math.min(aCenter+halfLength-7,a));
+        const outside=coord(align,cCenter+side*(halfWidth+margin+.95),site.y);
+        if(distance(portPoint(p),outside)>75)continue;
+        candidates.push({p,align,outside,score:distance(portPoint(p),outside)+Math.abs(p.y-site.y)*2});
+      }
+      for(const {p,align,outside} of candidates.sort((a,b)=>a.score-b.score)){
+        const start=portPoint(p),stubOut=stub(p,margin+.60);
+        if(!clearDeck(start,stubOut,p.building)||!clearExisting(start,stubOut))continue;
+        const platform=coord(align,cCenter+side*(halfWidth-2.1),site.y);
+        const routes=bridgePaths(start,stubOut,outside,platform);
+        let connected=false;
+        for(const route of routes){
+          let grade=1;
+          for(let i=2;i<route.length;i++)if(distance(route[i-1],route[i])>distance(route[grade-1],route[grade]))grade=i;
+          const middle=route.map(([x,,z],i)=>[x,i<grade?p.y:site.y,z]);
+          if(middle.slice(1).some((point,i)=>!clearDeck(middle[i],point)||!clearExisting(middle[i],point)))continue;
+          const entry={x:platform[0],y:platform[1],z:platform[2],building:null,open:true};
+          const link=makeWalkway('station',[p,entry],[start,...middle,platform],stationWidth,unit,true);
+          if(!link)continue;
+          link.architecture='enclosed';link.stationId=site.id;
+          add(link);used.add(p);
+          site.exits.push({side,along:align-aCenter,width:stationWidth+1});
+          connected=true;break;
+        }
+        if(connected)break;
+      }
+    }
+  }
+
   // Only inspect ports in nearby buckets. Route an initial flat landing out of both doors.
   const limit=Math.max(step*(angular?4.7:highRise?4.2:3),unit*12), buckets=new Map();
   const bucket=(x,z)=>`${Math.floor(x/limit)},${Math.floor(z/limit)}`;
@@ -318,6 +362,9 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   for(const [,a,b] of pairs.sort((p,q)=>p[0]-q[0])) {
     const key=p=>`${p.building}:${highRise?p.level:0}`;
     const aKey=key(a),bKey=key(b),pair=`${aKey}/${bKey}`;
+    // Preserve the primary links, then thin the optional repeats.
+    const repeats=(degrees.get(aKey)||0)+(degrees.get(bKey)||0);
+    if(highRise&&repeats>0&&(a.building*3+b.building+a.level+b.level)%5===0)continue;
     const capacity=highRise?3:2;
     if(used.has(a)||used.has(b)||connected.has(pair)||(degrees.get(aKey)||0)>=capacity||(degrees.get(bKey)||0)>=capacity)continue;
     const start=portPoint(a),end=portPoint(b),s=stub(a,Math.max(unit*1.1,margin+.02)),t=stub(b,Math.max(unit*1.1,margin+.02));

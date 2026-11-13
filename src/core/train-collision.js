@@ -1,50 +1,91 @@
-// Lightweight physical proxies for entity trains. World voxels remain untouched.
-// Fixed-size AABB ranges are checked only for a nearby carriage, with no mesh walks.
-const overlaps=(a,b,c,d)=>a<d-1e-5&&b>c+1e-5;
+import {TRAIN} from '../worldgen/station-train.js';
+import {BLOCK as B} from './blocks.js';
+import {SIZE} from './chunk.js';
+
+const overlap=(a,b,c,d)=>a<d-1e-5&&b>c+1e-5;
+const crossMin=TRAIN.center-TRAIN.halfWidth,crossMax=TRAIN.center+TRAIN.halfWidth;
+
+export function localTrainPoint(e,x,y,z){
+ return e.train.axis==='x'?[x-e.x,y-e.y,z-e.z]:[z-e.z,y-e.y,x-e.x];
+}
+
+// Proxies are aligned to the same shell dimensions as the render mesh.
+export function* trainShell(e){
+ const {start,end,doors}=e.train;
+ yield [start,0,crossMin,end+1,TRAIN.deck,crossMax];
+ yield [start,TRAIN.ceiling,crossMin,end+1,TRAIN.roof,crossMax];
+ yield [start,TRAIN.deck,crossMin,start+.17,TRAIN.ceiling,crossMax];
+ yield [end+.83,TRAIN.deck,crossMin,end+1,TRAIN.ceiling,crossMax];
+ // Console fronts constrain movement in both driving cabs.
+ yield [start+.70,TRAIN.deck,crossMin+.27,start+1.35,2.15,crossMax-.27];
+ yield [end-.43,TRAIN.deck,crossMin+.27,end+.22,2.15,crossMax-.27];
+ for(const [index,side] of [-1,1].entries()){
+  const c=side<0?crossMin:crossMax-TRAIN.sideWall;
+  let cursor=start;
+  for(const [i,left] of doors.entries()){
+   yield [cursor,TRAIN.deck,c,left,TRAIN.ceiling,c+TRAIN.sideWall];
+   const right=left+TRAIN.doorWidth;
+   yield [left,TRAIN.doorHeight+TRAIN.deck,c,right,TRAIN.ceiling,c+TRAIN.sideWall];
+   const travel=e.doorOpen[index*4+i]*TRAIN.doorTravel;
+   const mid=(left+right)/2;
+   if(left<mid-travel)yield [left,TRAIN.deck,c,mid-travel,TRAIN.deck+TRAIN.doorHeight,c+TRAIN.sideWall];
+   if(mid+travel<right)yield [mid+travel,TRAIN.deck,c,right,TRAIN.deck+TRAIN.doorHeight,c+TRAIN.sideWall];
+   cursor=right;
+  }
+  yield [cursor,TRAIN.deck,c,end+1,TRAIN.ceiling,c+TRAIN.sideWall];
+ }
+}
+
 export function trainCollision(trains,x,y,z,width=.6,height=1.8){
- if(!trains?.length)return false;
- const radius=width*.5,top=y+height;
- for(const e of trains){
-  if(e.type!=='train')continue;
-  const t=e.train,along=t.axis==='x'?x-e.x:z-e.z;
-  const cross=t.axis==='x'?z-e.z:x-e.x;
-  const a0=along-radius,a1=along+radius,c0=cross-radius,c1=cross+radius;
-  if(a1<=t.start||a0>=t.end+1||c1<=-2.7||c0>=2.8||top<=e.y||y>=e.y+3.24)continue;
-  // Underfoot rubber deck and the single joined overhead roof cassette.
-  if(overlaps(a0,a1,t.start,t.end+1)){
-   if(overlaps(c0,c1,-1.5,2.5)&&overlaps(y,top,e.y,e.y+1))return true;
-   if(overlaps(c0,c1,-2,3)&&overlaps(y,top,e.y+3,e.y+3.23))return true;
-  }
-  if(!overlaps(y,top,e.y+1,e.y+3))continue;
-  // Cab end bulkheads. The inter-car rubber connection remains walkable.
-  if(overlaps(c0,c1,-1.55,2.55)&&
-    (overlaps(a0,a1,t.start,t.start+.15)||overlaps(a0,a1,t.end+.85,t.end+1)))return true;
-  for(const side of [-1,1]){
-   const lo=side<0?-1.62:2.38,hi=side<0?-1.39:2.61;
-   if(!overlaps(c0,c1,lo,hi))continue;
-   for(const car of t.carriages){
-    if(!overlaps(a0,a1,car.from,car.to+1))continue;
-    let doorway=false;
-    if(e.doorOpen>.95)for(const [left]of car.doors)
-     if(a0>=left+.10&&a1<=left+1.90){doorway=true;break}
-    if(!doorway)return true;
-   }
-  }
+ const radius=width*.5;
+ for(const e of trains||[]){
+  const [a,b,c]=localTrainPoint(e,x,y,z);
+  if(a+radius<=e.train.start||a-radius>=e.train.end+1||c+radius<=crossMin||
+     c-radius>=crossMax||b+height<=0||b>=TRAIN.roof)continue;
+  for(const [a0,b0,c0,a1,b1,c1] of e.shell)
+   if(overlap(a-radius,a+radius,a0,a1)&&overlap(b,b+height,b0,b1)&&overlap(c-radius,c+radius,c0,c1))return true;
  }
  return false;
 }
-// A standing passenger shares the carriage's small translation for free.
-export function carryTrainPassenger(trains,player,deltaByTrain){
- if(!player?.grounded)return false;
- const radius=player.width*.5;
- for(const e of trains||[]){
-  const step=deltaByTrain.get(e.id)||0;
-  if(!step||Math.abs(player.y-(e.y+1))>.07&&Math.abs(player.y-(e.y+3.23))>.07)continue;
-  const along=e.train.axis==='x'?player.x-e.x:player.z-e.z;
-  const cross=e.train.axis==='x'?player.z-e.z:player.x-e.x;
-  if(along<e.train.start+radius||along>e.train.end+1-radius||cross<-1.5+radius||cross>2.5-radius)continue;
-  if(e.train.axis==='x')player.x+=step;else player.z+=step;
-  return true;
+
+export function carryTrainPassenger(e,player,step){
+ if(!step||player.fly)return false;
+ const [along,height,cross]=localTrainPoint(e,player.x,player.y,player.z);
+ const supported=height>=TRAIN.deck-.07&&height<TRAIN.ceiling||
+  player.grounded&&Math.abs(height-TRAIN.roof)<.07;
+ if(!supported||along<=e.train.start||along>=e.train.end+1||cross<=crossMin||cross>=crossMax)return false;
+ if(e.train.axis==='x')player.x+=step;else player.z+=step;
+ return true;
+}
+
+const isTrack=id=>id===B.STATION_TRACK_BALLAST||
+ id>=B.STATION_TRACK_SLEEPER&&id<=B.STATION_TRACK_GREASE||
+ id>=B.PART_STATION_TRACK_1&&id<=B.PART_STATION_TRACK_5;
+
+// The low edge tiles sit beside the rail pit, under the overhanging car sill.
+const platformEdge=(id,c,axis,state)=>id===B.PART_STATION_PLATFORM_1&&
+ state?.facing===(axis==='x'?(c>0?0:4):(c>0?6:2));
+export function trainObstructed(world,e,next){
+ const {train,offset,homeX,homeZ,y}=e;
+ const xAxis=train.axis==='x',origin=xAxis?homeX:homeZ,crossOrigin=xAxis?homeZ:homeX;
+ const first=Math.floor(origin+Math.min(next,offset)+train.start);
+ const last=Math.ceil(origin+Math.max(next,offset)+train.end+1)-1;
+ const crossStart=Math.floor(crossMin),crossEnd=Math.ceil(crossMax)-1;
+ // Skip a stationary footprint until a block is edited or the swept range changes.
+ const revision=world.trainObstacleRevision??0;
+ const chunks=world.trainChunkRevision??0;
+ const cache=e.obstruction;
+ if(cache&&cache.first===first&&cache.last===last&&cache.revision===revision&&cache.chunks===chunks)return cache.blocked;
+ let blocked=false;
+ scan:for(let a=first;a<=last;a++)for(let c=crossStart;c<=crossEnd;c++){
+  const x=xAxis?a:crossOrigin+c,z=xAxis?crossOrigin+c:a;
+  if(world.getChunk&&!world.getChunk(Math.floor(x/SIZE),Math.floor(z/SIZE),false)){blocked=true;break scan}
+  for(let h=y-(Math.abs(c)<=1?1:0);h<y+Math.ceil(TRAIN.roof+.18);h++){
+   const id=world.get(x,h,z,false);
+   if(id===B.AIR||isTrack(id)||h===y&&Math.abs(c)===2&&platformEdge(id,c,train.axis,world.getShapeState?.(x,h,z)))continue;
+   blocked=true;break scan;
+  }
  }
- return false;
+ e.obstruction={first,last,revision,chunks,blocked};
+ return blocked;
 }

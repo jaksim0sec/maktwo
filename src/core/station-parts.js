@@ -3,7 +3,7 @@ import {STATION_MATERIALS,STATION_PART_START} from './station-materials.js';
 export const STATION_PART_FAMILIES=Object.freeze([
  {key:'trainWall',label:'전동차 차체',variants:['골강판 측벽','철제 차창','슬라이딩 좌문','슬라이딩 우문','차량 지붕 이음']},
  {key:'trainInterior',label:'전동차 실내',variants:['청록 연결 좌석','스테인리스 손잡이 봉','삼각 현수 손잡이','수하물 선반','운전실 계기반']},
- {key:'track',label:'철도 선로',variants:['자갈 도상','레일 침목','주행 레일','급전 레일','선로 배선 트레이']},
+ {key:'track',label:'철도 선로',variants:['자갈 도상','레일 침목','주행 레일','주행 레일 이음','선로 배선 트레이']},
  {key:'platform',label:'역 승강장',variants:['승강장 단부','점자 유도 경계','노선 안내판','개찰구','환기 그릴']},
  {key:'stationLink',label:'도시 연결부',variants:['연결통로 난간','상부 배관','전선 덕트','방향 안내 표지','계단/경사 연결']},
  {key:'trainRunning',label:'전동차 하부·전면',variants:['차륜·대차','차체 하부 스커트','운전실 전면·통유리','차량 연결기','차간 주름막']},
@@ -99,21 +99,17 @@ export function stationPartGeometry(id){
  case 'track':{
   if(p.variant===0){add(0,.00,0,1,.18,1,'TRACK_BALLAST',true);break}
   if(p.variant===1){
-   add(.07,.06,.12,.86,.15,.76,'TRACK_SLEEPER',true);
-   for(const z of [.18,.75])add(.13,.20,z,.74,.025,.075,'TRACK_RAIL');
-   for(const x of [.18,.77])for(const z of [.18,.75])add(x,.215,z,.045,.035,.07,'TRACK_GREASE');
+   add(.17,0,0,.66,.16,1,'TRACK_SLEEPER',true);
    break;
   }
-  if(p.variant===2){
-   add(.05,.01,.12,.90,.12,.77,'TRACK_BALLAST',true);
-   add(0,.22,.45,1,.085,.10,'TRACK_RAIL',true);
-   add(0,.16,.47,1,.06,.06,'TRACK_GREASE',true);
-   add(.05,.13,.10,.90,.07,.83,'TRACK_SLEEPER',true);break;
-  }
-  if(p.variant===3){
-   add(0,.02,.19,1,.095,.23,'TRACK_GREASE',true);
-   add(0,.13,.25,1,.07,.07,'TRACK_RAIL',true);
-   for(const x of [.1,.78])add(x,.04,.12,.1,.12,.37,'STATION_CABLE');
+  if(p.variant===2||p.variant===3){
+   if(p.variant===2){
+    add(.17,0,0,.66,.16,1,'TRACK_SLEEPER',true);
+    for(const z of [.36,.58])add(.28,.16,z,.44,.035,.065,'TRACK_GREASE');
+   }
+   add(0,.16,.40,1,.027,.20,'TRACK_GREASE',true);
+   add(0,.187,.469,1,.10,.062,'TRACK_GREASE',true);
+   add(0,.287,.438,1,.045,.124,'TRACK_RAIL',true);
    break;
   }
   add(0,.02,.27,1,.13,.44,'STATION_CABLE',true);
@@ -123,10 +119,10 @@ export function stationPartGeometry(id){
  }
  case 'platform':{
   if(p.variant===0){
-   add(0,0,0,1,.62,1,'PLATFORM_STONE',true);
-   add(0,.62,.09,1,.055,.82,'PLATFORM_ORANGE',true);
-   add(0,.62,0,1,.075,.10,'PLATFORM_TACTILE',true);
-   add(0,.11,0,1,.09,.055,'STATION_SOOT');
+   add(0,0,.49,1,.96,.51,'PLATFORM_STONE',true);
+   add(0,.96,.49,1,.04,.51,'PLATFORM_STONE',true);
+   add(0,.94,.477,1,.06,.037,'PLATFORM_ORANGE',true);
+   add(0,.13,.47,1,.14,.025,'STATION_SOOT');
   }else if(p.variant===1){
    add(0,0,0,1,.24,1,'PLATFORM_STONE',true);
    add(0,.24,0,1,.045,1,'PLATFORM_TACTILE',true);

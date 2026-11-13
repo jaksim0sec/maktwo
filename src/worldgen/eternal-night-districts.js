@@ -315,7 +315,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   }
   const buildable=new Uint8Array(cells);
   const stations=highRise&&options.cityBlueprints!==false&&options.stationSites!==false
-    ?planCoreStations(layout,unit,Boolean(options.raisedStation)):{hub:null,stations:[]};
+    ?planCoreStations(layout,unit):{hub:null,stations:[]};
   const reserved=[[layout.centerX,layout.centerZ,layout.centerRadiusSq],
     ...layout.miniShaftCenters.map(([x,z])=>[x,z,layout.miniShaftRadiusSq])];
   for(let i=0;i<cells;i++){

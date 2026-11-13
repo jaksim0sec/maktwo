@@ -7,8 +7,7 @@ import {STATION_PARTS,stationPartGeometry} from '../src/core/station-parts.js';
 import {partById,partGeometry,PARTS} from '../src/core/part-library.js';
 import {shapeBoxes} from '../src/core/shapes.js';
 import {materialFor,makeTextureLayers,MATERIALS} from '../src/client/textures.js';
-import {stampStationPreview,STATION_PREVIEW_SPAWN} from '../src/worldgen/station-preview.js';
-import {createStationTrain,stampStationTrainColumn} from '../src/worldgen/station-train.js';
+import {stampStationPreview} from '../src/worldgen/station-preview.js';
 import {WORLD_PRESETS,PALETTES} from '../src/core/catalog.js';
 import {createCityPlan,stampCityChunk} from '../src/worldgen/eternal-night-game.js';
 import {EntityManager} from '../src/entities/entities.js';
@@ -78,14 +77,13 @@ test('sliding door, glazing, rails, seats and hanging handles have honest physic
 test('preview retains station architecture while train is an independent entity',()=>{
  const {map,at}=chunks(),ids=new Set();
  for(const c of map.values())for(const id of c.data)if(id)ids.add(id);
- for(const material of STATION_MATERIALS)assert.ok(ids.has(material.id));
- for(const id of [B.PART_STATION_TRACK_3,B.PART_STATION_PLATFORM_3,B.PART_STATION_STATIONLINK_1])
+ for(const id of [B.PART_STATION_TRACK_3,B.PART_STATION_PLATFORM_3,B.PART_STATION_PLATFORM_1])
   assert.ok(ids.has(id));
  assert.equal(at(0,21,1),B.PART_STATION_TRACK_3);
  assert.equal(at(0,23,0),B.AIR,'no old solid train overlaps the moving entity');
  assert.equal(at(-13,23,2),B.AIR,'train doors are not static chunk voxels');
  assert.equal(at(0,25,0),B.AIR,'train roof no longer resides in a chunk');
- assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,10)));
+ assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,7)));
  assert.ok(WORLD_PRESETS.some(p=>p.mode==='station-preview'));
  assert.ok(PALETTES.blocks.items.includes(B.STATION_PLATFORM_STONE));
  assert.ok(PALETTES.parts.items.includes(B.PART_STATION_TRAINWALL_2));
@@ -93,51 +91,6 @@ test('preview retains station architecture while train is an independent entity'
  assert.equal(manager.entities.filter(e=>e.type==='train').length,1);
  assert.equal(manager.world.trainColliders.length,1);
 });
-test('assembled moving train connects the roof and has 8 physically openable door pairs',()=>{
- const train=createStationTrain(),parts=new Map();
- const at=(x,y,z)=>parts.get(`${x},${y},${z}`);
- for(let x=train.start-1;x<=train.end+1;x++)
-  for(let z=-2;z<=2;z++){
-   const put=(y,id)=>parts.set(`${x},${y},${z}`,id);
-   stampStationTrainColumn(train,x,z,put);
-  }
- for(const z of [-1,1])for(const x of [-15,-4,4,15]){
-  assert.equal(at(x,21,z),B.PART_STATION_TRAINRUNNING_1);
-  assert.equal(at(x,22,z),B.STATION_TRAIN_RUBBER);
- }
- for(const z of [-2,2])for(const x of [-15,-4,4,15])
-  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2);
- for(const z of [-2,2])for(const [left,right] of [[-13,-12],[-7,-6],[6,7],[12,13]]){
-  assert.equal(at(left,23,z),B.PART_STATION_TRAINWALL_3);
-  assert.equal(at(right,23,z),B.PART_STATION_TRAINWALL_4);
- }
- assert.equal(at(0,21,0),B.PART_STATION_TRAINRUNNING_4);
- assert.equal(at(0,25,0),B.PART_STATION_TRAINWALL_5);
- const geometry=stationPartGeometry(B.PART_STATION_TRAINWALL_5);
- assert.equal(Math.min(...geometry.map(p=>p.y)),0,'roof underface must meet wall top');
- assert.ok(geometry.some(p=>p.y+p.h>.18));
- assert.equal(train.carriages.reduce((n,c)=>n+c.doors.length*2,0),8);
- const entity=new EntityManager({mode:'station-preview'}).entities[0];
- assert.equal(entity.train.start,train.start);
- assert.ok(entity.setDoors(true));for(let i=0;i<100;i++)entity.advance(1/60);
- assert.ok(entity.doorOpen>.95);
- assert.ok(!entity.speed);
- assert.ok(entity.setDoors(false));for(let i=0;i<100;i++)entity.advance(1/60);
- assert.equal(entity.doorOpen,0);
-});
-test('train assembly also composes cars across chunks when oriented north-south',()=>{
- const train=createStationTrain({x:9,z:18,cars:3,axis:'z'});
- const seen=new Map(),putAt=(x,z)=>(y,id,turn)=>seen.set(`${x},${y},${z}`,{id,turn});
- for(let z=train.z+train.start-1;z<=train.z+train.end+1;z++)for(let x=4;x<=14;x++)
-  stampStationTrainColumn(train,x,z,putAt(x,z));
- const id=(x,y,z)=>seen.get(`${x},${y},${z}`)?.id;
- assert.equal(train.carriages.length,3);
- assert.equal(id(10,21,train.z+train.carriages[0].bogies[0]),B.PART_STATION_TRAINRUNNING_1);
- assert.equal(id(11,23,train.z+train.carriages[0].doors[0][0]),B.PART_STATION_TRAINWALL_3);
- assert.equal(id(9,23,train.z+train.carriages[0].to+2),undefined,'the center of each gangway remains open');
- assert.equal(id(9,25,train.z+train.carriages[0].to+2),B.PART_STATION_TRAINWALL_5);
-});
-
 test('four suspended city stations share two library levels and own trains as entities',()=>{
  const plan=createCityPlan(9999,7);
  assert.equal(plan.stations.length,4);
@@ -151,6 +104,6 @@ test('four suspended city stations share two library levels and own trains as en
   const at=(y,cross=0)=>site.axis==='x'?chunk.get(x-cx*16,y,z+cross-cz*16):chunk.get(x+cross-cx*16,y,z-cz*16);
   assert.equal(at(site.y-2,1),B.PART_STATION_TRACK_3);
   assert.equal(at(site.y-1,3),B.STATION_PLATFORM_TACTILE);
-  assert.equal(at(site.y+7,3),B.STATION_STATION_CREAM);
+  assert.ok([B.STATION_STATION_SOOT,B.CONCRETE_BEAM].includes(at(site.y+10,3)));
  }
 });

@@ -32,8 +32,7 @@ export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
   const latest=cityBlueprints===true||cityBlueprints>=CITY_STATION_REDESIGN_VERSION;
   const layout=createFloorLayout({seed,floorY:CITY_BASE_Y,ratios:latest?{}:{roadHalfWidth:.01}});
   const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints:cityBlueprints!==false,
-    stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION,
-     raisedStation:latest});
+    stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION});
   plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
@@ -367,6 +366,38 @@ function stampAnnex(part,x,z,put,empty) {
   } else if(outer>.2&&(along<1.2||along>length-1.2)&&empty(y))put(y,cityPart('interior',0),turn);
 }
 
+function stampStationAccess(link,x,z,put){
+  let nearest=Infinity,segment=null,along=0;
+  for(const part of link.segments){
+    const [ax,,az]=part.from,[bx,,bz]=part.to;
+    const progress=Math.max(0,Math.min(1,((x-ax)*(bx-ax)+(z-az)*(bz-az))/part.length**2));
+    const distance=(x-ax-progress*(bx-ax))**2+(z-az-progress*(bz-az))**2;
+    if(distance<nearest){nearest=distance;segment=part;along=progress*part.length;}
+  }
+  const surface=segmentY(segment,x,z),level=Math.round(surface);
+  const [ax,ay,az]=segment.from,[bx,by,bz]=segment.to;
+  const turn=outwardTurn((bx-ax)*Math.sign(by-ay||1),(bz-az)*Math.sign(by-ay||1));
+  const profile=encodeCityStair(surface,turn);
+  const nearBuilding=Math.hypot(link.ports[0].x-x,link.ports[0].z-z)<1.25;
+  if(segment.kind==='deck')put(level-1,B.STATION_PLATFORM_STONE);
+  else if(!nearBuilding){
+    put(profile.base-1,B.CONCRETE_BEAM);
+    put(profile.base,cityPart('staircase',2),turn,false,CITY_STAIR_STYLE|(profile.quarter<<3));
+  }
+  const y=segment.kind==='deck'||nearBuilding?level:profile.base+1;
+  for(let h=y;h<y+4;h++)put(h,B.AIR);
+  if(nearBuilding)return;
+  const lateral=(z-az)*(bx-ax)-(x-ax)*(bz-az);
+  if(nearest>(link.width/2-.70)**2&&along>1.25&&along<segment.length-1.25){
+    const sideTurn=outwardTurn((az-bz)*Math.sign(lateral),(bx-ax)*Math.sign(lateral));
+    put(y,B.STATION_STATION_BLUE);
+    put(y+1,B.PART_WINDOW_4,sideTurn,true);
+    put(y+2,B.STATION_STATION_CREAM);
+  }
+  put(y+4,B.CONCRETE_BEAM);
+  if(nearest<.50&&Math.floor(along)%7===3)put(y+3,B.FLUORESCENT,axisTurn(bx-ax,bz-az));
+}
+
 function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
   const surface=part.y??segmentY(part,x,z);
@@ -468,9 +499,12 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     }
     const reservedPassage=y=>reservedLevels.has(y);
     for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage,chunk.height);
+    let stationAccess=null;
     for(const {link,part} of paths){
-      if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty,layout.centerX,layout.centerZ,seed);
+      if(link.kind==='station')stationAccess=link;
+      else if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty,layout.centerX,layout.centerZ,seed);
     }
+    if(stationAccess)stampStationAccess(stationAccess,x,z,put);
     const library=plan.library;
     if(Math.abs(x-library.x)<=library.radius+4&&Math.abs(z-library.z)<=library.radius+4){
       stampCoreLibrary(library,x,z,put,empty,corePath);

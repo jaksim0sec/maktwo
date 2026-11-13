@@ -9,6 +9,7 @@ import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolu
 import {cameraEyeY,dampStepOffset} from './camera.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
+import {TRAIN} from '../worldgen/station-train.js';
 import {stationTrainMesh} from './station-train-mesh.js';
 const VERT=`#version 300 es
 precision highp float;
@@ -251,7 +252,7 @@ export class Renderer{
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
- resetWorld(world){this.farWorker?.terminate();this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[])for(const name of ['opaque','transparent','doorA','doorB','doorAGlass','doorBGlass'])this.dispose(mesh[name]);this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
+ resetWorld(world){this.farWorker?.terminate();this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){for(const name of ['opaque','transparent','doorSteel','doorGlass'])this.dispose(mesh[name]);for(const states of mesh.levers)for(const lever of states)this.dispose(lever);}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
  queueMesh(world,key,chunk,yMin,yMax,detailY){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
@@ -386,7 +387,7 @@ export class Renderer{
    else if(this.frameAverage<19&&this.renderScale<1){this.renderScale=Math.min(1,this.renderScale+.06);this.scaleCooldown=240}
   }
  }
- drawMesh(mesh){if(!mesh?.count)return;this.lastDrawCalls++;const gl=this.gl;gl.bindVertexArray(mesh.vao);gl.drawArrays(gl.TRIANGLES,0,mesh.count)}
+ drawMesh(mesh,first=0,count=mesh?.count){if(!count)return;this.lastDrawCalls++;const gl=this.gl;gl.bindVertexArray(mesh.vao);gl.drawArrays(gl.TRIANGLES,first,count)}
  drawMeshRange(mesh,first,count){if(!mesh?.count||count<=0)return;this.lastDrawCalls++;const gl=this.gl;gl.bindVertexArray(mesh.vao);gl.drawArrays(gl.TRIANGLES,first,count)}
  dynamicData(entities,effects,time){
   const arr=[];
@@ -492,24 +493,44 @@ export class Renderer{
   }
 
   this.trainMeshes??=new Map();const trains=[];
-  // Six immutable GPU buffers per train; movement and opening use only uniforms.
-  const placeTrain=(e,direction=0)=>{
-   const travel=direction*e.doorOpen*.88,along=e.train.axis==='x';
+  const placeTrain=(e,travel=0)=>{
+   const along=e.train.axis==='x';
    gl.uniform3f(this.u.entityOffset,e.x+(along?travel:0),e.y,e.z+(along?0:travel));
   };
-  for(const e of entities)if(e.type==='train'&&Math.hypot(e.x-cx,e.z-cz)<maxDistance+25&&Math.abs(e.y-player.y)<70){
-   const meshKey=[e.train.axis,e.train.carriages.length,e.train.carLength,e.train.gap,e.train.width].join(':');
-   let mesh=this.trainMeshes.get(meshKey);
+  const drawDoors=(e,mesh,glass)=>{
+   const buffer=glass?mesh.doorGlass:mesh.doorSteel;
+   placeTrain(e);
+   if(!e.doorOpen.includes(1)){this.drawMesh(buffer);return}
+   // Coalesce adjacent closed leaves; only opened leaves need new offsets.
+   let first=0,count=0;
+   for(const range of mesh.doorRanges){
+    const start=glass?range.glassFirst:range.steelFirst;
+    const size=glass?range.glassCount:range.steelCount;
+    if(!e.doorOpen[range.index]){
+     if(!count)first=start;
+     count+=size;continue;
+    }
+    if(count){this.drawMesh(buffer,first,count);count=0}
+    placeTrain(e,range.leaf*TRAIN.doorTravel);
+    this.drawMesh(buffer,start,size);
+    placeTrain(e);
+   }
+   if(count)this.drawMesh(buffer,first,count);
+  };
+  for(const e of world.trainColliders||[]){
+   if(Math.abs(e.y-player.y)>40||Math.hypot(e.x-cx,e.z-cz)>maxDistance+TRAIN.length/2)continue;
+   let mesh=this.trainMeshes.get(e.train.axis);
    if(!mesh){
-    const generated=stationTrainMesh(e.train);mesh={};
-    for(const key of ['opaque','transparent','doorA','doorB','doorAGlass','doorBGlass'])
-     mesh[key]=this.upload(generated[key]);
-    this.trainMeshes.set(meshKey,mesh);
+    const generated=stationTrainMesh(e.train);mesh={doorRanges:generated.doorRanges};
+    for(const key of ['opaque','transparent','doorSteel','doorGlass'])mesh[key]=this.upload(generated[key]);
+    mesh.levers=generated.levers.map(states=>states.map(state=>this.upload(state)));
+    this.trainMeshes.set(e.train.axis,mesh);
    }
    trains.push({e,mesh});
    placeTrain(e);this.drawMesh(mesh.opaque);
-   placeTrain(e,-1);this.drawMesh(mesh.doorA);
-   placeTrain(e,+1);this.drawMesh(mesh.doorB);
+   for(const [index,side] of [-1,1].entries())
+    this.drawMesh(mesh.levers[index][e.cab===side?e.lever+1:1]);
+   drawDoors(e,mesh,false);
   }
   gl.uniform3f(this.u.entityOffset,0,0,0);
   const data=this.dynamicData(entities,effects,performance.now()*.001);
@@ -519,8 +540,7 @@ export class Renderer{
   for(const m of visible)this.drawMesh(m.transparent);
   for(const {e,mesh} of trains){
    placeTrain(e);this.drawMesh(mesh.transparent);
-   placeTrain(e,-1);this.drawMesh(mesh.doorAGlass);
-   placeTrain(e,+1);this.drawMesh(mesh.doorBGlass);
+   drawDoors(e,mesh,true);
   }
   gl.uniform3f(this.u.entityOffset,0,0,0);
   gl.depthMask(true);gl.disable(gl.BLEND);

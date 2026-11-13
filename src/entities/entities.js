@@ -1,9 +1,9 @@
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
-import {createStationTrain} from '../worldgen/station-train.js';
-import {STATION_PREVIEW_MODE} from '../worldgen/station-preview.js';
-import {carryTrainPassenger} from '../core/train-collision.js';
+import {createStationTrain,TRAIN,trainControls} from '../worldgen/station-train.js';
+import {STATION_PREVIEW_MODE,STATION_PREVIEW_SITE} from '../worldgen/station-preview.js';
+import {carryTrainPassenger,localTrainPoint,trainShell,trainObstructed} from '../core/train-collision.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
 export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.stamina=100;this.staminaRecovery=0;this.exhausted=false;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
@@ -44,62 +44,95 @@ export class SubwayTrain extends Entity{
  constructor(site){
   const train=createStationTrain({x:Math.round(site.x),z:Math.round(site.z),floorY:site.y-1,axis:site.axis});
   super('train',train.x,train.floorY,train.z);
-  this.train=train;this.stationId=site.id;this.width=train.width;this.height=4;
-  this.homeX=this.x;this.homeZ=this.z;this.offset=0;this.speed=0;
-  this.doorTarget=0;this.doorOpen=0;this.throttle=false;this.brake=false;
+  this.train=train;
+  this.stationId=site.id;
+  this.homeX=this.x;this.homeZ=this.z;
+  this.offset=0;this.speed=0;this.lever=0;this.cab=0;
+  this.doorOpen=new Uint8Array(train.doors.length*2);
+  this.handles=trainControls(train);
+  this.shell=[...trainShell(this)];
   const length=site.bounds?(site.axis==='x'?site.bounds.x1-site.bounds.x0:site.bounds.z1-site.bounds.z0):56;
-  const spare=Math.max(0,Math.floor(length/2-(train.end+1)-2));
-  this.limit=Math.min(site.preview?7:10,spare);this.driver=false;this.boardSide=1;
+  const limit=Math.max(0,Math.floor(length/2-TRAIN.length/2-4));
+  this.minOffset=-limit;this.maxOffset=limit;
+  if(site.approach){
+   const axis=site.axis==='x'?0:2;
+   const hub=site.approach.from[axis],center=axis===0?this.x:this.z;
+   if(hub<center)this.minOffset=Math.ceil(hub-center-train.start+2);
+   else this.maxOffset=Math.floor(hub-center-train.end-3);
+  }
  }
- hurt(){} // Not a combat entity.
- setDoors(open){
-  if(this.speed>.035)return false;
-  this.doorTarget=open?1:0;return true;
+ hurt(){}
+ pickControl(origin,direction,maxDistance){
+  const [a,y,c]=localTrainPoint(this,origin.x,origin.y,origin.z);
+  if(a<this.train.start-3||a>this.train.end+4||Math.abs(c-TRAIN.center)>5||y<-2||y>6)return null;
+  const pos={x:a,y,z:c};
+  const ray=this.train.axis==='x'?direction:{x:direction.z,y:direction.y,z:direction.x};
+  let target=null,nearest=Math.min(maxDistance,2.8);
+  for(const handle of this.handles){
+   const [x,h,z]=handle.at;
+   const hit=intersectAabb(pos,ray,[x-.18,h-.18,z-.17],[x+.18,h+(handle.kind==='lever'?.40:.18),z+.17]);
+   if(hit&&hit.distance<nearest){nearest=hit.distance;target={...handle,distance:nearest}}
+  }
+  return target;
  }
- control(accelerate,brake){this.throttle=Boolean(accelerate);this.brake=Boolean(brake)}
- advance(dt){
-  dt=Math.max(0,Math.min(.06,dt));
-  const difference=this.doorTarget-this.doorOpen;
-  this.doorOpen=Math.abs(difference)<=dt*.72?this.doorTarget:this.doorOpen+Math.sign(difference)*dt*.72;
-  // Low-speed traction and braking. No chunk edits or scene remeshing.
-  const traction=this.doorOpen<.005&&this.doorTarget===0&&this.throttle?.44:0;
-  const resistance=this.brake?1.35:.14;
-  this.speed=Math.max(0,Math.min(2.75,this.speed+(traction-resistance)*dt));
-  this.offset=Math.max(-this.limit,Math.min(this.limit,this.offset+this.speed*dt));
-  if(this.offset>=this.limit)this.speed=0;
+ shellDistance(origin,direction,maxDistance){
+  const [a,y,c]=localTrainPoint(this,origin.x,origin.y,origin.z);
+  if(a<this.train.start-maxDistance||a>this.train.end+1+maxDistance||
+     Math.abs(c-TRAIN.center)>TRAIN.halfWidth+maxDistance||y< -maxDistance||y>TRAIN.roof+maxDistance)return maxDistance;
+  const pos={x:a,y,z:c};
+  const ray=this.train.axis==='x'?direction:{x:direction.z,y:direction.y,z:direction.x};
+  let nearest=maxDistance;
+  for(const box of this.shell){
+   const hit=intersectAabb(pos,ray,box.slice(0,3),box.slice(3));
+   if(hit&&hit.distance<nearest)nearest=hit.distance;
+  }
+  return nearest;
+ }
+ useControl(handle,player){
+  if(handle.kind==='door'){
+   if(Math.abs(this.speed)>.01)return false;
+   const i=handle.index;
+   this.doorOpen[i]^=1;
+   const [a,y,c]=localTrainPoint(this,player.x,player.y,player.z);
+   if(!this.doorOpen[i]&&Math.abs(c-(TRAIN.center+handle.side*TRAIN.halfWidth))<player.width/2+.12&&
+      y<TRAIN.deck+TRAIN.doorHeight&&y+player.height>TRAIN.deck&&
+      Math.abs(a-(this.train.doors[i%4]+TRAIN.doorWidth/2))<TRAIN.doorWidth/2+player.width/2){
+    this.doorOpen[i]=1;return false;
+   }
+   this.lever=0;
+   this.shell=[...trainShell(this)];
+   return true;
+  }
+  if(this.lever){this.lever=0;return true}
+  if(this.doorOpen.includes(1))return false;
+  this.cab=handle.side;this.lever=handle.side;
+  return true;
+ }
+ advance(dt,world){
+  if(!this.speed&&!this.lever)return 0;
+  const traction=this.lever?this.lever*.84:0;
+  const resistance=this.lever?.13:1.85;
+  const speed=Math.sign(this.speed)*Math.max(0,Math.abs(this.speed)-resistance*dt)+traction*dt;
+  this.speed=Math.max(-5,Math.min(5,speed));
+  const next=Math.max(this.minOffset,Math.min(this.maxOffset,this.offset+this.speed*dt));
+  if(next!==this.offset&&world&&trainObstructed(world,this,next)){
+   this.speed=0;this.lever=0;return 0;
+  }
+  const step=next-this.offset;
+  this.offset=next;
+  if(this.offset===this.minOffset&&this.speed<0||this.offset===this.maxOffset&&this.speed>0){
+   this.speed=0;this.lever=0;
+  }
   this.x=this.homeX+(this.train.axis==='x'?this.offset:0);
   this.z=this.homeZ+(this.train.axis==='z'?this.offset:0);
- }
- doorDistance(player){
-  let distance=Infinity,side=1;
-  for(const car of this.train.carriages)for(const [from]of car.doors)for(const sign of [-1,1]){
-   const along=from+1+this.offset,cross=sign*(this.train.width+1)/2+.5;
-   const x=this.train.axis==='x'?this.homeX+along:this.homeX+cross;
-   const z=this.train.axis==='x'?this.homeZ+cross:this.homeZ+along;
-   const d=Math.hypot(player.x-x,player.z-z);
-   if(d<distance){distance=d;side=sign}
-  }
-  return {distance,side};
- }
- nearby(player){
-  return Math.abs(player.y-(this.y+1))<2.6&&this.doorDistance(player).distance<3.6;
- }
- driverPosition(){
-  const along=this.train.start+2+this.offset,cross=.5;
-  return {x:this.train.axis==='x'?this.homeX+along:this.homeX+cross,
-   y:this.y+1,z:this.train.axis==='x'?this.homeZ+cross:this.homeZ+along};
- }
- platformExit(side=this.boardSide){
-  const along=this.train.carriages[0].doors[0][0]+1+this.offset;
-  const cross=side*(this.train.width+2)/2+.5;
-  return {x:this.train.axis==='x'?this.homeX+along:this.homeX+cross,
-   y:this.y+1,z:this.train.axis==='x'?this.homeZ+cross:this.homeZ+along};
+  return step;
  }
 }
+
 export class EntityManager{
  constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0;
   if(world.mode===STATION_PREVIEW_MODE)
-   this.entities.push(new SubwayTrain({x:0,z:0,y:23,axis:'x',id:'preview',preview:true}));
+   this.entities.push(new SubwayTrain(STATION_PREVIEW_SITE));
   if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
    this.entities.push(...createCityPlan(world.seed,world.version).stations.map(site=>new SubwayTrain(site)));
   world.trainColliders=this.entities.filter(e=>e.type==='train');
@@ -107,13 +140,9 @@ export class EntityManager{
  spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null){
-  if(this.world.trainColliders?.length){
-   const shifts=new Map();
-   for(const e of this.world.trainColliders){
-    const before=e.offset;e.advance(dt);
-    if(e.offset!==before)shifts.set(e.id,e.offset-before);
-   }
-   if(shifts.size)carryTrainPassenger(this.world.trainColliders,player,shifts);
+  for(const train of this.world.trainColliders){
+   const step=train.advance(dt,this.world);
+   if(step)carryTrainPassenger(train,player,step);
   }
   // Wildlife is sparse and long-lived enough to make a quiet village feel settled.
   // Manual/test animals do not count against the natural population limit.

@@ -1,106 +1,162 @@
-import {BLOCK as B,BLOCKS} from '../core/blocks.js';
-import {partById} from '../core/part-library.js';
-import {partPrisms,prismFaces,prismNormal} from '../core/part-prisms.js';
-import {stampStationTrainColumn,stampTrainCoupler} from '../worldgen/station-train.js';
+import {BLOCK as B,block} from '../core/blocks.js';
+import {TRAIN,trainControls} from '../worldgen/station-train.js';
 import {materialFor} from './textures.js';
 import {rgb,quad} from './mesher.js';
 
-// Opaque carbody, glass and the two sliding leaf directions each own one GPU buffer.
-// All vertices are local to the train origin, allowing cheap movement with one uniform.
 const FACES=[
- [[1,0,0],[1,1,0],[1,1,1],[1,0,1]],
- [[0,0,1],[0,1,1],[0,1,0],[0,0,0]],
- [[0,1,1],[1,1,1],[1,1,0],[0,1,0]],
- [[0,0,0],[1,0,0],[1,0,1],[0,0,1]],
- [[1,0,1],[1,1,1],[0,1,1],[0,0,1]],
- [[0,0,0],[0,1,0],[1,1,0],[1,0,0]]
+ [[1,0,0],[1,1,0],[1,1,1],[1,0,1]],[[0,0,1],[0,1,1],[0,1,0],[0,0,0]],
+ [[0,1,1],[1,1,1],[1,1,0],[0,1,0]],[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],
+ [[1,0,1],[1,1,1],[0,1,1],[0,0,1]],[[0,0,0],[0,1,0],[1,1,0],[1,0,0]]
 ];
-const SHADE=[.78,.74,1,.56,.88,.82];
-export const TRAIN_DOOR_TRAVEL=.88;
-const CAR_PART_TEMPLATES=new Map();
-export function stationTrainMesh(train){
- const opaque=[],transparent=[],doorA=[],doorB=[],doorAGlass=[],doorBGlass=[];
- const box=(into,x,y,z,w,h,d,id)=>{
-  const color=rgb(BLOCKS[id].color),material=materialFor(id,0);
+const steel=B.STATION_TRAIN_DOOR_STEEL,skin=B.STATION_TRAIN_CORRUGATED,enamel=B.STATION_TRAIN_ENAMEL;
+const rubber=B.STATION_TRAIN_RUBBER,glass=B.STATION_TRAIN_SMOKED_GLASS;
+const blue=B.STATION_STATION_BLUE,orange=B.STATION_PLATFORM_ORANGE,seat=B.STATION_TRAIN_SEAT;
+const shade=[.84,.78,1,.56,.87,.83];
+
+function painter(axis){
+ const point=axis==='x'?p=>p:([a,y,c])=>[c,y,a];
+ const surface=(out,vertices,id,light=1)=>{
+  const v=vertices.map(point);
+  if(axis==='z')v.reverse(); // Axis exchange reflects the winding.
+  quad(out,v,rgb(block(id).color),light<0?light:light+4*materialFor(id,0));
+ };
+ const box=(out,a,y,c,w,h,d,id,glow=false)=>{
   for(let face=0;face<6;face++)
-   quad(into,FACES[face].map(([a,b,c])=>[x+a*w,y+b*h,z+c*d]),color,SHADE[face]+4*material);
+   surface(out,FACES[face].map(([i,j,k])=>[a+i*w,y+j*h,c+k*d]),id,glow?-1:shade[face]);
  };
- const panel=(into,along,height,cross,width,h,depth,id)=>{
-  // Shared local orientation for east-west and north-south trains.
-  if(train.axis==='x')box(into,along,height,cross,width,h,depth,id);
-  else box(into,cross,height,along,depth,h,width,id);
- };
- // Shared per-part templates are computed once, not clipped and textured
- // hundreds of times for identical carriage modules or repeated train entities.
- const append=(dest,data,x,y,z)=>{
-  for(let i=0;i<data.length;i+=7)
-   dest.push(data[i]+x,data[i+1]+y,data[i+2]+z,data[i+3],data[i+4],data[i+5],data[i+6]);
- };
- const emit=(x,y,z,id,facing=0)=>{
-  if(id===B.STATION_TRAIN_RUBBER||id===B.PART_STATION_TRAINWALL_5)return;
-  if(id===B.PART_STATION_TRAINWALL_3||id===B.PART_STATION_TRAINWALL_4)return;
-  const px=x-train.x,py=y-train.floorY,pz=z-train.z;
-  if(!partById(id)){box(opaque,px,py,pz,1,1,1,id);return}
-  const key=id*8+(facing&7);
-  let template=CAR_PART_TEMPLATES.get(key);
-  if(!template){
-   const solid=[],glass=[];
-   for(const prism of partPrisms(id,0,0,0,{facing})||[]){
-    const color=rgb(BLOCKS[prism.material].color),target=prism.alpha?glass:solid;
-    for(const face of prismFaces(prism)){
-     const normal=prismNormal(face);if(!normal)continue;
-     quad(target,face,color,.74+.26*Math.abs(normal[1])+4*materialFor(prism.material,0));
-    }
+ return {box,surface};
+}
+
+export function stationTrainMesh(train){
+ const opaque=[],transparent=[],doorSteel=[],doorGlass=[],doorRanges=[];
+ const {box,surface}=painter(train.axis),{start,end,bogies,doors}=train;
+ const {center,halfWidth,deck,ceiling,roof,doorWidth}=TRAIN;
+ const lo=center-halfWidth,hi=center+halfWidth,length=end+1-start;
+ const solid=(...args)=>box(opaque,...args);
+ solid(start,.70,lo,length,.30,hi-lo,skin);
+ solid(start,.94,lo+.04,length,.06,hi-lo-.08,rubber);
+ // One crown with shoulders instead of a full-width cuboid on the roof.
+ solid(start,ceiling,lo+.24,length,roof-ceiling,hi-lo-.48,enamel);
+ for(const [a,b] of [[lo,lo+.24],[hi-.24,hi]]){
+  const vertices=[[start,ceiling+(a===lo?0:.23),a],[start,ceiling+(a===lo?.23:0),b],
+    [end+1,ceiling+(a===lo?.23:0),b],[end+1,ceiling+(a===lo?0:.23),a]];
+  surface(opaque,vertices,enamel,.93);
+  surface(opaque,[...vertices].reverse(),enamel,.82);
+ }
+ for(const a of [start+6,start+12,start+18]){
+  solid(a,roof,center-.62,1.35,.14,1.24,steel);
+  solid(a+.1,roof+.14,center-.45,1.12,.04,.9,B.STATION_STATION_GRILLE);
+ }
+ for(const a of bogies){
+  solid(a-1.1,.04,center-.91,2.2,.65,1.82,B.STATION_TRACK_GREASE);
+  for(const offset of [-.76,.76])for(const c of [center-1.085,center+.915]){
+   // Eight-sided wheel, with a distinct steel axle cap on both flanks.
+   const points=Array.from({length:8},(_,i)=>{
+    const angle=(i+.5)*Math.PI/4;
+    return [a+offset+.54*Math.cos(angle),-.20+.54*Math.sin(angle)];
+   });
+   for(let i=0;i<8;i++){
+    const [x,y]=points[i],[nx,ny]=points[(i+1)%8];
+    surface(opaque,[[nx,ny,c],[x,y,c],[x,y,c+.17],[nx,ny,c+.17]],steel,.72);
+    surface(opaque,[[a+offset,-.20,c],[nx,ny,c],[x,y,c],[x,y,c]],steel,.75);
+    surface(opaque,[[a+offset,-.20,c+.17],[x,y,c+.17],[nx,ny,c+.17],[nx,ny,c+.17]],steel,.75);
    }
-   template={solid:new Float32Array(solid),glass:new Float32Array(glass)};
-   CAR_PART_TEMPLATES.set(key,template);
-  }
-  append(opaque,template.solid,px,py,pz);
-  append(transparent,template.glass,px,py,pz);
- };
- for(let along=train.start-1;along<=train.end+1;along++)
-  for(let cross=-(train.width-1)/2;cross<=(train.width-1)/2;cross++){
-   const x=train.axis==='x'?train.x+along:train.x+cross;
-   const z=train.axis==='x'?train.z+cross:train.z+along;
-   const put=(y,id,facing)=>emit(x,y,z,id,facing);
-   stampStationTrainColumn(train,x,z,put);
-   stampTrainCoupler(train,x,z,put);
-  }
- // One continuous roof and floor rather than 185 individual voxel roofs.
- // Roof underside y=3 is precisely flush with the upper sidewall top.
- const span=train.end-train.start+1,half=(train.width-1)/2;
- const horizontal=(a,y,c,w,h,d,mat)=>panel(opaque,a,y,c,w,h,d,mat);
- horizontal(train.start,0,-half+1,span,1,train.width-2,B.STATION_TRAIN_RUBBER);
- horizontal(train.start,3,-half,span,.19,train.width,B.STATION_TRAIN_ENAMEL);
- for(const cross of [-half+.18,0,half-.18])
-  horizontal(train.start,3.19,cross,span,.045,.09,B.STATION_TRAIN_CORRUGATED);
- for(const car of train.carriages){
-  for(let position=car.from+2;position<car.to-1;position+=7)
-   horizontal(position,3.19,-.40,1.4,.10,.8,B.STATION_STATION_GRILLE);
- }
- // Two doorways per car on each side: eight paired openings for two cars.
- // Door frames are static, leaf meshes shift left/right, leaving a true opening.
- for(const car of train.carriages)for(const [from] of car.doors)for(const side of [-1,1]){
-  const across=side*half+.465,inner=across-side*.075;
-  const fixed=(along,y,w,h,d,id)=>panel(opaque,along,y,across,w,h,d,id);
-  fixed(from,1.04,2,.09,.09,B.STATION_TRAIN_DOOR_STEEL); // threshold
-  fixed(from,2.90,2,.10,.09,B.STATION_TRAIN_DOOR_STEEL); // upper lintel
-  for(const x of [from+.015,from+1.93])fixed(x,1.11,.055,1.79,.10,B.STATION_TRAIN_ENAMEL);
-  for(let leaf=0;leaf<2;leaf++){
-   const x=from+leaf+.06,wall=leaf?doorB:doorA,glass=leaf?doorBGlass:doorAGlass;
-   const sheet=(start,y,w,h,d,id)=>panel(wall,start,y,inner,w,h,d,id);
-   sheet(x,1.12,.88,.97,.072,B.STATION_TRAIN_DOOR_STEEL);
-   sheet(x,2.69,.88,.20,.072,B.STATION_TRAIN_DOOR_STEEL);
-   for(const edge of [x,x+.82])sheet(edge,2.10,.06,.60,.072,B.STATION_TRAIN_ENAMEL);
-   panel(glass,x+.06,2.11,inner+.015,.76,.56,.038,B.STATION_TRAIN_SMOKED_GLASS);
-   sheet(x+.03,2.07,.82,.04,.075,B.STATION_TRAIN_ENAMEL);
-   sheet(x+.03,2.68,.82,.03,.075,B.STATION_TRAIN_ENAMEL);
-   sheet(leaf?x+.09:x+.73,1.54,.04,.28,.087,B.STATION_TRAIN_RUBBER);
+   solid(a+offset-.32,-.63,c-.015,.64,.65,.20,B.STATION_TRACK_GREASE);
+   solid(a+offset-.14,-.43,c-.03,.28,.24,.23,steel);
   }
  }
- return {
-  opaque:new Float32Array(opaque),transparent:new Float32Array(transparent),
-  doorA:new Float32Array(doorA),doorB:new Float32Array(doorB),
-  doorAGlass:new Float32Array(doorAGlass),doorBGlass:new Float32Array(doorBGlass)
- };
+ for(const side of [-1,1]){
+  const c=side<0?lo:hi-.12;
+  const cladding=(a,y,w,h,id)=>solid(a,y,c,w,h,.12,id);
+  cladding(start,3.57,length,ceiling-3.57,enamel);
+  const bay=(a,b,index)=>{
+   const w=b-a;if(w<.1)return;
+   cladding(a,deck,w,.87,skin);
+   const outside=side<0?c-.014:c+.12;
+   solid(a,1.42,outside,w,.18,.014,blue);
+   solid(a,1.60,outside,w,.05,.014,orange);
+   const windowStart=a+(index===0?1.8:.20),windowEnd=b-(index===doors.length?1.8:.20);
+   if(windowEnd-windowStart<.4){cladding(a,1.87,w,1.70,enamel);return}
+   cladding(a,1.87,w,.22,enamel);
+   cladding(a,3.22,w,.35,enamel);
+   cladding(a,2.09,windowStart-a,1.13,enamel);
+   cladding(windowEnd,2.09,b-windowEnd,1.13,enamel);
+   const width=windowEnd-windowStart;
+   cladding(windowStart,2.09,width,.07,rubber);
+   cladding(windowStart,3.15,width,.07,rubber);
+   for(const x of [windowStart,(windowStart+windowEnd)/2,windowEnd-.08])cladding(x,2.16,.08,.99,rubber);
+   box(transparent,windowStart+.06,2.16,c+.045,width-.12,.99,.024,glass);
+   if(index>0&&index<doors.length){
+    const inside=side<0?lo+.13:hi-.65;
+    solid(a+.3,1.15,inside,w-.6,.42,.52,seat);
+    solid(a+.3,1.57,side<0?inside:inside+.40,w-.6,.42,.12,seat);
+    solid(a+.25,3.35,inside,w-.5,.045,.42,steel);
+   }
+  };
+  let cursor=start;
+  for(const [index,left] of doors.entries()){
+   bay(cursor,left,index);
+   const right=left+doorWidth;
+   // Manual releases are fixed on the jamb, reachable even with the leaves open.
+   solid(left-.41,1.57,c-.045,.28,.43,.21,rubber);
+   solid(left-.315,1.65,c-.085,.09,.25,.29,orange);
+   cladding(left,3.51,doorWidth,.06,steel);
+   solid(left,deck-.015,c-.035,doorWidth,.055,.19,steel);
+   for(const leaf of [-1,1]){
+    const steelFirst=doorSteel.length/7,glassFirst=doorGlass.length/7;
+    const a=left+(leaf===1?doorWidth/2:0)+.012,w=doorWidth/2-.025;
+    const strip=(x,y,width,h,id)=>box(doorSteel,x,y,c+.014,width,h,.089,id);
+    strip(a,1.04,w,1.03,steel);
+    const outer=side<0?c+.008:c+.103;
+    box(doorSteel,a,1.42,outer,w,.18,.006,blue);
+    box(doorSteel,a,1.60,outer,w,.05,.006,orange);
+    strip(a,3.10,w,.41,steel);
+    for(const x of [a,a+w-.095])strip(x,2.07,.095,1.03,rubber);
+    box(doorGlass,a+.08,2.08,c+.043,w-.16,1.01,.024,glass);
+    const grip=a+(leaf===-1?w-.19:.13);
+    box(doorSteel,grip,1.49,c-.035,.07,.25,.19,rubber);
+    doorRanges.push({index:index+(side===1?4:0),leaf,steelFirst,glassFirst,
+     steelCount:doorSteel.length/7-steelFirst,glassCount:doorGlass.length/7-glassFirst});
+   }
+   cursor=right;
+  }
+  bay(cursor,end+1,doors.length);
+ }
+ // Full-width cab ends, glazing gasket, marker lamps and coupler.
+ for(const side of [-1,1]){
+  const a=side<0?start:end+.84;
+  solid(a,deck,lo,.16,1.16,hi-lo,enamel);
+  solid(a,1.49,lo,.165,.20,hi-lo,blue);
+  solid(a,2.06,lo,.16,.14,hi-lo,rubber);
+  solid(a,3.36,lo,.16,.46,hi-lo,enamel);
+  for(const c of [lo,center-.06,hi-.20])solid(a,2.20,c,.16,1.16,c===center-.06?.12:.20,rubber);
+  box(transparent,a+.065,2.20,lo+.18,.027,1.16,hi-lo-.36,glass);
+  const outside=side<0?a-.035:a+.16;
+  for(const c of [lo+.31,hi-.61]){
+   solid(outside,1.82,c,.038,.22,.30,rubber);
+   solid(outside+(side<0?-.014:.03),1.87,c+.055,.024,.11,.19,orange);
+  }
+  solid(outside,3.49,center-.48,.04,.19,.96,rubber);
+  solid(side<0?start-.48:end+.96,.61,center-.26,.52,.24,.52,B.STATION_TRACK_GREASE);
+  const console=side<0?start+.70:end-.43;
+  solid(console,deck,lo+.27,.65,1.04,hi-lo-.54,steel);
+  solid(console,2.04,lo+.24,.69,.11,hi-lo-.48,rubber);
+  for(const c of [lo+.55,lo+.82,hi-.90])solid(console+.27,2.15,c,.22,.02,.14,blue);
+ }
+ for(let a=start+4;a<end-2;a+=3){
+  solid(a,3.65,center-.82,1.8,.06,.10,steel);
+  if((a-start)%2===0)solid(a,3.73,center-.21,1.5,.06,.42,enamel);
+  if((a-start)%4===0)solid(a+.15,3.716,center-.17,1.20,.02,.34,B.STATION_STATION_CREAM,true);
+  for(const c of [center-.80,center+.70])solid(a+.38,3.39,c,.055,.27,.08,steel);
+ }
+ const levers=trainControls(train).filter(handle=>handle.kind==='lever').map(({at:[a,y,c],side})=>{
+  return [-1,0,1].map(state=>{
+   const mesh=[],angle=state*.65*side;
+   for(let i=0;i<6;i++)box(mesh,a+Math.sin(angle)*i*.047,y+i*.041,c,.055,.055,.055,steel);
+   box(mesh,a+Math.sin(angle)*.24-.03,y+.22,c-.036,.11,.09,.13,orange);
+   return new Float32Array(mesh);
+  });
+ });
+ return {opaque:new Float32Array(opaque),transparent:new Float32Array(transparent),
+  doorSteel:new Float32Array(doorSteel),doorGlass:new Float32Array(doorGlass),doorRanges,levers};
 }
