@@ -19,7 +19,7 @@ export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this
   this.sprint=Boolean(input.sprint)&&(forward>0||Math.abs(side)>.1)&&!this.fly&&!this.crouching&&!this.water&&!this.exhausted&&this.stamina>0;
   if(this.sprint&&!this.creative){this.stamina=Math.max(0,this.stamina-18*dt);this.staminaRecovery=.8;if(this.stamina===0){this.exhausted=true;this.sprint=false}}
   else if(this.staminaRecovery===0)this.stamina=Math.min(100,this.stamina+14*dt);
-  const speed=toVoxels(this.fly?8:this.crouching?2.7:this.sprint?7:4),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
+  const speed=toVoxels(this.fly?8:this.crouching?2.7:this.sprint?7:2.5),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
  if(this.fly){this.vy=(Number(Boolean(input.jump))-Number(Boolean(input.crouch)))*speed}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
  direction(){return{x:-Math.sin(this.yaw)*Math.cos(this.pitch),y:Math.sin(this.pitch),z:-Math.cos(this.yaw)*Math.cos(this.pitch)}}}
