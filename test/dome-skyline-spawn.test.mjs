@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {createCityPlan,citySpawnCandidates,CITY_BASE_Y} from '../src/worldgen/eternal-night-game.js';
 import {CORE_DOME_HEIGHT} from '../src/worldgen/eternal-night-library.js';
 import {DISTRICT_DOME_RATIO,DISTRICT_HEIGHT_SPREAD} from '../src/worldgen/eternal-night-precincts.js';
-test('spawn candidates start just above the dome, not at the tower midpoint',()=>{
+test('spawn candidates start in middle floors away from the core',()=>{
  for(const seed of [9999,371,2026]){
   const plan=createCityPlan(seed),first=citySpawnCandidates(seed).next().value;
   assert.ok(first,'spawn candidates must exist');
-  assert.ok(first.y>=plan.library.crown+3&&first.y<=plan.library.crown+21,
-   `seed ${seed} spawn floor ${first.y} versus dome ${plan.library.crown}`);
+  const radius=Math.hypot(first.x-plan.layout.centerX,first.z-plan.layout.centerZ);
+  assert.ok(radius>plan.layout.width*.22,
+   `seed ${seed} spawn radius ${radius} versus city width ${plan.layout.width}`);
  }
 });
 test('substantial district buildings center near 1.75 dome heights with seeded variance',()=>{

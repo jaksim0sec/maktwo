@@ -87,7 +87,7 @@ const SKY_FRAG=`#version 300 es
 precision highp float;
 in vec2 uv;
 uniform float uHorizon;
-uniform float uClarity;uniform float uSkyBrightness;
+uniform float uClarity;uniform float uSkyBrightness;uniform float uCitySky;
 out vec4 frag;
 float starHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
@@ -106,7 +106,10 @@ void main(){
  vec3 highAltitude=mix(clearHorizon,clearTop,clearGradient);
  color=mix(color,highAltitude,uClarity);
  color=mix(color,vec3(.22,.25,.30),uSkyBrightness*(1.-uClarity));
- color+=vec3(.21,.22,.23)*stars*(1.-uClarity);
+ color+=vec3(.21,.22,.23)*stars*(1.-uClarity)*(1.-uCitySky);
+ vec3 citySky=mix(vec3(.70,.82,.80),vec3(.20,.39,.45),smoothstep(uHorizon-.24,uHorizon+.70,uv.y));
+ citySky=mix(citySky,vec3(.29,.43,.45),(1.-smoothstep(uHorizon-.60,uHorizon+.02,uv.y))*.52);
+ color=mix(color,citySky,uCitySky);
  frag=vec4(color,1.);
 }`;
 // Depth-aware blur is only enabled by ?farblur=1; near geometry is left sharp.
@@ -140,7 +143,7 @@ export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);retur
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyBrightness=0;this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyBrightness=0;this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
  // Keep the experimental long-distance impostors opt-in; original city renderer is the default.
   this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')==='1';
  // Only an explicit test URL allocates the extra shader/framebuffer.
@@ -388,11 +391,11 @@ export class Renderer{
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const fog=city?[.16,.25,.27]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   gl.uniform1f(this.skyHorizon,Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32)));
-  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);
+  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,city?1:0);
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
   const camY=toMeters(cameraEyeY(player)),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(player.yaw+walkSway,player.pitch,toMeters(player.x),camY,toMeters(player.z)));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,toMeters(player.x),camY,toMeters(player.z));gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);

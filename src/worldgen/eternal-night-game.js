@@ -50,19 +50,19 @@ const inside=insidePolygon;
 
 export function* citySpawnCandidates(seed) {
  const plan=createCityPlan(seed);
- const domeTop=plan.library.crown;
- const target=domeTop+12; // Walking floor just above the dome crown.
  const centerX=plan.layout.centerX,centerZ=plan.layout.centerZ;
- const candidates=plan.volumes.filter(v=>v.support===null&&v.floors?.length>5).map(v=>{
-  const floors=v.floors.filter(f=>f.corridors?.length&&f.y>=domeTop+3&&f.y<=domeTop+21);
+ const targetRadius=plan.layout.width*.32;
+ const candidates=plan.volumes.filter(v=>v.support===null&&v.floors?.length>=25).map(v=>{
+  const mid=Math.floor(v.floors.length*(.44+hash(v.id,13,seed,seed)*.12));
+  const floors=v.floors.filter(f=>f.corridors?.length&&Math.abs(f.level-mid)<=2);
   if(!floors.length)return null;
-  floors.sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target)||a.y-b.y);
+  floors.sort((a,b)=>Math.abs(a.level-mid)-Math.abs(b.level-mid)||a.level-b.level);
   const dx=(v.x0+v.x1)/2-centerX,dz=(v.z0+v.z1)/2-centerZ;
-  return {v,floors,score:Math.hypot(dx,dz)+Math.abs(floors[0].y-target)*4};
+  return {v,floors,score:Math.abs(Math.hypot(dx,dz)-targetRadius)};
  }).filter(Boolean);
  candidates.sort((a,b)=>a.score-b.score||a.v.id-b.v.id);
  const recent=candidates.slice(0,12);
- const offset=recent.length?Math.floor(hash(seed,27,51,seed)*Math.min(3,recent.length)):0;
+ const offset=recent.length?Math.floor(hash(seed,27,51,seed)*recent.length):0;
  for(let i=0;i<recent.length;i++){
   const {floors}=recent[(i+offset)%recent.length];
   for(const f of floors){
@@ -72,9 +72,9 @@ export function* citySpawnCandidates(seed) {
    }
   }
  }
- // Accessible routes are fallback only, and should not override the dome-adjacent interior.
+ // Connected core routes remain a fallback when no middle-floor room is safe.
  const entries=plan.walkways.filter(link=>link.kind==='core').map(link=>link.ports[0])
-  .sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target));
+  .sort((a,b)=>Math.abs(a.y-plan.library.crown)-Math.abs(b.y-plan.library.crown));
  for(const entry of entries)for(const depth of [2,3,4]){
   const x=Math.floor(entry.x-entry.dx*depth)+.5,z=Math.floor(entry.z-entry.dz*depth)+.5;
   yield {x,y:Math.round(entry.y),z};
