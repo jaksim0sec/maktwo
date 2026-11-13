@@ -63,7 +63,7 @@ test('workbench lives in the world, uses a dedicated mesh, and does not renumber
  assert.ok(a.set(3,25,4,B.WORKBENCH));
  const geom=meshChunk(a,a.getChunk(0,0));assert.ok(geom.opaque.length>0);assert.equal(geom.opaque.length%7,0);
  a.save();const b=new World({name:'a',mode:'flat',storage});assert.equal(b.get(3,25,4),B.WORKBENCH);
- const tile=makeTextureLayers();assert.equal(tile.layers,14);assert.equal(tile.data.byteLength,14*32*32*4);
+ const tile=makeTextureLayers();assert.equal(tile.layers,94);assert.equal(tile.data.byteLength,tile.layers*32*32*4);
 });
 
 test('client accesses the bench in range, crafting UI uses real ingredient grid and PWA precaches it',()=>{

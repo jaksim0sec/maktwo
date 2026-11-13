@@ -36,8 +36,8 @@ test('append-only station registry preserves 188 previous IDs and 8-bit chunk fo
 });
 test('all 20 distinct pixel tiles are loaded and mapped to consecutive atlas layers',()=>{
  const atlas=makeTextureLayers();
- assert.equal(atlas.layers,MATERIALS.length);assert.equal(atlas.layers,90);
- assert.equal(atlas.data.length,32*32*4*90);
+ assert.equal(atlas.layers,MATERIALS.length);assert.equal(atlas.layers,94);
+ assert.equal(atlas.data.length,32*32*4*atlas.layers);
  const hashes=[];
  for(let i=0;i<20;i++){
   const id=STATION_MATERIALS[i].id,layer=materialFor(id,0)-1;

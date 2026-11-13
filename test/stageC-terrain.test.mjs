@@ -21,7 +21,7 @@ test('25 new terrain materials and plants appear in reproducible new-world geogr
 test('new texture layers remain a single compact GPU texture array',()=>{
  const {data}=makeTextureLayers(TEXTURE_SIZE);
  assert.equal(data.length,MATERIALS.length*TEXTURE_SIZE*TEXTURE_SIZE*4);
- assert.ok(data.byteLength<256*1024); // 40 compact 32px layers in v1.11
+ assert.ok(data.byteLength<512*1024); // 94 compact RGBA8 layers, still under 512 KiB
  for(let id=30;id<=54;id++)assert.ok(materialFor(id,0)<=MATERIALS.length);
 });
 test('natural glow and decorative cross geometry are rendered without separate draw calls',()=>{

@@ -70,7 +70,7 @@ test('hotbar labels localized without modifying stable block IDs',()=>{
 });
 test('offline service worker includes new ray picker, door and texture modules',()=>{
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
- for(const p of ['src/client/picking.js','src/client/textures.js','src/core/door.js'])assert.ok(sw.includes(p));
+ for(const p of ['src/client/picking.js','src/client/textures.js','src/client/material-art.js','src/core/door.js'])assert.ok(sw.includes(p));
  assert.match(sw,/maktwo-shell-v\d+\.\d+\.\d+/);
 });
 

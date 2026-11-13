@@ -1,11 +1,11 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.50-closer-idle-weapon';
+const CACHE_NAME='maktwo-shell-v1.15.51-material-art';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
  './src/client/game.js','./src/client/weapon-view.js','./src/core/combat.js','./src/client/station-train-mesh.js','./src/core/world-slots.js','./src/client/input.js','./src/client/gestures.js','./src/client/item-icons.js','./src/client/tree-mesh.js',
- './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/station-textures.js','./src/client/architecture-texture-sampler.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
+ './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/material-art.js','./src/client/station-textures.js','./src/client/architecture-texture-sampler.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
  './src/client/city-distance.js','./src/client/city-far.js','./src/client/city-far.worker.js','./src/client/far-look.js','./src/client/renderer.js','./src/client/mesher.js','./src/client/mesh.worker.js',
  './src/client/light.worker.js','./src/core/blocks.js','./src/core/chunk.js',
  './src/core/panel-joints.js','./src/core/fence-joints.js','./src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
