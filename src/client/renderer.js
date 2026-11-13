@@ -20,7 +20,7 @@ void main(){vec3 worldPosition=aPos+uEntityOffset;gl_Position=uVP*vec4(worldPosi
 const FRAG=`#version 300 es
 precision highp float;
 in vec3 vColor;in float vFog;in vec3 vPos;in vec3 vMaterialPos;in float vEmission;flat in int vMaterial;flat in int vTurns;
-uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;uniform bool uCityDaylight;
+uniform vec3 uFog;uniform vec3 uLowerFog;uniform float uBrightness;uniform float uAlpha;uniform bool uCityDaylight;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;uniform bool uDistant;uniform vec2 uCenterChunk;
 uniform vec3 uCamera;
@@ -76,8 +76,10 @@ void main(){
   // basement like an open street. Preserve cool fill even on back faces.
   float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+6).toFixed(1)},vPos.y);
   float skyFill=daylight*daylight*daylight;
-  vec3 skyTint=mix(vec3(.075,.097,.113),vec3(.29,.39,.42),outdoorHeight);
-  ambient=vec3(.151,.166,.184)+skyTint*skyFill
+  float hemisphere=normal.y*.5+.5;
+  vec3 fill=mix(vec3(.140,.152,.163),vec3(.154,.178,.180),hemisphere);
+  vec3 skyTint=mix(vec3(.069,.090,.096),vec3(.30,.37,.385),outdoorHeight);
+  ambient=fill+skyTint*skyFill
    +vec3(.38,.33,.25)*facing*smoothstep(.80,1.,daylight)*outdoorHeight;
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
@@ -98,9 +100,15 @@ void main(){
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
  vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
  float peak=max(c.r,max(c.g,c.b));
- if(uCityDaylight&&vEmission<.5)c/=1.+max(0.,peak-.47)*.62;
- else c/=1.+max(0.,peak-1.)*.6;
- c=mix(c,uFog,vFog);
+ if(uCityDaylight){
+  float knee=vEmission>.5?.60:.39;
+  c/=1.+max(0.,peak-knee)*.78;
+  float lowAir=1.-smoothstep(${(CITY_BASE_Y+4).toFixed(1)},${(CITY_BASE_Y+42).toFixed(1)},vPos.y);
+  c=mix(c,mix(uFog,uLowerFog,lowAir),smoothstep(0.,1.,vFog));
+ }else{
+  c/=1.+max(0.,peak-1.)*.6;
+  c=mix(c,uFog,vFog);
+ }
  frag=vec4(c,uAlpha);
 }`;
 // One fullscreen triangle: a subdued near-black sky with a horizon gradient.
@@ -176,6 +184,53 @@ void main(){
  float fade=smoothstep(.03,.47,p.y)*(1.-smoothstep(.88,1.,p.y)*.15);
  frag=vec4(.13,.26,.29,opacity*shape*fade);
 }`;
+// Nearby dust only becomes visible in lit air. Fixed GPU points, no CPU
+// particle updates, buffers, or full-screen post-processing.
+const DUST_VERT=`#version 300 es
+precision highp float;
+uniform mat4 uVP;
+uniform vec3 uEye;
+uniform float uTime;
+uniform float uPointScale;
+uniform highp sampler3D uLightVolume;
+uniform vec3 uLightOrigin;
+uniform vec3 uLightSize;
+out float opacity;
+vec3 hash(vec3 p){
+ p=fract(p*vec3(.1031,.11369,.13787));
+ p+=dot(p,p.yzx+19.19);
+ return fract((p.xxy+p.yzz)*p.zyx);
+}
+void main(){
+ int id=gl_VertexID;
+ vec3 cell=floor(uEye/3.)+vec3(float(id%5-2),float(id/25-1),float(id/5%5-2));
+ vec3 seed=hash(cell);
+ vec3 local=fract(seed+vec3(sin(uTime*.23+seed.y*6.)*.065,-uTime*.018,sin(uTime*.17+seed.x*5.)*.055));
+ vec3 pos=(cell+local)*3.;
+ vec3 delta=pos-uEye;
+ float distanceToEye=length(delta);
+ vec3 at=pos-uLightOrigin;
+ vec4 light=vec4(0.);
+ if(all(greaterThanEqual(at,vec3(0.)))&&all(lessThan(at,uLightSize)))
+  light=texelFetch(uLightVolume,ivec3(at),0);
+ float lamp=light.a>0.?max(light.r,max(light.g,light.b)):0.;
+ float sky=light.a*smoothstep(0.,4.,pos.y-${(CITY_BASE_Y-2).toFixed(1)});
+ float fade=smoothstep(1.5,3.,distanceToEye)*(1.-smoothstep(4.5,7.,distanceToEye));
+ float wrapFade=smoothstep(0.,.10,min(local.y,1.-local.y));
+ opacity=max(lamp*.38,sky*.16)*fade*wrapFade;
+ gl_Position=uVP*vec4(pos*${BLOCK_SIZE.toFixed(2)},1.);
+ gl_PointSize=clamp(uPointScale/max(1.,gl_Position.w),1.,3.);
+}
+`;
+const DUST_FRAG=`#version 300 es
+precision highp float;
+in float opacity;
+out vec4 frag;
+void main(){
+ vec2 p=gl_PointCoord-.5;
+ frag=vec4(.65,.74,.68,opacity*(1.-smoothstep(.06,.25,dot(p,p))));
+}
+`;
 // Depth-aware blur is only enabled by ?farblur=1; near geometry is left sharp.
 const DISTANCE_BLUR_FRAG=`#version 300 es
 precision highp float;
@@ -207,7 +262,15 @@ export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);retur
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','CityDaylight'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ this.dustProgram=gl.createProgram();
+ gl.attachShader(this.dustProgram,shader(gl,gl.VERTEX_SHADER,DUST_VERT));
+ gl.attachShader(this.dustProgram,shader(gl,gl.FRAGMENT_SHADER,DUST_FRAG));
+ gl.linkProgram(this.dustProgram);
+ if(!gl.getProgramParameter(this.dustProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.dustProgram));
+ this.dustUniforms={};
+ for(const name of ['VP','Eye','Time','PointScale','LightVolume','LightOrigin','LightSize'])
+  this.dustUniforms[name]=gl.getUniformLocation(this.dustProgram,'u'+name);
  // Keep the experimental long-distance impostors opt-in; original city renderer is the default.
   this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')==='1';
  // Only an explicit test URL allocates the extra shader/framebuffer.
@@ -225,7 +288,7 @@ export class Renderer{
  this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
  this.meshes=new Map();this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
- gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_LINEAR);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
@@ -461,7 +524,7 @@ export class Renderer{
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=city?[.15,.25,.275]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const fog=city?[.147,.225,.247]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32));
@@ -484,6 +547,7 @@ export class Renderer{
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniform3f(this.u.entityOffset,0,0,0);
   const camY=toMeters(cameraEyeY(player)),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(player.yaw+walkSway,player.pitch,toMeters(player.x),camY,toMeters(player.z)));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,toMeters(player.x),camY,toMeters(player.z));gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
+  if(city)gl.uniform3f(this.u.LowerFog,.087,.135,.143);
   this.updateLightVolume(world,player);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);
@@ -587,6 +651,20 @@ export class Renderer{
    drawDoors(e,mesh,true);
   }
   gl.uniform3f(this.u.entityOffset,0,0,0);
+  if(city&&!this.hologram?.opened&&this.frameAverage<25&&this.renderScale>=.90){
+   const u=this.dustUniforms;
+   gl.useProgram(this.dustProgram);
+   gl.uniformMatrix4fv(u.VP,false,vp);
+   gl.uniform3f(u.Eye,player.x,cameraEyeY(player),player.z);
+   gl.uniform1f(u.Time,performance.now()*.001);
+   gl.uniform1f(u.PointScale,height*.013);
+   gl.uniform1i(u.LightVolume,0);
+   gl.uniform3fv(u.LightOrigin,this.lightOrigin);
+   gl.uniform3f(u.LightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
+   gl.bindVertexArray(this.skyVao);
+   gl.drawArrays(gl.POINTS,0,75);
+   this.lastDrawCalls++;
+  }
   gl.depthMask(true);gl.disable(gl.BLEND);
   if(blurActive)this.applyDistanceBlur(width,height,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:260);
   if(this.hologram?.render(vp,performance.now()*.001))this.lastDrawCalls++;

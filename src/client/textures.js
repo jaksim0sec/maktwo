@@ -225,11 +225,15 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
    f=.78+.23*patch+.095*(fine-.5)+.04*(n-.5);
    if(m===22||m===23){ // Poured concrete, pitting and cracks.
     if((px<1||py<1)&&fine<.72)f*=.78;
-    if(n>.966)f*=.64;
+    // Broad damp marks keep weathering legible under low station light.
+    const damp=Math.max(0,Math.sin(px*.26+Math.sin(py*.29))*Math.sin(py*.22));
+    f*=1-.12*damp;
+    if(n>.975)f*=.76;
     if(m===23&&(fissure||Math.abs(px-21-4*Math.sin(py*.2))<.7))f*=.47;
     r=.96;g=.98;b=1;
    }else if(m===24||m===34){ // Whitewashed walls, peeling paint and damp mold.
-    f=.90+.10*patch-stain;
+    const drip=Math.max(0,rand(x>>2,0,m+413)-.48)*(.4+.6*Math.sin(py*.11)**2);
+    f=.92+.08*patch-stain-.16*drip;
     if(fine>.79&&n>.5)f*=.65;
     if(m===34&&patch<.48){f*=.68;r=.74;g=.87;b=.74}
     else{r=1;g=.98;b=.94}
