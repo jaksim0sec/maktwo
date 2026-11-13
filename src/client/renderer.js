@@ -44,7 +44,7 @@ void main(){
  vec3 normal=vec3(0.,1.,0.);
  if(!uDistant)normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
  vec3 emission=vec3(0.);
- float daylight=.30;
+ float daylight=.22;
  if(!uDistant&&vEmission<.5&&vFog<.99){
   vec3 samplePos=vPos+normal*.02-uLightOrigin;
   ivec3 cell=ivec3(floor(samplePos));
@@ -71,9 +71,10 @@ void main(){
  if(uCityDaylight){
   vec3 sun=normalize(vec3(.42,.86,-.29));
   float facing=max(0.,dot(normal,sun));
-  // Cool shadows and warm, directional daylight share the same sky exposure.
-  ambient=vec3(.036,.052,.065)
-   +vec3(.46,.64,.67)*daylight
+  // Weak spill falls off quickly while shaded surfaces retain a cool fill.
+  float skyFill=daylight*daylight*daylight;
+  ambient=vec3(.105,.122,.147)
+   +vec3(.391,.570,.588)*skyFill
    +vec3(.47,.39,.24)*facing*smoothstep(.78,1.,daylight);
   ambient+=vec3(.12,.14,.16)*max(0.,uBrightness-.35);
   if(uDistant)ambient=vec3(.25,.34,.37);
