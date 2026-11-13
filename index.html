@@ -33,6 +33,7 @@
   <div class="settings-section"><span class="section-caption">관리 및 도움말</span><button id="water-repair" class="setting-row" title="직접 설치한 물을 복구하고 자연 물과 건축물을 보호합니다"><span>◌</span> 설치된 물 정리</button><button id="help-btn" class="setting-row"><span>?</span> 조작법 확인 <kbd>H</kbd></button></div>
   <div class="settings-foot">이 세계의 밤은 끝나지 않습니다</div>
  </aside>
+ <button id="inventory-close" type="button" aria-label="인벤토리 닫기" title="인벤토리 닫기 · E / Esc">✕</button>
  <div id="crosshair" aria-hidden="true"><i></i><i></i></div>
  
  <div id="underwater-filter" aria-hidden="true"></div>
@@ -59,7 +60,7 @@
  </div>
  <div id="help" class="overlay hidden"><div class="help-card" role="dialog" aria-labelledby="help-title">
   <div class="help-top"><div><span class="eyebrow">GUIDE</span><h2 id="help-title">조작법</h2></div><button id="close-help" aria-label="도움말 닫기">✕</button></div>
-  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프 · 웅크리기</b><span>Space · Shift / 모바일 우측 버튼</span><b>달리기</b><span>Ctrl / 모바일 ⇧ 누르기 · 스태미나 소모</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 길게 누르기</span><b>아이템</b><span>1–7 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E · 열린 상태에서도 이동 / 시점 조작 가능</span><b>발견형 제작법</b><span>재료를 모으면 조합법이 나타나요</span><b>생존</b><span>채굴하면 아이템을 얻고 설치하면 1개 소모</span><b>소지품 제작</b><span>E → 제작(2×2) · 작업대를 설치하고 클릭하면 3×3 제작</span><b>건축 형태</b><span>R 형태 전환 · T 회전 / 모바일은 하단 버튼을 누른 뒤 설치할 면을 탭</span><b>비행</b><span>크리에이티브에서 F · 점프 상승 / 웅크리기 하강</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
+  <div class="help-grid"><b>이동</b><span>WASD · 모바일 좌측 드래그</span><b>카메라</b><span>우클릭 드래그 · C 시점 고정 · 모바일 우측 드래그</span><b>점프 · 웅크리기</b><span>Space · Shift / 모바일 우측 버튼</span><b>달리기</b><span>Ctrl / 모바일 ⇧ 누르기 · 스태미나 소모</span><b>설치</b><span>아이템 선택 후 짧게 클릭 또는 탭</span><b>채굴</b><span>누르고 있기 · 모바일 길게 누르기</span><b>아이템</b><span>1–7 / 스크롤 · Q 맨손</span><b>공간 가방</b><span>E 열기·닫기 · 방향키 선택 · Enter 실행 · ✕ 닫기 · WASD 이동 가능</span><b>발견형 제작법</b><span>재료를 모으면 조합법이 나타나요</span><b>생존</b><span>채굴하면 아이템을 얻고 설치하면 1개 소모</span><b>소지품 제작</b><span>E → 제작(2×2) · 작업대를 설치하고 클릭하면 3×3 제작</span><b>건축 형태</b><span>R 형태 전환 · T 회전 / 모바일은 하단 버튼을 누른 뒤 설치할 면을 탭</span><b>비행</b><span>크리에이티브에서 F · 점프 상승 / 웅크리기 하강</span><b>저장</b><span>P</span><b>설정</b><span>M</span></div>
  </div></div>
  <div id="rotate-screen" aria-live="polite"><span class="rotate-icon" aria-hidden="true">▱</span><strong>가로로 돌려주세요</strong><span>MakTwo는 가로 화면에서 플레이할 수 있어요</span></div>
  <div id="fatal" hidden></div>

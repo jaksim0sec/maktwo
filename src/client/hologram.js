@@ -33,21 +33,25 @@ const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
-function cardGeometry(palette,items,compact=false,page=null){
- const headers=[
-  ['tab:blocks','건축재'],['tab:parts','부품'],['tab:items','배치품'],['tab:craft','제작'],['hand','맨손'],['close','닫기'],
- ];
- if(page?.total>1)headers.splice(4,0,['page:prev','‹'],['page:next',`${page.index+1}/${page.total} ›`]);
- const spacing=compact?.22:.35;
- const cards=headers.map(([id,name],i)=>({
-  id,name,x:(i-(headers.length-1)/2)*spacing,y:compact?.54:.67,
-  w:spacing-.025,h:.25,depth:-.035,
- }));
+function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
+ const cards=[],craft=palette==='craft';
+ const add=(id,name,x,y,w,h,role='control')=>cards.push({id,name,x,y,w,h,depth:-.035,role});
+ add('view:inventory','내 가방',-.53,.81,.86,.27,'view');
+ add('view:craft','제작하기',.43,.81,.80,.27,'view');
+ add('close','✕',1.06,.81,.27,.27,'close');
+ const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능'],['hand','맨손']]:
+  [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
+ const space=craft?.63:.46;
+ filters.forEach(([id,name],i)=>add(id,name,(i-(filters.length-1)/2)*space,.50,space-.055,.19,'filter'));
  for(let i=0;i<items.length;i++){
-  const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5));
-  const x=compact?(col-1)*.40:(col-2)*.52,y=(compact?.06:.15)-row*(compact?.49:.53);
-  cards.push({id:`item:${i}`,name:items[i].name,color:items[i].color,blockId:items[i].id,count:items[i].count,craftable:items[i].craftable,recipe:items[i].recipe,x,y,w:compact?.43:.46,h:.43,depth:-.06+Math.abs(x)*.065});
+  const col=compact?i%3:i%5,row=Math.floor(i/(compact?3:5)),item=items[i],x=compact?(col-1)*.46:(col-2)*.51;
+  cards.push({id:`item:${i}`,name:item.name,color:item.color,blockId:item.id,count:item.count,
+   craftable:item.craftable,recipe:item.recipe,missing:item.missing,
+   x,y:.15-row*(compact?.49:.55),w:compact?.43:.46,h:.43,depth:-.07+Math.abs(x)*.035,role:'item'});
  }
+ if(!items.length)add('empty',craft?'표시할 제작법이 없습니다':'보유한 아이템이 없습니다',0,-.14,1.6,.4,'empty');
+ if(page?.total>1){add('page:prev','‹ 이전',-.48,-.86,.65,.22,'page');add('page:next',`다음 › ${page.index+1}/${page.total}`,.48,-.86,.84,.22,'page')}
+ if(cards.length>20)throw Error('Spatial inventory atlas overflow');
  return cards;
 }
 export {cardGeometry};
@@ -113,18 +117,41 @@ function pointerRay(player,nx,ny,aspect){
 }
 function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(`Spatial inventory shader: ${gl.getShaderInfoLog(shader)}`);return shader}
 export class Hologram{
- constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.dirty=true;
+ constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
- open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.buildGeometry()}
+ open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
- close(){this.opened=false;this.pointer=null;this.hover=null}
- setInventory(palette,items,selected,station='hand',page=null){this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.cards=cardGeometry(palette,items,this.compact,page);this.dirty=true;this.buildGeometry()}
+ close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}
+ setInventory(palette,items,selected,station='hand',page=null,craftFilter='all'){
+  const changed=this.palette!==palette;
+  this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.craftFilter=craftFilter;
+  this.cards=cardGeometry(palette,items,this.compact,page,craftFilter);
+  if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(palette==='craft'?'view:craft':'view:inventory');
+  this.dirty=true;this.buildGeometry();
+ }
+ moveFocus(direction){
+  if(!this.opened)return null;
+  const controls=this.cards.filter(c=>c.role!=='empty');
+  const current=controls.find(c=>c.id===this.focusId)||controls.find(c=>c.role==='item')||controls[0];
+  if(!current)return null;
+  const axis=direction==='left'||direction==='right'?'x':'y',positive=direction==='right'||direction==='up';
+  const candidates=controls.filter(c=>c.id!==current.id&&(positive?c[axis]>current[axis]+.01:c[axis]<current[axis]-.01));
+  let next=current,score=Infinity;
+  for(const c of candidates){
+   const side=axis==='x'?'y':'x';
+   const weight=Math.abs(c[axis]-current[axis])+Math.abs(c[side]-current[side])*3.1;
+   if(weight<score){score=weight;next=c}
+  }
+  this.focusId=next.id;this.keyboardMode=true;this.hover={id:next.id,index:this.cards.indexOf(next)};this.dirty=true;
+  return this.focusId;
+ }
+ focusedId(){return this.focusId}
  buildGeometry(){if(!this.anchor||!this.cards.length)return;const gl=this.gl,vertices=[],a=this.anchor;
   this.cards.forEach((card,i)=>{
    const col=i%5,row=Math.floor(i/5),u0=(col*CELL_W+3)/ATLAS_W,u1=((col+1)*CELL_W-3)/ATLAS_W;
@@ -135,37 +162,60 @@ export class Hologram{
   });
   gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));this.count=vertices.length/6;
  }
- point(clientX,clientY,rect){this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
- aim(player){if(!this.opened)return null;const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
+ point(clientX,clientY,rect){this.keyboardMode=false;this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
+ aim(player){if(!this.opened)return null;
+  if(this.keyboardMode){const index=this.cards.findIndex(c=>c.id===this.focusId);this.hover=index<0?null:{id:this.focusId,index};return this.focusId}
+  const ray=this.pointer?pointerRay(player,this.pointer.nx,this.pointer.ny,this.pointer.aspect):(()=>{const d=player.direction();return[d.x,d.y,d.z]})();const found=spatialHit(this.anchor,this.cards,player,ray);this.hover=found;return found?.id||null}
  // Pick synchronously using the same camera projection as the rendered cards.
  // Never act on a hover result cached before the most recent pointer movement.
  pickAt(player,clientX,clientY,rect,{center=false}={}){
   if(!this.opened)return null;
-  if(center){this.pointer=null}
+  this.keyboardMode=false;if(center){this.pointer=null}
   else this.point(clientX,clientY,rect);
   return this.aim(player);
  }
- click(){return this.hover?.id||null}
- drawAtlas(){const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
-  this.cards.forEach((card,i)=>{const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;
-   const isHeader=!card.id.startsWith('item:'),active=isHeader?(card.id===`tab:${this.palette}`||card.id==='hand'&&this.selected===-1):Number(card.id.slice(5))===this.selected;
-   const grad=ctx.createLinearGradient(x,y,x+w,y+h);grad.addColorStop(0,'rgba(60,52,44,.86)');grad.addColorStop(1,'rgba(24,29,30,.93)');
-   rounded(ctx,x+5,y+8,w-10,h-16,16,grad,active?'rgba(232,191,137,.82)':'rgba(205,199,181,.17)');
-   if(isHeader){ctx.font=font(34,true);ctx.fillStyle=active?'#f8dfb7':'#e6e7e3';ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9);ctx.textAlign='left';return}
+ click(){return this.keyboardMode?this.focusId:this.hover?.id||null}
+ drawAtlas(){
+  const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
+  const fitted=(value,width,size=30)=>{
+   ctx.font=font(size,true);
+   while(ctx.measureText(String(value)).width>width&&size>16){size-=2;ctx.font=font(size,true)}
+  };
+  this.cards.forEach((card,i)=>{
+   const x=i%5*CELL_W+3,y=Math.floor(i/5)*CELL_H+3,w=CELL_W-6,h=CELL_H-6;
+   const active=card.id==='view:inventory'?this.palette!=='craft':card.id==='view:craft'?this.palette==='craft':
+    card.id.startsWith('tab:')?card.id===`tab:${this.palette}`:
+    card.id.startsWith('filter:')?card.id===`filter:${this.craftFilter}`:false;
+   const focused=this.keyboardMode&&this.focusId===card.id;
+   const ready=card.role==='item'&&this.palette==='craft'&&card.craftable;
+   rounded(ctx,x+5,y+8,w-10,h-16,16,ready?'#213b32ef':active?'#454139ef':'#202a2fee',
+    focused?'#ffe1ae':ready?'#6fba91':active?'#e1b982':'#67696766');
+   if(card.role!=='item'){
+    ctx.fillStyle=card.role==='close'?'#f6cfbd':active||focused?'#ffe1b7':'#d8dfdc';
+    fitted(card.name,w-22,card.role==='close'?50:card.role==='view'?35:28);
+    ctx.textAlign='center';ctx.fillText(card.name,x+w/2,y+h/2+9,w-18);ctx.textAlign='left';return;
+   }
    if(this.palette==='craft'&&card.recipe){
-    const cells=recipeGrid(card.recipe);const startX=x+w/2-43,startY=y+25,step=29;
-    for(let c=0;c<9;c++){
-     const xx=startX+c%3*step,yy=startY+Math.floor(c/3)*step;
-     ctx.fillStyle='rgba(8,12,14,.36)';ctx.fillRect(xx,yy,27,27);
-     if(cells[c])drawItemIcon(ctx,cells[c],xx+2,yy+2,23);
+    const cells=recipeGrid(card.recipe),left=x+w/2-43,top=y+20,step=29;
+    for(let k=0;k<9;k++){
+     const px=left+k%3*step,py=top+Math.floor(k/3)*step;
+     ctx.fillStyle='rgba(5,11,13,.55)';ctx.fillRect(px,py,27,27);
+     if(cells[k])drawItemIcon(ctx,cells[k],px+2,py+2,23);
     }
-   }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+24,96);
-   ctx.textAlign='center';ctx.font=font(34,true);ctx.fillStyle='#efeee9';ctx.fillText(card.name,x+w/2,y+166,177);ctx.font=font(22);ctx.fillStyle='#aeb5b3';ctx.fillText(this.palette==='craft'?(card.craftable?'제작 가능':card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':'재료 부족'):(card.count===Infinity?'무제한':`보유 ${card.count||0}`),x+w/2,y+184);ctx.textAlign='left';
+    if(ready){ctx.font=font(20,true);ctx.fillStyle='#8de6b6';ctx.textAlign='center';ctx.fillText('제작 가능',x+w/2,y+122);ctx.textAlign='left'}
+   }else drawItemIcon(ctx,card.blockId,x+w/2-48,y+21,96);
+   ctx.textAlign='center';fitted(card.name,176,29);ctx.fillStyle='#f2f4f0';ctx.fillText(card.name,x+w/2,y+163,177);
+   ctx.font=font(20,true);
+   const state=this.palette==='craft'?(ready?`선택하면 제작 ×${card.recipe?.count||1}`:
+    card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':
+    card.missing>0?`재료 ${card.missing}개 부족`:'제작 불가'):
+    card.count===Infinity?'무제한':`보유 ${card.count||0}`;
+   ctx.fillStyle=ready?'#9de1b5':'#b9c1bb';ctx.fillText(state,x+w/2,y+191,180);ctx.textAlign='left';
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
-  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.cards.findIndex(card=>card.id===(this.selected<0?'hand':`item:${this.selected}`)));
+  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.keyboardMode?this.cards.findIndex(card=>card.id===this.focusId):-1);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
   // Spatial head-attached UI is not world geometry: keep full 3D perspective

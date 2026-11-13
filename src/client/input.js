@@ -86,8 +86,8 @@ export class Input{
   const fingerTap=canvasAim(this.gestures.consumeTapPoint());const picked=this.tapPoint||fingerTap;this.tapPoint=null;
   const minePoint=this.inventoryMode?null:(this.pointer.left&&performance.now()-this.pointer.start>=HOLD_MS?{x:this.pointer.x,y:this.pointer.y}:canvasAim(this.gestures.miningPoint(performance.now())));
   return{
-   forward:k.has('KeyW')||k.has('ArrowUp'),backward:k.has('KeyS')||k.has('ArrowDown'),
-   left:k.has('KeyA')||k.has('ArrowLeft'),right:k.has('KeyD')||k.has('ArrowRight'),
+   forward:k.has('KeyW')||(!this.inventoryMode&&k.has('ArrowUp')),backward:k.has('KeyS')||(!this.inventoryMode&&k.has('ArrowDown')),
+   left:k.has('KeyA')||(!this.inventoryMode&&k.has('ArrowLeft')),right:k.has('KeyD')||(!this.inventoryMode&&k.has('ArrowRight')),
    moveX:m.x,moveY:-m.y,
    jump:Boolean(k.has('Space')||this.held.jump),crouch:Boolean(k.has('ShiftLeft')||this.held.crouch),
    sprint:k.has('ControlLeft')||k.has('ControlRight')||Boolean(this.held.sprint),

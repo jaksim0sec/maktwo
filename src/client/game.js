@@ -14,7 +14,7 @@ const $=id=>document.getElementById(id);
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));const savedPlayer=loadPlayerState(localStorage,this.world.name,this.world.height);if(savedPlayer)Object.assign(this.player,savedPlayer);if(this.world.mode==='parts'&&!savedPlayer)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));const savedPlayer=loadPlayerState(localStorage,this.world.name,this.world.height);if(savedPlayer)Object.assign(this.player,savedPlayer);if(this.world.mode==='parts'&&!savedPlayer)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  bindWorld(){
   this.stopMountEvents?.();
@@ -133,7 +133,7 @@ class Game{
  }
  togglePanel(name){if(this.panel===name)this.requestGameFocus();else this.setPanel(name)}
  toggleMenu(){this.togglePanel('settings')}
- openCraft(){if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.inventoryPage=0;this.updateHologram()}
+ openCraft(){if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram()}
  togglePalette(){this.openCraft()}
  activeStation(){
   if(this.player.creative)return 'bench';
@@ -141,28 +141,37 @@ class Game{
   return Math.hypot(p.x-(s.x+.5),p.y-(s.y+.5),p.z-(s.z+.5))<=5?'bench':'hand';
  }
  updateHologram(){
-  const category=this.inventoryPalette||'blocks',station=this.activeStation(),craft=category==='craft';
-  const entries=craft?this.inventory.knownRecipes(station):paletteItems(category).filter(id=>this.inventory.count(id)>0);
+  const category=this.inventoryPalette||'all',station=this.activeStation(),craft=category==='craft';
+  // Bag content and craft output are different views. Bench recipes remain inspectable.
+  const catalog=craft?[...this.inventory.knownRecipes('bench')].sort((a,b)=>Number(this.inventory.canCraft(b,station))-Number(this.inventory.canCraft(a,station))):
+   category==='all'?CREATIVE_ITEMS.filter(id=>this.inventory.count(id)>0):
+    paletteItems(category).filter(id=>this.inventory.count(id)>0);
+  const entries=craft&&this.craftFilter==='available'?catalog.filter(recipe=>this.inventory.canCraft(recipe,station)):catalog;
   const pageSize=this.hologram.compact?6:10,total=Math.max(1,Math.ceil(entries.length/pageSize));
   this.inventoryPage=Math.min(total-1,Math.max(0,this.inventoryPage));
-  const start=this.inventoryPage*pageSize,page=entries.slice(start,start+pageSize);
+  const page=entries.slice(this.inventoryPage*pageSize,(this.inventoryPage+1)*pageSize);
   if(craft)this.visibleRecipes=page;else this.visibleItems=page;
   const items=page.map(entry=>{
    const id=craft?entry.id:entry;
    return {...block(id),name:craft?entry.label:blockLabel(id),count:this.inventory.count(id),
-    ...(craft?{craftable:this.inventory.canCraft(entry,station),recipe:entry}:{})};
+    ...(craft?{craftable:this.inventory.canCraft(entry,station),recipe:entry,
+     missing:Object.entries(entry.needs).reduce((sum,[key,num])=>sum+Math.max(0,num-this.inventory.count(Number(key))),0)}:{})};
   });
-  this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total});
+  this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total},this.craftFilter);
  }
  inventoryClick(hit=this.hologram.click()){
   if(!hit)return;
   if(hit==='close'){this.requestGameFocus();return}
+  if(hit==='empty')return;
+  if(hit==='view:inventory'){this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit==='view:craft'){this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit.startsWith('filter:')){this.craftFilter=hit.slice(7);this.inventoryPage=0;this.updateHologram();return}
   if(hit==='hand'){this.select(-1,{toggle:false});this.requestGameFocus();return}
   if(hit.startsWith('page:')){
    this.inventoryPage+=hit==='page:next'?1:-1;this.updateHologram();return;
   }
   if(hit.startsWith('tab:')){
-   const category=hit.slice(4);if(!PALETTES[category])return;
+   const category=hit.slice(4);if(category!=='all'&&!PALETTES[category])return;
    this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
   }
   if(hit.startsWith('item:')){
@@ -170,7 +179,11 @@ class Game{
    if((this.inventoryPalette||'blocks')==='craft'){
     const recipe=this.visibleRecipes[index],station=this.activeStation();if(!recipe)return;
     if(recipe.station==='bench'&&station!=='bench'){this.status('이 제작은 작업대 근처에서만 가능해요');return}
-    if(this.inventory.craft(recipe,station)){
+    if(!this.inventory.canCraft(recipe,station)){
+      const missing=Object.entries(recipe.needs).reduce((sum,[id,count])=>sum+Math.max(0,count-this.inventory.count(Number(id))),0);
+      this.status(missing?`재료 ${missing}개 부족`:'제작할 수 없는 상태예요');return;
+     }
+     if(this.inventory.craft(recipe,station)){
      const slot=this.inventory.assignQuickSlot(recipe.id,this.player.creative&&this.paletteItems.every(id=>id!==null)?Math.max(0,this.selected):null);
      if(this.player.creative&&slot>=0){this.renderHotbar();this.select(slot,{toggle:false});this.requestGameFocus();return}
      this.renderHotbar();this.status(`${recipe.label} 제작 완료`);this.updateHologram();
@@ -186,7 +199,7 @@ class Game{
  updateControlHint(){
   this.updateCameraButton();const el=$('control-hint');if(!el)return;
   el.classList.toggle('ui-active',this.uiOpen);
-  el.textContent=this.panel==='inventory'?'가방을 보며 이동 가능 · 카드 선택 후 E 닫기':
+  el.textContent=this.panel==='inventory'?'방향키 선택 · Enter 실행 · E 닫기 · C 시점 전환':
    this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 돌아가기로 복귀':
    this.selected<0?'길게 클릭해 채굴 · 우클릭 드래그 또는 C 시점 고정 · E 가방':
    '클릭 설치 · 길게 누르면 채굴 · 우클릭 드래그 / C 시점 고정 · E 가방';
@@ -264,7 +277,15 @@ class Game{
    this.select(next,{toggle:false});
   },{passive:false});
   document.addEventListener('keydown',e=>{
-   if(e.repeat||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
+   if(e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
+   if(this.panel==='inventory'&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)){
+    e.preventDefault();this.input.keys.delete(e.code);
+    this.hologram.moveFocus(e.code.slice(5).toLowerCase());return;
+   }
+   if(this.panel==='inventory'&&(e.code==='Enter'||e.code==='NumpadEnter')){
+    e.preventDefault();if(!e.repeat)this.inventoryClick(this.hologram.focusedId());return;
+   }
+   if(e.repeat)return;
    if(e.code==='KeyE'||e.code==='KeyI'){e.preventDefault();this.togglePanel('inventory');return}
    if(e.code==='KeyM'){e.preventDefault();this.togglePanel('settings');return}
    if(e.code==='KeyC'&&!this.menuOpen&&!this.helpOpen){e.preventDefault();this.toggleCameraMode();return}
