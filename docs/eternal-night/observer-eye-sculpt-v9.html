@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Observer / Eye Anatomy V9</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#201c1e;color:#d0c1b8;font:14px system-ui,sans-serif}
+canvas{display:block;width:100vw;height:100dvh;touch-action:none}
+aside{position:absolute;top:16px;left:18px;pointer-events:none;opacity:.8;font-size:11px;letter-spacing:.11em}
+.controls{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;gap:8px}
+button{background:#373034;border:1px solid #645558;color:#eee3dc;padding:11px 16px;border-radius:12px;font-size:13px}
+button:focus-visible{outline:2px solid #dfb7aa}button[aria-pressed=true]{background:#74615b}
+#err{position:absolute;left:10%;right:10%;top:40%;text-align:center;color:#e5c2b3;display:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head><body><canvas id="screen"></canvas>
+<aside>OBSERVER / EYE SCULPT 09<br>3D geometry · no reference-image decal</aside>
+<div class="controls"><button id="front" aria-pressed="true">정면</button><button id="angle">45°</button><button id="side">측면</button></div>
+<div id="err">Three.js 또는 WebGL을 불러올 수 없음</div>
+<script>
+(()=>{'use strict';
+const T=window.THREE;
+if(!T){document.getElementById('err').style.display='block';return;}
+let renderer;
+try{renderer=new T.WebGLRenderer({canvas:document.querySelector('canvas'),antialias:true});}
+catch(e){document.getElementById('err').style.display='block';return;}
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
+renderer.setClearColor(0x201c1e);renderer.outputEncoding=T.sRGBEncoding;
+renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.01;
+const scene=new T.Scene();scene.background=new T.Color(0x201c1e);
+const camera=new T.PerspectiveCamera(35,1,.01,30);
+scene.add(new T.HemisphereLight(0xb49c93,0x251c22,.95));
+let light=new T.DirectionalLight(0xf1d2bf,1.15);light.position.set(-2.5,3,4);scene.add(light);
+light=new T.DirectionalLight(0x857276,.33);light.position.set(2,1,-3);scene.add(light);
+const subject=new T.Group();scene.add(subject);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const sstep=(a,b,v)=>{let t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};
+const UP=[[-.172,-.027],[-.123,.123],[.018,.184],[.172,-.012]];
+const LO=[[-.172,-.027],[-.139,-.110],[.051,-.143],[.172,-.012]];
+function bez(P,t){let s=1-t;return [s*s*s*P[0][0]+3*s*s*t*P[1][0]+3*s*t*t*P[2][0]+t*t*t*P[3][0],s*s*s*P[0][1]+3*s*s*t*P[1][1]+3*s*t*t*P[2][1]+t*t*t*P[3][1]]}
+const hx=.208,hy=.207,hz=.187, headY=1.77;
+function frontZ(x,y){return hz*Math.sqrt(Math.max(0,1-(x/hx)**2-(y/hy)**2))}
+function eyeZ(x,y){return -.010+Math.sqrt(Math.max(0,.174**2-x*x-y*y))}
+function VGeo(v,c,f){let g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(v,3));g.setAttribute('color',new T.Float32BufferAttribute(c,3));g.setIndex(f);g.computeVertexNormals();return g}
+const skinMat=new T.MeshStandardMaterial({vertexColors:true,roughness:.97,side:T.DoubleSide});
+const pointCount=256, ringCount=36;
+let contour=[];
+for(let i=0;i<pointCount/2;i++)contour.push(bez(UP,i/(pointCount/2)));
+for(let i=0;i<pointCount/2;i++)contour.push(bez(LO,1-i/(pointCount/2)));
+function skull(front){
+ let v=[],col=[],faces=[];
+ for(let j=0;j<pointCount;j++){
+  let p=contour[j],a=Math.atan2(p[1]/hy,p[0]/hx);
+  let minRad=Math.hypot(p[0]/hx,p[1]/hy);
+  for(let k=0;k<=ringCount;k++){
+   let t=k/ringCount,r=front?lerp(minRad,1,t):t;
+   let x=hx*r*Math.cos(a),y=hy*r*Math.sin(a);
+   let z=(front?1:-1)*hz*Math.sqrt(Math.max(0,1-r*r));
+   v.push(x,headY+y,z);
+   let hash=Math.sin(x*164+y*41+z*67)*Math.cos(x*73-y*111);
+   let base=[.53,.47,.45],variation=hash*.027;
+   for(let l=0;l<3;l++)col.push(clamp(base[l]+variation*(l===0?1:.82),0,1));
+  }
+ }
+ for(let j=0;j<pointCount;j++){let next=(j+1)%pointCount;
+  for(let k=0;k<ringCount;k++){
+   let a=j*(ringCount+1)+k,b=next*(ringCount+1)+k;
+   if(front)faces.push(a,a+1,b,b,a+1,b+1);
+   else faces.push(a,b,a+1,b,b+1,a+1);
+  }
+ }
+ return new T.Mesh(VGeo(v,col,faces),skinMat);
+}
+subject.add(skull(true),skull(false));
+const eyeball=new T.SphereGeometry(.174,128,96);
+const a=eyeball.getAttribute('position'),pig=new Float32Array(a.count*3);
+for(let i=0;i<a.count;i++){
+ let x=a.getX(i),y=a.getY(i),z=a.getZ(i);
+ let rr=Math.hypot(x-.041,y-.002),theta=Math.atan2(y-.002,x-.041);
+ let grain=Math.sin(x*91+y*157)*Math.sin(x*137-y*91)*.012;
+ let color=[.59,.515,.498];
+ let edge=sstep(.11,.172,Math.hypot(x,y));
+ for(let j=0;j<3;j++)color[j]=lerp(color[j], [.35,.246,.258][j],edge*.75);
+ if(z>0){
+  let fiber=Math.sin(theta*62+rr*217)*Math.cos(theta*33-rr*94)*.052;
+  let iris=[.258+fiber,.177+fiber*.75,.163+fiber*.73];
+  let outer=sstep(.073,.087,rr);
+  for(let j=0;j<3;j++)iris[j]=lerp(iris[j],[.077,.049,.055][j],outer);
+  let pupil=1-sstep(.048,.056,rr);
+  for(let j=0;j<3;j++)iris[j]=lerp(iris[j],[.020,.015,.018][j],pupil);
+  let border=1-sstep(.084,.09,rr);
+  for(let j=0;j<3;j++)color[j]=lerp(color[j],iris[j],border);
+ }
+ for(let j=0;j<3;j++)pig[i*3+j]=clamp(color[j]+grain,0,1);
+}
+eyeball.setAttribute('color',new T.BufferAttribute(pig,3));
+const eye=new T.Mesh(eyeball,new T.MeshPhysicalMaterial({vertexColors:true,roughness:.35,metalness:0,clearcoat:.9,clearcoatRoughness:.12}));
+eye.position.set(0,headY,-.010);subject.add(eye);
+// Thin volumetric lid lips, individual top/bottom depths. No raised oval ring.
+function lid(part,sign){
+ let v=[],col=[],faces=[],K=7,M=128;
+ for(let j=0;j<=M;j++){
+  let t=j/M,p=bez(part,t),x=p[0],y=p[1],w=Math.pow(Math.sin(Math.PI*t),.85);
+  for(let k=0;k<K;k++){
+   let u=k/(K-1), yy=y+sign*(u-.42)*.025*w;
+   let z=lerp(eyeZ(x,y)+.004,frontZ(x,yy)+.008,sstep(.04,.93,u));
+   // Subtle lip thickening around, not a tube sitting on the forehead.
+   z+=Math.sin(u*Math.PI)*.003*w;
+   v.push(x,headY+yy,z);
+   let cr=lerp(.34,.52,u),cg=lerp(.128,.36,u),cb=lerp(.145,.345,u);
+   let dust=Math.sin(j*1.8+k*8.3)*.008;
+   col.push(cr+dust,cg+dust,cb+dust);
+  }
+ }
+ for(let j=0;j<M;j++)for(let k=0;k<K-1;k++){
+  let a=j*K+k,b=(j+1)*K+k;faces.push(a,b,a+1,a+1,b,b+1);
+ }
+ return new T.Mesh(VGeo(v,col,faces),new T.MeshStandardMaterial({vertexColors:true,roughness:.92,side:T.DoubleSide}));
+}
+subject.add(lid(UP,1),lid(LO,-1));
+// Small angular caruncle at the LEFT corner. Its root starts inside the cut, not outside the head.
+// It is a shallow 3D wedge with tapered width, not a spherical knob or painted texture.
+function tearDuct(){
+ let v=[],col=[],faces=[],M=22,K=12;
+ for(let j=0;j<=M;j++){
+  let t=j/M,x=lerp(-.170,-.128,t),center=lerp(-.027,-.017,t);
+  let half=(1-t)*.014+.0015*t;
+  for(let k=0;k<=K;k++){
+   let u=k/K,y=center+(u*2-1)*half;
+   let bulge=Math.sin(u*Math.PI)*(1-t)*.008;
+   let z=lerp(frontZ(x,y)-.006,eyeZ(x,y)+.017,.65)+bulge;
+   v.push(x,headY+y,z);
+   let shade=.10*Math.sin(Math.PI*u)*Math.sin(Math.PI*t);
+   col.push(.33+shade,.116+shade*.3,.135+shade*.3);
+  }
+ }
+ for(let j=0;j<M;j++)for(let k=0;k<K;k++){
+  let a=j*(K+1)+k,b=a+K+1;faces.push(a,b,a+1,a+1,b,b+1);
+ }
+ return new T.Mesh(VGeo(v,col,faces),new T.MeshStandardMaterial({vertexColors:true,side:T.DoubleSide,roughness:.9}));
+}
+subject.add(tearDuct());
+// Neck flows into the rear underside of the head, kept only to give the eye a side-view reference.
+function neck(){
+ let v=[],col=[],faces=[],P=22,N=22;
+ const knots=[[.40,.10,-.03,.105],[.58,.055,-.01,.085],[.78,.04,-.04,.061],[.99,.085,-.04,.053],[1.18,.12,-.065,.047],[1.35,.075,-.085,.049],[1.52,-.010,-.100,.063],[1.66,-.079,-.104,.078]];
+ for(let j=0;j<=P;j++){
+  let t=j/P*(knots.length-1),i=Math.min(knots.length-2,Math.floor(t)),f=t-i;
+  let k=knots[i],n=knots[i+1],Y=lerp(k[0],n[0],f),X=lerp(k[1],n[1],f),Z=lerp(k[2],n[2],f),R=lerp(k[3],n[3],f);
+  for(let h=0;h<=N;h++){
+   let a=h/N*Math.PI*2;
+   v.push(X+R*Math.cos(a),Y,Z+R*.84*Math.sin(a));
+   col.push(.48,.40,.39);
+  }
+ }
+ for(let j=0;j<P;j++)for(let h=0;h<N;h++){
+  let a=j*(N+1)+h,b=a+N+1;faces.push(a,b,a+1,a+1,b,b+1);
+ }
+ return new T.Mesh(VGeo(v,col,faces),skinMat);
+}
+subject.add(neck());
+function glint(x,y,r){
+ const z=eyeZ(x,y)+.003;
+ const mesh=new T.Mesh(new T.SphereGeometry(r,12,8),new T.MeshBasicMaterial({color:0xd8c5bb,transparent:true,opacity:.64}));
+ mesh.position.set(x,headY+y,z);mesh.scale.set(1.3,.60,.16);subject.add(mesh);
+}
+glint(.018,.050,.006);glint(.038,.062,.0026);
+let yaw=0,pitch=.01,desiredYaw=0,desiredPitch=.01,dist=1.68,desiredDist=dist;
+const stage=document.getElementById('screen'),pointers=new Map();let pinch=0;
+stage.addEventListener('pointerdown',e=>{stage.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY})});
+stage.addEventListener('pointermove',e=>{
+ const p=pointers.get(e.pointerId);if(!p)return;
+ if(pointers.size===1){desiredYaw+=(e.clientX-p.x)*.006;desiredPitch=clamp(desiredPitch+(p.y-e.clientY)*.005,-.65,.65)}
+ p.x=e.clientX;p.y=e.clientY;
+ if(pointers.size===2){let arr=[...pointers.values()],d=Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y);if(pinch)desiredDist=clamp(desiredDist+(pinch-d)*.004,1.05,3.0);pinch=d}
+});
+for(const n of ['pointerup','pointercancel','lostpointercapture'])stage.addEventListener(n,e=>{pointers.delete(e.pointerId);pinch=0});
+stage.addEventListener('wheel',e=>{e.preventDefault();desiredDist=clamp(desiredDist+e.deltaY*.0015,1.05,3)},{passive:false});
+const buttons=['front','angle','side'];
+for(const [n,v] of [['front',0],['angle',Math.PI/4],['side',Math.PI/2]])document.getElementById(n).onclick=()=>{
+ desiredYaw=v;desiredPitch=0;buttons.forEach(b=>document.getElementById(b).setAttribute('aria-pressed',String(b===n)));
+};
+function resize(){let w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+function draw(){
+ requestAnimationFrame(draw);
+ yaw+=(desiredYaw-yaw)*.12;pitch+=(desiredPitch-pitch)*.12;dist+=(desiredDist-dist)*.12;
+ const target=new T.Vector3(0,1.47,0);
+ camera.position.set(target.x+Math.sin(yaw)*Math.cos(pitch)*dist,target.y+Math.sin(pitch)*dist,target.z+Math.cos(yaw)*Math.cos(pitch)*dist);
+ camera.lookAt(target);renderer.render(scene,camera);
+}
+draw();
+})();
+</script></body></html>
