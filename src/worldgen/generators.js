@@ -29,12 +29,12 @@ const BIOME_MATERIALS={
  desert:{soil:B.SAND,surface:()=>B.SAND},
  volcanic:{soil:B.BASALT,surface:()=>B.BASALT,rock:[.22,B.SLATE,B.BASALT]},
  limestone:{soil:B.LIMESTONE,surface:()=>B.LIMESTONE,rock:[.34,B.MARBLE,B.LIMESTONE]},
- badlands:{soil:B.TERRACOTTA,surface:()=>B.RED_SAND,rock:[.55,B.SHALE,B.TERRACOTTA]},
- alpine:{soil:B.ALPINE_SOIL,surface:r=>r>.85?B.ICE:B.SNOW,rock:[.39,B.SLATE,B.GRANITE]},
+ badlands:{soil:B.TERRACOTTA,surface:()=>B.TERRACOTTA,rock:[.55,B.SHALE,B.TERRACOTTA]},
+ alpine:{soil:B.DIRT,surface:()=>B.STONE,rock:[.39,B.SLATE,B.GRANITE]},
  mountains:{soil:B.DIRT,surface:()=>B.GRASS,rock:[.72,null,B.BASALT]},
- wetlands:{soil:B.CLAY,surface:r=>r>.45?B.PEAT:B.CLAY,peat:true},
- boreal:{soil:B.ALPINE_SOIL,surface:()=>B.MOSS},
- meadow:{soil:B.DIRT,surface:()=>B.HIGHLAND_GRASS},
+ wetlands:{soil:B.DIRT,surface:()=>B.MOSS},
+ boreal:{soil:B.DIRT,surface:()=>B.MOSS},
+ meadow:{soil:B.DIRT,surface:()=>B.GRASS},
  forest:{soil:B.DIRT,surface:r=>r>.7?B.MOSS:B.GRASS}
 };
 export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
@@ -61,7 +61,6 @@ export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
      if(r>.997)id=B.QUARTZ;
     }else if(y<h){
      id=material.soil;
-     if(material.peat&&geology>.65)id=B.PEAT;
     }else if(y===h){
      id=material.surface(r);
      if(b==='forest'&&r>.997)id=B.GLOW_MOSS;
@@ -84,7 +83,7 @@ export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
    function put(ax,ay,az,id,onlyAir=false){const lx=ax-ox,lz=az-oz;if(lx<0||lx>=SIZE||lz<0||lz>=SIZE||ay<0||ay>=HEIGHT)return;const idx=(ay*SIZE+lz)*SIZE+lx;if(!onlyAir||chunk.data[idx]===B.AIR)chunk.data[idx]=id}
    const variant=biome==='boreal'?'cedar':biome==='forest'&&hash(wx,7,wz,seed)>.48?'birch':'oak';
    const wood=variant==='cedar'?B.CEDAR_WOOD:variant==='birch'?B.BIRCH_WOOD:B.WOOD;
-   const leaves=variant==='cedar'?B.CEDAR_LEAVES:variant==='birch'?B.BIRCH_LEAVES:B.LEAVES;
+   const leaves=B.LEAVES;
    for(let y=h+1;y<=h+trunk;y++)put(wx,y,wz,wood);
    for(let dy=-2;dy<=2;dy++)for(let dz=-2;dz<=2;dz++)for(let dx=-2;dx<=2;dx++)if(dx*dx+dz*dz+(dy*.9)**2<=5.7&&hash(wx+dx,dy,wz+dz,seed+9)>.12)put(wx+dx,h+trunk+dy,wz+dz,leaves,true);
   }
@@ -94,8 +93,6 @@ export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
    const roll=hash(wx,4,wz,seed);
    let decor=B.AIR;
    if(biome==='wetlands'&&roll>.948)decor=B.REEDS;
-   else if(biome==='alpine'&&roll>.968&&top!==B.ICE)decor=B.HEATHER;
-   else if(biome==='meadow'&&roll>.957)decor=B.BLUE_FLOWER;
    else if((biome==='forest'||biome==='boreal'||biome==='wetlands')&&roll>.992)decor=B.FIREFLY_GRASS;
    else if((biome==='meadow'||biome==='forest')&&roll>.965)decor=B.FLOWER;
    if(decor!==B.AIR)chunk.set(x,h+1,z,decor);
