@@ -22,9 +22,8 @@ uniform vec3 uFog;uniform float uBrightness;uniform float uAlpha;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;uniform bool uDistant;uniform vec2 uCenterChunk;
 uniform vec3 uCamera;
-uniform float uFarFog;uniform float uFacade;uniform float uLodNear;uniform bool uFarPass;uniform vec2 uNearY;
+uniform float uLodNear;uniform bool uFarPass;uniform vec2 uNearY;
 out vec4 frag;
-float facadeHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void main(){
  if(uDistant){
   vec2 delta=abs(floor(vPos.xz/16.)-uCenterChunk);
@@ -36,32 +35,7 @@ void main(){
   if(nearChunk&&(!uFarPass||!outsideNearY))discard;
   vec3 relative=vPos*${BLOCK_SIZE.toFixed(2)}-uCamera;
   if(!nearChunk&&uLodNear>0.&&dot(relative.xz,relative.xz)<uLodNear*uLodNear)discard;
-  if(uFarFog>0.){
-   float fog=min(${FAR_LOOK.fogCap},1.-exp(-pow(length(relative)/uFarFog,${FAR_LOOK.fogExponent})));
-   fog*=mix(1.,${FAR_LOOK.fogHighMultiplier},smoothstep(${FAR_LOOK.fogLowY.toFixed(1)},${FAR_LOOK.fogHighY.toFixed(1)},vPos.y));
-   vec3 tinted=vColor,glow=vec3(0.);
-   if(uFacade>0.&&vEmission<.5){
-    vec3 face=cross(dFdx(vPos),dFdy(vPos));
-    vec3 n=face*inversesqrt(max(dot(face,face),1e-12));
-    float wall=1.-smoothstep(.35,.6,abs(n.y));
-    vec2 tangent=vec2(-n.z,n.x);
-    // Keep the same coordinate direction on both sides of an axis.
-    if(abs(tangent.x)>abs(tangent.y)?tangent.x<0.:tangent.y<0.)tangent=-tangent;
-    vec2 cell=vec2(dot(vPos.xz,tangent)/${FAR_LOOK.bay.toFixed(1)},vPos.y/${FAR_LOOK.storey.toFixed(1)});
-    vec2 f=fract(cell),id=floor(cell);
-    float row=facadeHash(vec2(id.y,floor(vPos.x/48.)+71.*floor(vPos.z/48.)));
-    float on=step(row>${FAR_LOOK.litRowThreshold}?${FAR_LOOK.busyWindowThreshold}:${FAR_LOOK.quietWindowThreshold},facadeHash(id));
-    vec3 lamp=vec3(.92,.84,.72);
-    vec2 footprint=fwidth(cell);
-    float detail=1.-smoothstep(.3,.7,max(footprint.x,footprint.y));
-    float window=step(.28,f.x)*step(f.x,.72)*step(.22,f.y)*step(f.y,.78)*wall;
-    glow=mix(lamp*.012*wall,lamp*on*window*${FAR_LOOK.windowGlow},detail);
-    tinted*=mix(1.,.62,window*(1.-on)*detail);
-   }
-   vec3 lit=vEmission>.5?tinted:tinted*vec3(.65,.72,.93)*uBrightness;
-   frag=vec4(min(mix(lit,uFog,fog)+glow*(1.-.6*fog),vec3(1.)),uAlpha);
-   return;
-  }
+
  }
  // The lighting volume contains ONLY reachable open-air cells. A wall cannot
  // illuminate its far side. Sample the air just outside the fragment's face.
@@ -98,7 +72,7 @@ void main(){
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
  vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
  c=c/(1.+max(0.,max(c.r,max(c.g,c.b))-1.)*.6);
- c=mix(c,uFog,vEmission>.5&&uFarFog>0.?vFog*${FAR_LOOK.emissionFog}:vFog);
+ c=mix(c,uFog,vFog);
  frag=vec4(c,uAlpha);
 }`;
 // One fullscreen triangle: a subdued near-black sky with a horizon gradient.
@@ -140,8 +114,9 @@ export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);retur
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyBrightness=0;this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['FarFog','Facade','LodNear','FarPass','NearY'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
- this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')!=='0';
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyBrightness=0;this.skyVao=gl.createVertexArray();gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ // Keep the experimental long-distance impostors opt-in; original city renderer is the default.
+  this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')==='1';
  this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
  this.meshes=new Map();this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
@@ -344,7 +319,6 @@ export class Renderer{
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);
   const camY=toMeters(cameraEyeY(player)),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(player.yaw+walkSway,player.pitch,toMeters(player.x),camY,toMeters(player.z)));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,toMeters(player.x),camY,toMeters(player.z));gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
-  gl.uniform1f(this.u.FarFog,farLook?FAR_LOOK.fogMeters:0);
   this.updateLightVolume(world,player);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);
@@ -356,7 +330,6 @@ export class Renderer{
    gl.uniform2f(this.u.fogRange,30,230);
    gl.uniform1i(this.u.distant,1);
    gl.uniform2f(this.u.centerChunk,Math.floor(cx/SIZE),Math.floor(cz/SIZE));
-   gl.uniform1f(this.u.Facade,farLook&&this.renderScale>=FAR_LOOK.facadeMinScale?1:0);
    gl.enable(gl.POLYGON_OFFSET_FILL);
    if(this.distanceMesh?.count){
     gl.polygonOffset(1,1);
