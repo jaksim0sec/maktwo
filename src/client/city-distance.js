@@ -2,58 +2,105 @@ import {SIZE} from '../core/chunk.js';
 import {BLOCK as B,block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {libraryRoofHeight} from '../worldgen/eternal-night-library.js';
+import {FAR_LOOK} from './far-look.js';
 import {quad,rgb} from './mesher.js';
 
 const NEAR=44, FAR=256, MAX_BUILDINGS=96;
-const nearSquared=NEAR**2, farSquared=FAR**2;
+const nearSquared=NEAR**2;
+const legacyBuildingMeshes=new WeakMap();
 const buildingMeshes=new WeakMap();
 const towerMeshes=new WeakMap();
 const libraryMeshes=new WeakMap();
 
-export function distantCityMesh(plan,cx,cz) {
+export function distantCityMesh(plan,cx,cz,options) {
+ const enhanced=options?.enhanced??true;
+ const radius=enhanced?FAR_LOOK.middleRadius:FAR;
  const x=(cx+.5)*SIZE,z=(cz+.5)*SIZE;
+ const pieces=[];
+ const tower=plan.tower, library=plan.library;
+ if(tower&&Math.hypot(tower.x-x,tower.z-z)<=radius+tower.radius)
+  pieces.push(towerSilhouette(tower));
+ if(library&&Math.hypot(library.x-x,library.z-z)<=radius+library.radius)
+  pieces.push(librarySilhouette(library));
+
+ // Keep the upload below the old size even where the city's edge is sparse.
+ // Count legacy geometry without building or uploading another mesh.
+ const landmarkFloats=pieces.reduce((sum,piece)=>sum+piece.length,0);
  const buildings=[];
+ const searchRadius=enhanced?Math.max(FAR,radius):FAR;
  for(const volume of plan.volumes){
   const dx=Math.max(volume.x0-x,0,x-volume.x1);
   const dz=Math.max(volume.z0-z,0,z-volume.z1);
   const distance=dx*dx+dz*dz;
-  if(distance>=nearSquared&&distance<=farSquared)buildings.push({volume,distance});
+  if(distance>searchRadius**2)continue;
+  const insideNear=volume.x0>=(cx-2)*SIZE&&volume.x1<=(cx+3)*SIZE
+   &&volume.z0>=(cz-2)*SIZE&&volume.z1<=(cz+3)*SIZE;
+  const legacy=distance>=nearSquared&&distance<=FAR**2;
+  if(legacy||(enhanced&&!insideNear&&distance<=radius**2))
+   buildings.push({volume,distance,insideNear,legacy});
  }
  buildings.sort((a,b)=>a.distance-b.distance);
- const pieces=buildings.slice(0,MAX_BUILDINGS).map(({volume})=>{
-  let mesh=buildingMeshes.get(volume);
-  if(!mesh){mesh=buildingSilhouette(plan,volume);buildingMeshes.set(volume,mesh)}
-  return mesh;
- });
- const tower=plan.tower;
- if(tower&&Math.hypot(tower.x-x,tower.z-z)<=FAR+tower.radius){
-  let mesh=towerMeshes.get(tower);
-  if(!mesh){
-   const vertices=[],color=rgb(block(B.ARCH_STONE_MARBLE).color),sides=48;
-   for(let i=0;i<sides;i++){
-    const a=i*2*Math.PI/sides,b=(i+1)*2*Math.PI/sides;
-    const ax=tower.x+tower.radius*Math.cos(a),az=tower.z+tower.radius*Math.sin(a);
-    const bx=tower.x+tower.radius*Math.cos(b),bz=tower.z+tower.radius*Math.sin(b);
-    quad(vertices,[[ax,tower.bottom,az],[ax,tower.top,az],[bx,tower.top,bz],[bx,tower.bottom,bz]],color,.78);
-   }
-   mesh=new Float32Array(vertices);
-   towerMeshes.set(tower,mesh);
+ let budget=FAR_LOOK.middleVertexBudget*7;
+ if(enhanced){
+  let legacyFloats=0;
+  if(tower&&Math.hypot(tower.x-x,tower.z-z)<=FAR+tower.radius)legacyFloats+=towerSilhouette(tower).length;
+  if(library&&Math.hypot(library.x-x,library.z-z)<=FAR+library.radius)legacyFloats+=librarySilhouette(library).length;
+  let count=0;
+  for(const {volume,legacy} of buildings){
+   if(!legacy)continue;
+   legacyFloats+=legacyVertexCount(plan,volume)*7;
+   if(++count===MAX_BUILDINGS||legacyFloats>budget)break;
+  }
+  // Leave at least one triangle of headroom against the legacy upload.
+  budget=Math.max(0,Math.min(budget,legacyFloats-3*7));
+ }
+ let floats=landmarkFloats,covered=radius,count=0;
+ if(enhanced&&floats>budget){
+  pieces.length=0;
+  floats=0;
+  covered=0;
+ }
+ for(const {volume,distance,insideNear,legacy} of buildings){
+  if(enhanced){
+   if(covered===0||distance>radius**2)break;
+   if(insideNear)continue;
+  }else if(!legacy)continue;
+  const cache=enhanced?buildingMeshes:legacyBuildingMeshes;
+  let mesh=cache.get(volume);
+  if(!mesh){mesh=buildingSilhouette(plan,volume,enhanced);cache.set(volume,mesh)}
+  if(enhanced&&floats+mesh.length>budget){
+   covered=Math.sqrt(distance);
+   break;
   }
   pieces.push(mesh);
+  floats+=mesh.length;
+  if(!enhanced&&++count===MAX_BUILDINGS)break;
  }
- const library=plan.library;
- if(library&&Math.hypot(library.x-x,library.z-z)<=FAR+library.radius){
-  let mesh=libraryMeshes.get(library);
-  if(!mesh){mesh=librarySilhouette(library);libraryMeshes.set(library,mesh)}
-  pieces.push(mesh);
- }
- const merged=new Float32Array(pieces.reduce((length,piece)=>length+piece.length,0));
+ if(options)options.coveredRadius=covered;
+ const merged=new Float32Array(floats);
  let offset=0;
  for(const piece of pieces){merged.set(piece,offset);offset+=piece.length}
  return merged;
 }
 
-function librarySilhouette(library){
+export function towerSilhouette(tower){
+ let mesh=towerMeshes.get(tower);
+ if(mesh)return mesh;
+ const vertices=[],color=rgb(block(B.ARCH_STONE_MARBLE).color),sides=48;
+ for(let i=0;i<sides;i++){
+  const a=i*2*Math.PI/sides,b=(i+1)*2*Math.PI/sides;
+  const ax=tower.x+tower.radius*Math.cos(a),az=tower.z+tower.radius*Math.sin(a);
+  const bx=tower.x+tower.radius*Math.cos(b),bz=tower.z+tower.radius*Math.sin(b);
+  quad(vertices,[[ax,tower.bottom,az],[ax,tower.top,az],[bx,tower.top,bz],[bx,tower.bottom,bz]],color,.78);
+ }
+ mesh=new Float32Array(vertices);
+ towerMeshes.set(tower,mesh);
+ return mesh;
+}
+
+export function librarySilhouette(library){
+ const cached=libraryMeshes.get(library);
+ if(cached)return cached;
  const mesh=[],sides=96,rings=12;
  const color=rgb(block(B.ARCH_BRICK_WHITE).color);
  const point=(angle,r,y)=>[library.x+Math.cos(angle)*r,y,library.z+Math.sin(angle)*r];
@@ -73,10 +120,45 @@ function librarySilhouette(library){
    quad(mesh,face.toReversed(),color,.52);
   }
  }
- return new Float32Array(mesh);
+ const result=new Float32Array(mesh);
+ libraryMeshes.set(library,result);
+ return result;
 }
 
-function buildingSilhouette(plan,v){
+export function shadedWall(mesh,points,color){
+ const dx=points[3][0]-points[0][0],dz=points[3][2]-points[0][2];
+ const shade=.75+.15*(dz-dx)*Math.SQRT1_2/(Math.hypot(dx,dz)||1);
+ for(const i of [0,1,2,0,2,3])mesh.push(...points[i],...color,shade*(i===0||i===3?.74:.98));
+}
+
+const legacyCounts=new WeakMap();
+
+function hasLegacyWindow(plan,volume,floor,first,edge,length,height){
+ return length>=6&&height>=3&&floor.program!=='workshops'&&hash(volume.id,edge,first,plan.layout.seed)<=.5;
+}
+
+function legacyVertexCount(plan,volume){
+ let count=legacyCounts.get(volume);
+ if(count!==undefined)return count;
+ count=0;
+ for(let first=0;first<volume.floors.length;){
+  const floor=volume.floors[first];
+  let end=first+1;
+  while(end<volume.floors.length&&volume.floors[end].band===floor.band)end++;
+  const height=volume.floors[end-1].top-floor.y;
+  const outline=floor.outline;
+  for(let edge=0;edge<outline.length;edge++){
+   const [ax,az]=outline[edge],[bx,bz]=outline[(edge+1)%outline.length];
+   count+=12;
+   if(hasLegacyWindow(plan,volume,floor,first,edge,Math.hypot(bx-ax,bz-az),height))count+=6;
+  }
+  first=end;
+ }
+ legacyCounts.set(volume,count);
+ return count;
+}
+
+function buildingSilhouette(plan,v,enhanced){
  const mesh=[];
  let first=0;
  while(first<v.floors.length){
@@ -87,9 +169,11 @@ function buildingSilhouette(plan,v){
   const color=rgb(block(plan.details[v.id].kits[first].body).color);
   for(let edge=0;edge<outline.length;edge++){
    const [ax,az]=outline[edge],[bx,bz]=outline[(edge+1)%outline.length];
-   quad(mesh,[[ax,bottom,az],[ax,top,az],[bx,top,bz],[bx,bottom,bz]],color,.76);
+   const wall=[[ax,bottom,az],[ax,top,az],[bx,top,bz],[bx,bottom,bz]];
+   if(enhanced){shadedWall(mesh,wall,color);continue}
+   quad(mesh,wall,color,.76);
    const length=Math.hypot(bx-ax,bz-az);
-   if(length<6||top-bottom<3||floor.program==='workshops'||hash(v.id,edge,first,plan.layout.seed)>.5)continue;
+   if(!hasLegacyWindow(plan,v,floor,first,edge,length,top-bottom))continue;
    // A few emissive apertures sell the scale without adding light sources.
    const nx=(bz-az)/length*.04,nz=(ax-bx)/length*.04;
    const t=.25+hash(v.id,edge,first,41)*.5;
@@ -103,7 +187,7 @@ function buildingSilhouette(plan,v){
   for(let i=0;i<outline.length;i++){
    const [ax,az]=outline[i],[bx,bz]=outline[(i+1)%outline.length];
    mesh.push(center[0],top,center[1],...color,.93, bx,top,bz,...color,.93, ax,top,az,...color,.93);
-   mesh.push(center[0],bottom,center[1],...color,.58, ax,bottom,az,...color,.58, bx,bottom,bz,...color,.58);
+   if(!enhanced)mesh.push(center[0],bottom,center[1],...color,.58, ax,bottom,az,...color,.58, bx,bottom,bz,...color,.58);
   }
   first=end;
  }

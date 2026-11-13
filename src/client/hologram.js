@@ -172,5 +172,6 @@ export class Hologram{
   // but don't let opaque world polygons cut holes through selectable cards.
   gl.disable(gl.DEPTH_TEST);gl.uniform1f(this.u.opacity,1);gl.drawArrays(gl.TRIANGLES,0,this.count);
   gl.depthFunc(gl.LESS);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.disable(gl.BLEND);
+  return true;
  }
 }
