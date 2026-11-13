@@ -51,11 +51,11 @@ void main(){
     vec2 f=fract(cell),id=floor(cell);
     float row=facadeHash(vec2(id.y,floor(vPos.x/48.)+71.*floor(vPos.z/48.)));
     float on=step(row>${FAR_LOOK.litRowThreshold}?${FAR_LOOK.busyWindowThreshold}:${FAR_LOOK.quietWindowThreshold},facadeHash(id));
-    vec3 lamp=mix(vec3(.84,.89,.93),vec3(1.,.60,.36),step(.5,facadeHash(id+7.)));
+    vec3 lamp=vec3(.92,.84,.72);
     vec2 footprint=fwidth(cell);
     float detail=1.-smoothstep(.3,.7,max(footprint.x,footprint.y));
     float window=step(.28,f.x)*step(f.x,.72)*step(.22,f.y)*step(f.y,.78)*wall;
-    glow=mix(vec3(.024,.022,.018)*wall,lamp*on*window,detail);
+    glow=mix(lamp*.012*wall,lamp*on*window*${FAR_LOOK.windowGlow},detail);
     tinted*=mix(1.,.62,window*(1.-on)*detail);
    }
    vec3 lit=vEmission>.5?tinted:tinted*vec3(.65,.72,.93)*uBrightness;
