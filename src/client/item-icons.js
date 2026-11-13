@@ -1,6 +1,7 @@
 import {block,BLOCK as B} from '../core/blocks.js';
 import {makeTextureLayers,materialFor} from './textures.js';
 import {shapeBoxes} from '../core/shapes.js';
+import {TREE_SPECIES,treeKind,isTreeAnchor,isFallenLeaves} from '../core/tree-assets.js';
 
 // Render tiny isometric item portraits from the same procedural material layers
 // as world blocks. No separate texture pack, network requests, or GPU draws.
@@ -31,6 +32,30 @@ function face(ctx,id,faceIndex,points,shade){
 // Item previews share the exact partial-voxel geometry with world meshing/collision.
 // Isometric box projection is applied once when the icon is cached, not per frame.
 export function drawShapeIcon(ctx,id){
+ const kind=treeKind(id);
+ if(kind>=0){
+  const tree=TREE_SPECIES[kind];
+  if(isFallenLeaves(id)){
+   for(let j=0;j<16;j++){
+    const x=8+(j*17%51),y=31+(j*13%24),r=1.8+j%3;
+    poly(ctx,[[x-r,y],[x,y-r*1.5],[x+r,y],[x,y+r]],tree.litter[j%tree.litter.length]);
+   }
+  }else if(isTreeAnchor(id)){
+   ctx.strokeStyle=tree.bark;ctx.lineCap='round';ctx.lineWidth=5;
+   ctx.beginPath();ctx.moveTo(32,59);ctx.bezierCurveTo(30,44,33,33,35,25);ctx.stroke();
+   for(let i=0;i<7;i++){
+    const a=(i/7)*Math.PI*2,tx=32+Math.cos(a)*16,ty=27+Math.sin(a)*10;
+    ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(34,39);ctx.lineTo(tx,ty);ctx.stroke();
+   }
+   for(let j=0;j<14;j++){
+    const a=j*2.39996,r=4+Math.sqrt(j/14)*18;
+    const x=32+Math.cos(a)*r,y=23+Math.sin(a)*r*.62-(j%3)*2;
+    ctx.fillStyle=tree.crown[j%tree.crown.length];
+    ctx.beginPath();ctx.ellipse(x,y,7+(j%3)*2,5+(j%2)*2,a*.5,0,Math.PI*2);ctx.fill();
+   }
+  }
+  return true;
+ }
  let boxes=shapeBoxes(id,0,0,0,{facing:0,upper:false});
  // Reuse the component proportions from the world mesh, not a generic cube.
  if(id===B.WORKBENCH)boxes=[{x:.045,y:.77,z:.045,w:.91,h:.22,d:.91},...[.11,.72].flatMap(x=>[.11,.72].map(z=>({x,y:0,z,w:.17,h:.76,d:.17})))];

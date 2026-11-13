@@ -17,9 +17,13 @@ for(const id of [6,10,20,21,28,29,31,33])UV_VARIANTS[id]=1; // maintain wood, ru
 for(let id=71;id<=90;id++)UV_VARIANTS[id]=1; // station patterns remain aligned to track geometry
 export const textureTransformMode=id=>UV_VARIANTS[id]||0;
 export function materialUVTransform(id,random,authoredTurn=0){
- const mode=textureTransformMode(id),sample=Math.min(7,Math.floor(random*8));
- const rotation=(mode>>1)*(sample&3),mirror=(mode&1)*(sample&4);
- return authoredTurn?authoredTurn|mirror:rotation|mirror;
+ // Temporarily disable coordinate-hashed UV rotations and mirroring.
+ // Preserve authored orientations on directional blocks; re-enable only
+ // after visual review of the original texture alignment.
+ // const mode=textureTransformMode(id),sample=Math.min(7,Math.floor(random*8));
+ // const rotation=(mode>>1)*(sample&3),mirror=(mode&1)*(sample&4);
+ // return authoredTurn?authoredTurn|mirror:rotation|mirror;
+ return authoredTurn;
 }
 export function materialFor(id,face){
  if(id>=STATION_MATERIAL_START&&id<STATION_MATERIAL_START+STATION_MATERIALS.length)return 41+ARCH_MATERIALS.length+id-STATION_MATERIAL_START;

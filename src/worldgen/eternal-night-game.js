@@ -11,6 +11,7 @@ import {encodeCityStair,encodeSplitTread,stairOuterRail,walkwayJunction,CITY_STA
 import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
 import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
 import {stampElevatedStationColumn} from './eternal-night-station-build.js';
+import {roadsideTreeCell} from './trees.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 import {floorEnvironment,lightProbability,survivingFixture} from './eternal-night-decay.js';
 
@@ -22,6 +23,7 @@ export const CITY_SEED=9999;
 export const CITY_BLUEPRINT_VERSION=6;
 export const CITY_STATION_VERSION=7;
 export const CITY_STATION_REDESIGN_VERSION=8;
+export const CITY_BOTANICAL_VERSION=9;
 export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
 
@@ -457,6 +459,13 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
       stampCoreTower(tower,x,z,put);
     if(plan.stations.length)stampElevatedStationColumn(plan,x,z,put);
+    if((cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION)&&zone===CORE_ZONE.MAIN_ROUTE){
+      const tree=roadsideTreeCell(x,z,layout,seed);
+      // Trees occupy only free lower sidewalks, never a bridge, doorway or track.
+      if(tree&&empty(CITY_BASE_Y)&&!plan.columns[index].length&&
+        ![...reservedLevels].some(level=>level>=CITY_BASE_Y&&level<=CITY_BASE_Y+13))
+        put(CITY_BASE_Y,tree.id,undefined,false,tree.variant);
+    }
   }
   return chunk;
 }

@@ -49,9 +49,9 @@ function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
   add('view:craft','제작하기',.14,.80,.32,.20,'view');
   add('close','✕',.38,.80,.14,.14,'close');
   const filters=craft?[['filter:all','전체'],['filter:available','제작 가능'],['hand','맨손']]:
-   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
+   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:trees','수목'],['tab:items','소품'],['hand','맨손']];
   filters.forEach(([id,name],i)=>{
-   const row=craft?0:Math.floor(i/3),col=craft?i:i%3,total=craft?3:row===0?3:2;
+   const row=craft?0:Math.floor(i/3),col=craft?i:i%3,total=3;
    add(id,name,(col-(total-1)/2)*.29,craft?.49:row===0?.53:.34,.27,.15,'filter');
   });
  }else{
@@ -59,8 +59,8 @@ function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
   add('view:craft','제작하기',.43,.81,.80,.27,'view');
   add('close','✕',1.06,.81,.27,.27,'close');
   const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능'],['hand','맨손']]:
-   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:items','소품'],['hand','맨손']];
-  const step=craft?.63:.46;
+   [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:trees','수목'],['tab:items','소품'],['hand','맨손']];
+  const step=craft?.63:.41;
   filters.forEach(([id,name],i)=>add(id,name,(i-(filters.length-1)/2)*step,.50,step-.055,.19,'filter'));
  }
  for(let i=0;i<items.length;i++){

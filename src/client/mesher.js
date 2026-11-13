@@ -11,6 +11,7 @@ import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
 import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections} from '../core/part-prisms.js';
+import {treeGeometryForBlock} from './tree-mesh.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -24,7 +25,7 @@ const FACES = [
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part','tree','leaf-litter'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
@@ -156,6 +157,11 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
    continue;
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
+  if(BLOCKS[id].render==='tree'||BLOCKS[id].render==='leaf-litter'){
+   const local=treeGeometryForBlock(id,(chunk.styles?.[idx]||0)&3);
+   if(local)emitPart(opaque,local,ox+x,y,oz+z);
+   continue;
+  }
   const wx=ox+x,wz=oz+z,authored=states.size?stateAt(wx,y,wz):undefined;
   const style=chunk.styles?.[idx]||0,variant=style&TURN_STYLE?0:style;
   const state=style&TURN_STYLE?{facing:style&7,...authored}:variant?{variant,...authored}:authored;

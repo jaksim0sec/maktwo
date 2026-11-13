@@ -4,13 +4,13 @@ import {materialUVTransform,textureTransformMode,makeTextureLayers} from '../src
 import {meshChunkData} from '../src/client/mesher.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {Chunk} from '../src/core/chunk.js';
-test('only orientation safe material groups rotate or mirror',()=>{
+test('coordinate UV transforms are paused; authored rotations remain',()=>{
  assert.equal(textureTransformMode(4),3);
  assert.equal(textureTransformMode(26),0);
  assert.equal(textureTransformMode(33),1);
  assert.equal(textureTransformMode(65),0);
- assert.equal(materialUVTransform(4,.99),7);
- assert.equal(materialUVTransform(33,.99),4);
+ assert.equal(materialUVTransform(4,.99),0);
+ assert.equal(materialUVTransform(33,.99),0);
  assert.equal(materialUVTransform(26,.99),0);
  assert.equal(materialUVTransform(4,0,2),2);
 });

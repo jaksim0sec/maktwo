@@ -5,6 +5,7 @@ import {partById} from './part-library.js';
 import {fencePrisms} from './fence-joints.js';
 import {panelPoint} from './panel-joints.js';
 import {partPrisms,prismAabb,partOverlaps} from './part-prisms.js';
+import {isTreeAnchor} from './tree-assets.js';
 export const isStairs=id=>id===B.STONE_STAIRS||id===B.WOOD_STAIRS||id===B.CONCRETE_STAIRS;
 export const isSlab=id=>id===B.STONE_SLAB||id===B.WOOD_SLAB||id===B.CONCRETE_SLAB||id===B.UPPER_STAIR_TREAD||id===B.FLOOR_FINISH||id===B.CEILING_FINISH;
 export const isPanel=id=>itemId(id)===B.WINDOW_NS||itemId(id)===B.THIN_WALL_NS;
@@ -27,6 +28,7 @@ function rotateBoxes(boxes,x,z,facing){
 export function shapeBoxes(id,x,y,z,state={}){
  const facing=((state.facing||0)%4+4)%4;
  if(partById(id))return (partPrisms(id,x,y,z,state)||[]).map(prismAabb);
+ if(isTreeAnchor(id))return [{x:x+.30,y,z:z+.30,w:.4,h:1,d:.4}]; // narrow trunk; canopy is decorative
  if(isPanel(id)&&state.panelTurn!==undefined){
   const base=itemId(id);
   id=(state.panelTurn&2)?(base===B.WINDOW_NS?B.WINDOW_EW:B.THIN_WALL_EW):base;

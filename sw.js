@@ -1,18 +1,18 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.34-elevated-metro-v8';
+const CACHE_NAME='maktwo-shell-v1.15.35-botanical-models';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
  './icons/maktwo-192.png','./icons/maktwo-512.png',
- './src/client/game.js','./src/client/station-train-mesh.js','./src/core/world-slots.js','./src/client/input.js','./src/client/gestures.js','./src/client/item-icons.js',
+ './src/client/game.js','./src/client/station-train-mesh.js','./src/core/world-slots.js','./src/client/input.js','./src/client/gestures.js','./src/client/item-icons.js','./src/client/tree-mesh.js',
  './src/client/pwa.js','./src/client/picking.js','./src/client/textures.js','./src/client/station-textures.js','./src/client/architecture-texture-sampler.js','./src/client/camera.js','./src/client/atmosphere.js','./src/client/hologram.js',
  './src/client/city-distance.js','./src/client/city-far.js','./src/client/city-far.worker.js','./src/client/far-look.js','./src/client/renderer.js','./src/client/mesher.js','./src/client/mesh.worker.js',
  './src/client/light.worker.js','./src/core/blocks.js','./src/core/chunk.js',
  './src/core/panel-joints.js','./src/core/fence-joints.js','./src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/inventory.js','./src/core/crafting.js','./src/core/physics.js',
- './src/core/scale.js','./src/core/train-collision.js','./src/core/part-library.js','./src/core/station-parts.js','./src/core/station-materials.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
+ './src/core/scale.js','./src/core/train-collision.js','./src/core/part-library.js','./src/core/station-parts.js','./src/core/station-materials.js','./src/core/tree-assets.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
- './src/worldgen/generators.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
+ './src/worldgen/generators.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/trees.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
  './src/worldgen/eternal-night-game.js','./src/worldgen/eternal-night-core-floor.js','./src/worldgen/eternal-night-districts.js',
  './src/worldgen/eternal-night-buildings.js','./src/worldgen/eternal-night-blueprints.js','./src/worldgen/eternal-night-stations.js','./src/worldgen/eternal-night-walkways.js','./src/worldgen/eternal-night-kits.js',
  './src/worldgen/eternal-night-precincts.js','./src/worldgen/eternal-night-station-build.js','./src/worldgen/eternal-night-decay.js','./src/worldgen/eternal-night-facade.js','./src/worldgen/eternal-night-interiors.js','./src/worldgen/eternal-night-stairs.js','./src/worldgen/eternal-night-tower.js','./src/worldgen/eternal-night-library.js'
