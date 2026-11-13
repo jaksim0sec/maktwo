@@ -102,3 +102,25 @@ test('sloped skybridges voxelize the same quarter-step walkway geometry as build
  }
  assert.ok(found>=5,`sloping bridges need real treads, got ${found} of ${checked}`);
 });
+
+test('connected roof passages stamp actual continuous rails, not only a plan label',()=>{
+ const plan=createCityPlan(9999),world=new World({seed:9999,mode:'eternal-city-lab'});
+ let rails=0,scanned=0;
+ for(const link of plan.walkways.filter(l=>l.kind==='roof').slice(0,18)){
+  for(const segment of link.segments.filter(s=>s.kind==='deck'&&s.length>6)){
+   const dx=(segment.to[0]-segment.from[0])/segment.length;
+   const dz=(segment.to[2]-segment.from[2])/segment.length;
+   for(const t of [.27,.40,.53,.66,.78])for(const side of [-1,1]){
+    const px=segment.from[0]+(segment.to[0]-segment.from[0])*t;
+    const pz=segment.from[2]+(segment.to[2]-segment.from[2])*t;
+    const x=Math.floor(px-dz*side*(link.width/2-.23))+.5;
+    const z=Math.floor(pz+dx*side*(link.width/2-.23))+.5;
+    const y=Math.round(segment.from[1]);
+    const id=world.get(x,y,z);
+    scanned++;
+    if(partById(id)?.family==='passage'&&world.getShapeState(x,y,z).cityBridge)rails++;
+   }
+  }
+ }
+ assert.ok(rails>=2,`roof circulation needs genuine joined rails, got ${rails} of ${scanned} samples`);
+});
