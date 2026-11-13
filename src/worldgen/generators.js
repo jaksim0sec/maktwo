@@ -22,32 +22,44 @@ export const biomeAt=(x,z,seed,mode='normal')=>terrainAt(x,z,seed,mode).biome;
 export const surfaceAt=(x,z,seed,mode='normal')=>terrainAt(x,z,seed,mode).height;
 // Stable world-coordinate passes: features can cross chunk boundaries without load-order dependence.
 const MAX_TREE_CHANCE=Math.max(...Object.values(BIOMES).map(biome=>biome.tree));
+const DEFAULT_MATERIAL={soil:B.DIRT,surface:()=>B.GRASS};
+const BIOME_MATERIALS={
+ desert:{soil:B.SAND,surface:()=>B.SAND},
+ volcanic:{soil:B.BASALT,surface:()=>B.BASALT,rock:[.22,B.SLATE,B.BASALT]},
+ limestone:{soil:B.LIMESTONE,surface:()=>B.LIMESTONE,rock:[.34,B.MARBLE,B.LIMESTONE]},
+ badlands:{soil:B.TERRACOTTA,surface:()=>B.RED_SAND,rock:[.55,B.SHALE,B.TERRACOTTA]},
+ alpine:{soil:B.ALPINE_SOIL,surface:r=>r>.85?B.ICE:B.SNOW,rock:[.39,B.SLATE,B.GRANITE]},
+ mountains:{soil:B.DIRT,surface:()=>B.GRASS,rock:[.72,null,B.BASALT]},
+ wetlands:{soil:B.CLAY,surface:r=>r>.45?B.PEAT:B.CLAY,peat:true},
+ boreal:{soil:B.ALPINE_SOIL,surface:()=>B.MOSS},
+ meadow:{soil:B.DIRT,surface:()=>B.HIGHLAND_GRASS},
+ forest:{soil:B.DIRT,surface:r=>r>.7?B.MOSS:B.GRASS}
+};
 export function generateChunk(chunk,seed,mode='normal'){
  if(mode===CITY_MODE)return stampCityChunk(chunk,seed);
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE, profiles=new Array(SIZE*SIZE);
+ const studio=isStudioMode(mode),detail=mode!=='flat'&&!studio;
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const wx=ox+x,wz=oz+z,profile=terrainAt(wx,wz,seed,mode);
   profiles[z*SIZE+x]=profile;
-  const {height:h,biome:b}=profile;
+  const {height:h,biome:b}=profile,material=BIOME_MATERIALS[b]??DEFAULT_MATERIAL;
   for(let y=0;y<HEIGHT;y++){
-   let id=B.AIR;if(y===0)id=B.BEDROCK;else if(y<h-4)id=B.STONE;else if(y<h)id=b==='desert'?B.SAND:B.DIRT;else if(y===h)id=isStudioMode(mode)?B.CONCRETE:b==='desert'?B.SAND:B.GRASS;else if(y<=SEA)id=B.WATER;
-   if(mode!=='flat'&&!isStudioMode(mode)&&y>5&&y<h-4&&y<36&&fbm(wx*.085+y*.017,wz*.085-y*.01,seed+y*31,2)>.48)id=B.AIR;
-   if(mode!=='flat'&&!isStudioMode(mode)&&id!==B.BEDROCK&&id!==B.AIR&&id!==B.WATER){
+   let id=B.AIR;if(y===0)id=B.BEDROCK;else if(y<h-4)id=B.STONE;else if(y<h)id=material.soil;else if(y===h)id=studio?B.CONCRETE:b==='desert'?B.SAND:B.GRASS;else if(y<=SEA)id=B.WATER;
+   if(detail&&y>5&&y<h-4&&y<36&&fbm(wx*.085+y*.017,wz*.085-y*.01,seed+y*31,2)>.48)id=B.AIR;
+   if(detail&&id!==B.BEDROCK&&id!==B.AIR&&id!==B.WATER){
     const geology=hash(Math.floor(wx/6),Math.floor(y/5),Math.floor(wz/6),seed+850);
     const r=hash(wx,y,wz,seed+862);
     if(y<h-4){
-     if(b==='volcanic')id=geology>.22?B.BASALT:B.SLATE;
-     else if(b==='limestone')id=geology>.34?B.LIMESTONE:B.MARBLE;
-     else if(b==='badlands')id=geology>.55?B.TERRACOTTA:B.SHALE;
-     else if(b==='alpine')id=geology>.39?B.GRANITE:B.SLATE;
-     else if(b==='mountains'&&geology>.72)id=B.BASALT;
+     const rock=material.rock;
+     if(rock&&geology>rock[0])id=rock[2];
+     else if(rock&&rock[1]!==null)id=rock[1];
      else id=geology>.83?B.SHALE:geology<.18?B.SLATE:B.STONE;
      if(r>.997)id=B.QUARTZ;
     }else if(y<h){
-     id=b==='badlands'?B.TERRACOTTA:b==='wetlands'?B.CLAY:b==='boreal'?B.ALPINE_SOIL:b==='alpine'?B.ALPINE_SOIL:b==='volcanic'?B.BASALT:b==='limestone'?B.LIMESTONE:B.DIRT;
-     if(b==='wetlands'&&geology>.65)id=B.PEAT;
+     id=material.soil;
+     if(material.peat&&geology>.65)id=B.PEAT;
     }else if(y===h){
-     id=b==='alpine'?(r>.85?B.ICE:B.SNOW):b==='volcanic'?B.BASALT:b==='badlands'?B.RED_SAND:b==='wetlands'? (r>.45?B.PEAT:B.CLAY):b==='limestone'?B.LIMESTONE:b==='boreal'?B.MOSS:b==='meadow'?B.HIGHLAND_GRASS:b==='forest'&&r>.7?B.MOSS:B.GRASS;
+     id=material.surface(r);
      if(b==='forest'&&r>.997)id=B.GLOW_MOSS;
     }
    }
@@ -55,7 +67,7 @@ export function generateChunk(chunk,seed,mode='normal'){
    chunk.data[(y*SIZE+z)*SIZE+x]=id;
   }
  }
- if(mode!=='flat'&&mode!=='ruins'&&!isStudioMode(mode)){
+ if(detail&&mode!=='ruins'){
   // Search an expanded region so neighboring chunks receive identical feature pieces.
   for(let wz=oz-5;wz<oz+SIZE+5;wz++)for(let wx=ox-5;wx<ox+SIZE+5;wx++){
    const roll=hash(wx,0,wz,seed+401);

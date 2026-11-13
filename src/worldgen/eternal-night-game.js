@@ -122,7 +122,7 @@ function furnishRoom(room,x,z,kit,seed) {
   return null;
 }
 
-function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
+function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLimit=Infinity) {
   const xi=Math.floor(x),zi=Math.floor(z),{stairs,landing,access,kits}=detail;
   const stairAlongX=v.stairFacing===2;
   const sampleX=stairAlongX?.25:0,sampleZ=stairAlongX?0:.25;
@@ -142,18 +142,28 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
   const from=step>=0?stairs.find(t=>containsRect(t,x-dx*.25,z-dz*.25)):null;
   const to=step>=0?stairs.find(t=>containsRect(t,x+dx*.25,z+dz*.25)):null;
   const shapeCache=new Map();
+  let lastKey,lastCachedShape;
   const columnHash=hash(xi,v.id,zi,seed);
   const roofY=Math.round(v.roof.y);
   if(inside(v.roof.outline,x,z)&&!(shaft&&containsRect(shaft,x,z)))put(roofY-1,kits.at(-1).body);
   let lastShape=null;
-  for(const f of v.floors) {
-    if(!shapeCache.has(f.key))shapeCache.set(f.key,inspectShape(f,x,z));
-    const shape=shapeCache.get(f.key);
+  for(let floorIndex=0;floorIndex<v.floors.length;floorIndex++) {
+    const f=v.floors[floorIndex];
+    if(Math.round(f.y)-1>=yLimit)break;
+    if(f.key!==lastKey){
+      lastCachedShape=shapeCache.get(f.key);
+      if(lastCachedShape===undefined){
+        lastCachedShape=inspectShape(f,x,z);
+        shapeCache.set(f.key,lastCachedShape);
+      }
+      lastKey=f.key;
+    }
+    const shape=lastCachedShape;
     const kit=kits[f.level],floor=Math.round(f.y),ceiling=Math.round(f.top)-1;
     if(!shape) {
       // Recessed upper floors expose the roof of the previous mass as a terrace.
       if(lastShape&&lastShape.edge>=0&&columnHash>.54&&!reservedPassage(floor)) {
-        const previous=v.floors[f.level-1].outline;
+        const previous=v.floors[floorIndex-1].outline;
         put(floor,cityPart('balcony',2),lineTurn(previous[lastShape.edge],previous[(lastShape.edge+1)%previous.length]),true);
       }
       lastShape=shape;
@@ -179,7 +189,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
       &&!reservedPassage(ceilingY)&&hasDropCeiling(f,shape);
     if(hasCeiling)put(ceilingY,ceilingFixture(f,corridor,x,z,v.id,seed));
     // An exposed underside still needs a slab even where the next storey steps back.
-    const next=v.floors[f.level+1];
+    const next=v.floors[floorIndex+1];
     if((!next||!inside(next.outline,x,z))&&!(shaft&&containsRect(shaft,x,z)))put(ceiling,kit.body);
     if(edge>=0) {
       const a=f.outline[edge],b=f.outline[(edge+1)%f.outline.length],turn=lineTurn(a,b);
@@ -298,7 +308,6 @@ function stampAnnex(part,x,z,put,empty) {
 }
 
 function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
-  if(!inside(part.outline,x,z))return;
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
   const surface=part.y??segmentY(part,x,z);
   const level=Math.round(surface),style=link.architecture??'open';
@@ -385,27 +394,25 @@ export function stampCityChunk(chunk,seed) {
       put(0,B.BEDROCK);
       put(CITY_BASE_Y-1,plan.lanes?.[index]?(mod(Math.floor(x)+Math.floor(z),6)===0?B.WET_TILE:B.FLOOR_TILE):B.CONCRETE);
     }
-    // Walkway ports reserve traversable volume BEFORE buildings stamp their
-    // decorative balcony rails. This prevents roof/atrium rails obstructing
-    // the actual deck when a district or shop footprint changes.
-    const reservedLevels=new Map();
-    const reservedPassage=y=>{
-      if(reservedLevels.has(y))return reservedLevels.get(y);
-      const blocked=plan.pathColumns[index].some(({part})=>{
-        if(!inside(part.outline,x,z))return false;
-        const level=Math.round(part.y??segmentY(part,x,z));
-        return Math.abs(level-y)<=1;
-      });
-      reservedLevels.set(y,blocked);
-      return blocked;
-    };
-    for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage);
-    for(const {link,part} of plan.pathColumns[index]){
+    // Determine each route footprint once; buildings, walkways and the
+    // library all consume this same spatial classification.
+    const paths=[],reservedLevels=new Set();
+    let corePath=false;
+    for(const item of plan.pathColumns[index]){
+      const {link,part}=item;
+      if(!inside(part.outline,x,z))continue;
+      paths.push(item);
+      if(link.kind==='core')corePath=true;
+      const level=Math.round(part.y??segmentY(part,x,z));
+      reservedLevels.add(level-1);reservedLevels.add(level);reservedLevels.add(level+1);
+    }
+    const reservedPassage=y=>reservedLevels.has(y);
+    for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage,chunk.height);
+    for(const {link,part} of paths){
       if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty,layout.centerX,layout.centerZ,seed);
     }
     const library=plan.library;
     if(Math.abs(x-library.x)<=library.radius+4&&Math.abs(z-library.z)<=library.radius+4){
-      const corePath=plan.pathColumns[index].some(({link,part})=>link.kind==='core'&&inside(part.outline,x,z));
       stampCoreLibrary(library,x,z,put,empty,corePath);
     }
     const tower=plan.tower;

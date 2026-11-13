@@ -3,26 +3,19 @@
  * chamfers, narrow recesses and structural piers remain opaque.
  * Windows are NOT selected by random material swaps.
  */
+const USE={shops:1,market:1,housing:2,workshops:4,court:8,exchange:8};
 export function facadeBay({program,level,entryLevel,edge,bay,frontEdge=0,span=Infinity,stride=5}){
- const front=edge===frontEdge,retail=program==='shops'||program==='market';
+ const front=edge===frontEdge,kind=USE[program]??0,retail=kind===1;
  const longFace=span>=4.5,street=retail&&level<=entryLevel+1&&front&&longFace;
- const service=program==='workshops',publicUse=program==='court'||program==='exchange';
- let opening='wall';
- if(street&&(bay===1||bay===2))opening='shopfront';
- else if(longFace&&program==='housing'){
-  // Broad residential frontages gain a second staggered opening every four
-  // storeys. All long side/rear wings still get one window bay per module.
-  if(bay===2||(front&&span>=12&&bay===3&&level%4===0))opening='window';
- }else if(longFace&&service){
-  if(bay===2&&(level%2===0||front))opening='window';
- }else if(longFace&&publicUse){
-  if(level%3===0&&(bay===2||(front&&span>=12&&bay===3)))opening='window';
- }else if(longFace&&retail){
-  // Upper shops need windows along their sides too; the street-level side
-  // remains a service wall, never a fake extra storefront.
-  if(level>entryLevel+1&&bay===2&&level%2===0)opening='window';
- }
- const vent=longFace&&service&&!front&&bay===3&&level%4===2;
+ const service=kind===4,wideFront=front&&span>=12;
+ const shopfront=street&&((1<<bay)&0b110)!==0;
+ const window=longFace&&(
+  kind===2&&(bay===2||wideFront&&bay===3&&(level&3)===0)||
+  service&&bay===2&&((level&1)===0||front)||
+  kind===8&&level%3===0&&(bay===2||wideFront&&bay===3)||
+  retail&&level>entryLevel+1&&bay===2&&(level&1)===0);
+ const opening=shopfront?'shopfront':window?'window':'wall';
+ const vent=longFace&&service&&!front&&bay===3&&(level&3)===2;
  return {opening,vent,sign:street&&bay===3,front,street};
 }
 
