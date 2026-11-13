@@ -116,7 +116,7 @@ export function plankGrain(x,y,size,n=0){
  const vein=Math.sin(v*.63+.22*Math.sin(u*.36))*.043+Math.sin(v*1.65+u*.09)*.018;
  return .96+vein+.023*(n-.5)-(seam<.7?.12:0);
 }
-// 32x32 seamless low-contrast fixture pigments, generated only on atlas upload.
+// Visible 32x32 fixture albedo: wood grain, fabric weave and aged iron.
 const fc=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 function fh(x,y,s){
  let n=Math.imul(x+43,374761393)^Math.imul(y+89,668265263)^Math.imul(s+17,2246822519);
@@ -131,31 +131,40 @@ function fn(u,v,period,seed){
             mix(fh(x0,y1,seed),fh(x1,y1,seed),tx),ty);
 }
 export function sampleFixtureTexture(index,x,y,size=32){
- const u=x/size,v=y/size,s=177+index*67;
- const broad=fn(u,v,3,s),fine=fn(u,v,8,s+3),speck=fn(u,v,16,s+9),cloud=.62*broad+.27*fine+.11*speck;
- let light=.97,r=1,g=1,b=1;
- if(index===0){ // Timbers: directional fibres, subtle warm age
-  const warp=(fn(u,v,4,s+19)-.5)*.17;
-  const fibre=Math.cos((u+warp)*Math.PI*24)*.5+.5;
-  const pores=fn(u,v,16,s+21);
-  light=.89+.19*cloud+.042*(fibre-.5)-.055*Math.max(0,pores-.72);
-  r=1.035;g=.987;b=.925;
- }else if(index===1){ // Linen: tight woven thread and diffuse creases
-  const weave=(Math.cos(u*Math.PI*64)+Math.cos(v*Math.PI*64))*.012;
-  light=.964+.110*(cloud-.5)+weave-.030*Math.max(0,.35-fine);
-  r=1.018+.030*(broad-.5);g=1.007+.019*(fine-.5);b=.975+.024*(speck-.5);
- }else if(index===2){ // Muted washed quilt, no geometric printed motifs
-  const weave=(Math.cos(u*Math.PI*48)+Math.cos(v*Math.PI*48))*.009;
-  const wash=fn(u,v,5,s+33);
-  light=.952+.113*(cloud-.5)+weave-.04*Math.max(0,.40-wash);
-  r=.978+.029*(wash-.5);g=1.015+.015*(broad-.5);b=1.014+.023*(fine-.5);
- }else if(index===3){ // Softly oxidized lantern metal
-  const patina=fc((cloud-.50)*2.3);
-  const brush=(Math.cos(u*Math.PI*44)+Math.cos(v*Math.PI*12))*.013;
-  light=.965+.12*(cloud-.5)+brush-.07*patina;
-  r=1.01-.055*patina;g=1+.01*patina;b=.984-.024*patina;
+ const u=x/size,v=y/size,s=177+index*67,TAU=Math.PI*2;
+ const broad=fn(u,v,3,s),mid=fn(u,v,8,s+3),small=fn(u,v,16,s+9);
+ const cloud=.55*broad+.30*mid+.15*small;
+ const patch=fn(u,v,4,s+27),fine=fn(u,v,11,s+29);
+ let light=.96,r=1,g=1,b=1;
+ if(index===0){
+  // Real directional fibres: a few dark bends and fine pores, not printed squares.
+  const warp=(patch-.5)*.19+(mid-.5)*.06;
+  const grain=Math.cos(TAU*(u*4+warp));
+  const narrow=Math.pow(Math.max(0,grain),12);
+  const thin=Math.sin(TAU*(u*12+(broad-.5)*.12));
+  light=.615+.72*cloud+.09*(patch-.5)-.20*narrow+.035*thin;
+  r=1.07+.07*(patch-.5);g=.97+.055*(mid-.5);b=.865+.06*(fine-.5);
+ }else if(index===1){
+  // Soft linen with visible irregular fibres and broad, subtle folds.
+  const threads=Math.sin(TAU*(u*13+(patch-.5)*.14))*Math.sin(TAU*(v*13+(mid-.5)*.10));
+  const fold=Math.max(0,.56-patch);
+  light=.59+.78*cloud+.12*(patch-.5)-.22*fold+.055*threads;
+  r=1.045+.048*(mid-.5);g=1+.035*(patch-.5);b=.91+.056*(fine-.5);
+ }else if(index===2){
+  // Washed fabric and sparse diagonal twill, avoiding a repeating geometric print.
+  const washed=fn(u,v,5,s+37);
+  const twill=Math.sin(TAU*(u*6+v*5+(washed-.5)*.12));
+  light=.45+.79*cloud+.18*(washed-.5)+.038*twill;
+  r=.99+.060*(washed-.5);g=1.02+.065*(patch-.5);b=1.015+.08*(mid-.5);
+ }else if(index===3){
+  // Nonuniform iron patina and faint directional brushing on thin lamp parts.
+  const corrode=fc((.57-patch)*2.7);
+  const brushing=Math.cos(TAU*(u*12+(broad-.5)*.13));
+  const dents=Math.max(0,.4-fine);
+  light=.59+.70*cloud-.20*corrode+.046*brushing-.10*dents;
+  r=1.055-.14*corrode;g=1+.025*(mid-.5);b=.967-.10*corrode;
  }else throw Error('Unknown fixture texture '+index);
- return [fc(light,.76,1.10),r,g,b];
+ return [fc(light,.56,1.20),r,g,b];
 }
 // Compact, intentionally pixelated material art. Every surface has its own
 // spatial structure (chips, fibres, mortar, joints), not just random grayscale.

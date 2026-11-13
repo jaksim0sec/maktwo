@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.55-bed-lantern-silhouette';
+const CACHE_NAME='maktwo-shell-v1.15.56-visible-fixtures';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',

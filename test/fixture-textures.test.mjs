@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {makeTextureLayers,FIXTURE_MATERIAL,sampleFixtureTexture} from '../src/client/textures.js';
 import {fixture} from '../src/client/mesher.js';
 import {BLOCK as B} from '../src/core/blocks.js';
@@ -44,4 +45,24 @@ test('lantern metal parts sample texture; incandescent bulb remains emissive',()
   assert.ok(glow>0&&metal>0);
   assert.equal(verts.length%7,0);assert.ok(verts.every(Number.isFinite));
  }
+});
+
+test('fixture pigment contrast is visibly larger than the previous near-solid 4 percent texture',()=>{
+ const atlas=makeTextureLayers();
+ for(let kind=0;kind<4;kind++){
+  const brightness=[];
+  let white=0;
+  for(let y=0;y<32;y++)for(let x=0;x<32;x++){
+   const p=(((94+kind)*32+y)*32+x)*4;
+   const [r,g,b]=atlas.data.subarray(p,p+3);
+   brightness.push((.2126*r+.7152*g+.0722*b)/255);
+   if(r===255&&g===255&&b===255)white++;
+  }
+  brightness.sort((a,b)=>a-b);
+  const contrast=brightness[921]-brightness[102];
+  assert.ok(contrast>=.17&&contrast<=.36,'texture '+kind+' contrast='+contrast);
+  assert.ok(white<=150,'highlight clipping washes out fixture '+kind);
+ }
+ const shader=readFileSync(new URL('../src/client/renderer.js',import.meta.url),'utf8');
+ assert.match(shader,/vMaterial==95\?1\.45:\(vMaterial==98\?2\.75:1\.05\)/);
 });
