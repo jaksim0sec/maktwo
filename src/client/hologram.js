@@ -32,7 +32,6 @@ const add=(a,b,k)=>a.map((v,i)=>v+b[i]*k);
 const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,y),forward,depth);
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
-function colorParts(hex){return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0)}
 // Every card samples an atlas rectangle with its own world-space aspect ratio.
 // Using fixed 196x235 images stretched all wide buttons and item cards.
 export function atlasRect(card,index){
@@ -45,8 +44,8 @@ function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
  const cards=[],craft=palette==='craft';
  const add=(id,name,x,y,w,h,role='control')=>cards.push({id,name,x,y,w,h,depth:-.035,role});
  if(compact){
-  add('view:inventory','내 가방',-.25,.80,.34,.20,'view');
-  add('view:craft','제작하기',.14,.80,.32,.20,'view');
+  add('view:inventory','소지품',-.25,.80,.34,.20,'view');
+  add('view:craft','제작',.14,.80,.32,.20,'view');
   add('close','✕',.38,.80,.14,.14,'close');
   const filters=craft?[['filter:all','전체'],['filter:available','제작 가능'],['hand','맨손']]:
    [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:trees','수목'],['tab:items','소품'],['hand','맨손']];
@@ -55,8 +54,8 @@ function cardGeometry(palette,items,compact=false,page=null,craftFilter='all'){
    add(id,name,(col-(total-1)/2)*.29,craft?.49:row===0?.53:.34,.27,.15,'filter');
   });
  }else{
-  add('view:inventory','내 가방',-.53,.81,.86,.27,'view');
-  add('view:craft','제작하기',.43,.81,.80,.27,'view');
+  add('view:inventory','소지품',-.53,.81,.86,.27,'view');
+  add('view:craft','제작',.43,.81,.80,.27,'view');
   add('close','✕',1.06,.81,.27,.27,'close');
   const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능'],['hand','맨손']]:
    [['tab:all','전체'],['tab:blocks','블록'],['tab:parts','부품'],['tab:trees','수목'],['tab:items','소품'],['hand','맨손']];
@@ -203,13 +202,9 @@ export class Hologram{
  click(){return this.keyboardMode?this.focusId:this.hover?.id||null}
  drawAtlas(){
   const ctx=this.ctx;ctx.clearRect(0,0,ATLAS_W,ATLAS_H);
-  const textFit=(value,maxWidth,size,min=12)=>{
-   let n=size;ctx.font=font(n,true);
-   while(ctx.measureText(String(value)).width>maxWidth&&n>min){n-=1;ctx.font=font(n,true)}
-   return n;
-  };
+  const textFit=(value,maxWidth,size,min=12)=>{let n=size;ctx.font=font(n,true);while(ctx.measureText(String(value)).width>maxWidth&&n>min){n--;ctx.font=font(n,true)}return n};
   this.cards.forEach((card,i)=>{
-   const {x,y,w,h}=atlasRect(card,i),cx=x+w*.5;
+   const {x,y,w,h}=atlasRect(card,i),cx=x+w*.5,cy=y+h*.5;
    const active=card.id==='view:inventory'?this.palette!=='craft':
     card.id==='view:craft'?this.palette==='craft':
     card.id.startsWith('tab:')?card.id===`tab:${this.palette}`:
@@ -217,34 +212,43 @@ export class Hologram{
    const focused=this.keyboardMode&&this.focusId===card.id;
    const ready=card.role==='item'&&this.palette==='craft'&&card.craftable;
    ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-   rounded(ctx,x+2,y+2,w-4,h-4,Math.min(16,h*.17),
-    ready?'#213b32ef':active?'#454139ef':'#202a2fee',
-    focused?'#ffe1ae':ready?'#6fba91':active?'#e1b982':'#67696766');
    if(card.role!=='item'){
-    ctx.fillStyle=card.role==='close'?'#f6cfbd':active||focused?'#ffe1b7':'#d8dfdc';
-    const fontsize=textFit(card.name,w-12,card.role==='close'?Math.min(58,h*.57):Math.min(29,h*.43));
-    ctx.textAlign='center';ctx.fillText(card.name,cx,y+h*.5+fontsize*.34,w-12);
+    const tab=card.role==='view',close=card.role==='close';
+    rounded(ctx,x+2,y+2,w-4,h-4,tab?10:7,
+     active?'#49443cf5':close?'#292d30ef':'#252b2dec',
+     focused?'#eed7b1':active?'#b69b78':'#89898466');
+    if(active){ctx.fillStyle='#d7bb91';ctx.fillRect(x+12,y+h-6,w-24,2)}
+    ctx.fillStyle=active||focused?'#f4e8d2':close?'#c9bcb0':'#c9ccc7';
+    const fontsize=textFit(card.name,w-14,close?Math.min(42,h*.52):Math.min(tab?28:22,h*.43));
+    ctx.font=font(fontsize,active||tab);ctx.textAlign='center';ctx.fillText(card.name,cx,cy+fontsize*.33,w-14);
     ctx.textAlign='left';ctx.restore();return;
    }
+   const inset=3,innerX=x+inset,innerY=y+inset,innerW=w-inset*2,innerH=h-inset*2;
+   rounded(ctx,innerX,innerY,innerW,innerH,9,'#252b2def',focused?'#e0c69e':ready?'#a3ad88':'#8b8a805c');
+   const well=ctx.createLinearGradient(x,y,x+w,y+h*.65);well.addColorStop(0,'#46504d');well.addColorStop(1,'#303a3c');
+   rounded(ctx,x+8,y+8,w-16,h*.53,5,well);
+   ctx.fillStyle='#ded4c0aa';ctx.fillRect(x+12,y+11,Math.max(18,w*.17),2);
    if(this.palette==='craft'&&card.recipe){
-    const cells=recipeGrid(card.recipe),step=Math.min(25,h*.16),side=step-2,baseX=cx-step*1.5,baseY=y+h*.055;
+    const cells=recipeGrid(card.recipe),step=Math.min(26,h*.165),side=step-2,baseX=cx-step*1.5,baseY=y+h*.075;
     for(let k=0;k<9;k++){
      const px=baseX+k%3*step,py=baseY+Math.floor(k/3)*step;
-     ctx.fillStyle='rgba(5,11,13,.55)';ctx.fillRect(px,py,side,side);
+     rounded(ctx,px,py,side,side,2,'#1a2325b9');
      if(cells[k])drawItemIcon(ctx,cells[k],px+1,py+1,side-2);
     }
    }else{
-    const size=Math.min(78,h*.46);drawItemIcon(ctx,card.blockId,cx-size*.5,y+h*.06,size);
+    const size=Math.min(78,h*.40);drawItemIcon(ctx,card.blockId,cx-size*.5,y+h*.08,size);
    }
-   ctx.textAlign='center';const titleSize=textFit(card.name,w-14,Math.min(26,h*.15));
-   ctx.fillStyle='#f2f4f0';ctx.fillText(card.name,cx,y+h*.76+titleSize*.24,w-14);
+   ctx.fillStyle='#ffffff18';ctx.fillRect(x+12,y+h*.575,w-24,1);
+   const titleSize=textFit(card.name,w-20,Math.min(24,h*.155));
+   ctx.font=font(titleSize,true);ctx.textAlign='center';ctx.fillStyle='#f0eee7';ctx.fillText(card.name,cx,y+h*.73+titleSize*.28,w-20);
    const status=this.palette==='craft'?(ready?`제작 가능 ×${card.recipe?.count||1}`:
     card.recipe?.station==='bench'&&this.station!=='bench'?'작업대 필요':
     card.missing>0?`재료 ${card.missing}개 부족`:'제작 불가'):
-    card.count===Infinity?'무제한':`보유 ${card.count||0}`;
-   ctx.fillStyle=ready?'#9de1b5':'#b9c1bb';
-   const size=textFit(status,w-12,Math.min(19,h*.12));
-   ctx.fillText(status,cx,y+h*.92+size*.18,w-12);ctx.textAlign='left';ctx.restore();
+    card.count===Infinity?'무제한':`소지 ${card.count||0}`;
+   ctx.fillStyle=ready?'#bed7aa':'#aeb8b4';
+   const size=textFit(status,w-20,Math.min(18,h*.115));ctx.font=font(size);
+   ctx.fillText(status,cx,y+h*.90+size*.22,w-20);
+   ctx.textAlign='left';ctx.restore();
   });this.dirty=false;
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;

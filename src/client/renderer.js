@@ -447,7 +447,7 @@ export class Renderer{
   gl.uniform1i(this.u.materials,2);
   gl.uniform3fv(this.u.lightOrigin,this.lightOrigin);
   gl.uniform3f(this.u.lightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
-  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=88;const visible=[];for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m)}this.lastDrawnChunks=visible.length;for(const m of visible)this.drawMesh(m.opaque);
+  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=this.maxDistance||88;const visible=[];for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m)}this.lastDrawnChunks=visible.length;for(const m of visible)this.drawMesh(m.opaque);
   if(this.distanceMesh?.count||this.farMesh?.count){
    gl.uniform2f(this.u.fogRange,30,230);
    gl.uniform1i(this.u.distant,1);
