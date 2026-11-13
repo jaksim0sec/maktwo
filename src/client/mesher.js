@@ -295,6 +295,10 @@ export function fixture(dest,id,x,y,z){
    quad(dest,corners,paint,face.shade+4*material);
   }
  };
+ // Cloth top has a low-poly ridge rather than another rigid rectangular slab.
+ // Coordinates remain in the existing saved one-cell model frame.
+ const clothFace=(corners,color,material,shade=1)=>
+  quad(dest,corners.map(([a,b,c])=>[x+a,y+b,z+c]),rgb(color),shade+4*material);
  if(id===B.CRATE){ // Weathered non-emissive cargo box with separated wood slats.
   shape(.085,.06,.085,.83,.75,.83,'#806b52');
   for(const y of [.10,.34,.58])for(const z of [.074,.86]){
@@ -306,48 +310,89 @@ export function fixture(dest,id,x,y,z){
   shape(.13,.81,.13,.74,.035,.74,'#a28c6e');
   shape(.17,.849,.17,.66,.016,.66,'#8b775a');
  }else if(isBed(id)){
-  // Two saved cells, one joined mattress; layers are readable without a texture.
-  const frame=itemId(id)===B.BED,foot=isBedFoot(id),base=frame?.26:.025;
-  const start=foot?0:.055,end=foot?.945:1;
-  if(frame){
-   for(const leg of [.115,.79])textured(leg,.025,foot?.79:.065,.095,.265,.108,'#55473d',FIXTURE_MATERIAL.BED_WOOD);
-   for(const side of [.072,.863])textured(side,.185,start,.061,.092,end-start,'#695344',FIXTURE_MATERIAL.BED_WOOD);
-   textured(.10,.177,start,.80,.065,end-start,'#826c54',FIXTURE_MATERIAL.BED_WOOD);
+  // Two-cell bed: wood is structural, the mattress is padded, and the quilt
+  // really rises and drapes instead of being two flat gray rectangular slabs.
+  const framed=itemId(id)===B.BED,foot=isBedFoot(id),base=framed?.245:.018;
+  const near=foot?0:.012,far=foot?.988:1;
+  const wood=FIXTURE_MATERIAL.BED_WOOD,linen=FIXTURE_MATERIAL.BED_LINEN,cover=FIXTURE_MATERIAL.BED_COVER;
+  if(framed){
+   // Discrete legs, dark under-slat clearance and a ledge for the mattress.
+   for(const xSide of [.095,.825]){
+    textured(xSide,.018,foot?.81:.035,.08,.275,.14,'#483830',wood);
+    textured(xSide,.145,near,.063,.105,far-near,'#65483b',wood);
+   }
+   textured(.14,.175,near,.72,.050,far-near,'#8b6a53',wood);
+   textured(.165,.112,near,.67,.034,far-near,'#493931',wood);
+   for(const zs of [.18,.74])textured(.12,.207,zs,.76,.035,.060,'#554236',wood);
    if(!foot){
-    textured(.08,.162,.034,.84,.49,.062,'#745d4b',FIXTURE_MATERIAL.BED_WOOD);
-    textured(.11,.585,.025,.78,.056,.076,'#94745d',FIXTURE_MATERIAL.BED_WOOD);
+    // Slender raised headboard; inset panel and top cap, not one solid sheet.
+    for(const px of [.092,.826])textured(px,.18,.045,.082,.515,.068,'#51392f',wood);
+    textured(.174,.320,.060,.655,.256,.038,'#765844',wood);
+    textured(.194,.352,.046,.61,.175,.018,'#63473b',wood);
+    textured(.102,.663,.031,.794,.049,.101,'#9a765c',wood);
    }else{
-    textured(.10,.20,.882,.80,.215,.066,'#715b4b',FIXTURE_MATERIAL.BED_WOOD);
-    textured(.13,.382,.877,.74,.032,.075,'#9b7d66',FIXTURE_MATERIAL.BED_WOOD);
+    // Short foot rail with visible wood frame behind the quilt end.
+    for(const px of [.105,.820])textured(px,.18,.889,.075,.225,.063,'#513d35',wood);
+    textured(.18,.265,.903,.64,.078,.045,'#7c5947',wood);
+    textured(.12,.389,.886,.76,.036,.075,'#9e765d',wood);
    }
   }
-  textured(.105,base,start,.79,.109,end-start,'#b0aa9a',FIXTURE_MATERIAL.BED_LINEN);
-  textured(.112,base+.104,start,.776,.023,end-start,'#d1c7b5',FIXTURE_MATERIAL.BED_LINEN);
-  for(const side of [.106,.879])textured(side,base+.029,start,.013,.082,end-start,'#80776c',FIXTURE_MATERIAL.BED_LINEN);
+  // Two softly stepped layers show the mattress welt and pale cotton ticking.
+  textured(.118,base,near,.764,.100,far-near,'#b5ac99',linen);
+  textured(.128,base+.098,near,.744,.021,far-near,'#e2d5bc',linen);
+  for(const px of [.116,.861])textured(px,base+.025,near,.020,.074,far-near,'#7b7064',linen);
+  // Puffy cover spans the seam: same ridge at z=1 of head and z=0 of foot.
+  const front=foot?.0:.612,back=foot?1:.998;
+  const mid=.50,yEdge=base+.150,yCenter=base+.204;
+  textured(.136,base+.107,front,.728,.046,back-front,'#698783',cover);
+  clothFace([[.128,yEdge,back],[mid,yCenter,back],[mid,yCenter,front],[.128,yEdge,front]],'#88a7a0',cover);
+  clothFace([[mid,yCenter,back],[.872,yEdge,back],[.872,yEdge,front],[mid,yCenter,front]],'#74938e',cover);
+  // Cloth hangs down both sides. A narrow low edge shows its true thickness.
+  for(const px of [.115,.864]){
+   textured(px,base+.062,front,.024,.093,back-front,'#627b76',cover);
+   textured(px,base+.055,front,.023,.017,back-front,'#536b68',cover);
+  }
   if(foot){
-   textured(.127,base+.128,.035,.744,.036,.87,'#77817c',FIXTURE_MATERIAL.BED_COVER);
-   textured(.13,base+.160,.052,.739,.012,.793,'#8d9990',FIXTURE_MATERIAL.BED_COVER);
-   textured(.125,base+.157,.846,.749,.020,.042,'#616b68',FIXTURE_MATERIAL.BED_COVER);
+   // One gentle end fold, not repetitive stripes across every block.
+   textured(.145,base+.137,.820,.710,.031,.064,'#7a9991',cover);
+   textured(.15,base+.113,.917,.70,.033,.040,'#536e69',cover);
   }else{
-   textured(.127,base+.128,.565,.744,.039,.424,'#798782',FIXTURE_MATERIAL.BED_COVER);
-   textured(.132,base+.165,.576,.734,.012,.035,'#bac1b5',FIXTURE_MATERIAL.BED_COVER);
-   textured(.185,base+.132,.126,.63,.044,.329,'#d4c7b8',FIXTURE_MATERIAL.BED_LINEN);
-   textured(.205,base+.175,.157,.59,.013,.267,'#e0d6c6',FIXTURE_MATERIAL.BED_LINEN);
+   // Fold-back cuff and a real raised pillow with beveled cloth tiers.
+   textured(.144,base+.146,.615,.712,.045,.085,'#c4c5b4',linen);
+   textured(.158,base+.193,.630,.685,.012,.050,'#e1dcc9',linen);
+   textured(.174,base+.132,.142,.652,.082,.329,'#9d9587',linen);
+   textured(.192,base+.193,.159,.617,.087,.300,'#d8cbbc',linen);
+   textured(.216,base+.271,.178,.568,.025,.259,'#f1e4d0',linen);
+   textured(.202,base+.185,.158,.018,.068,.300,'#b2a79c',linen);
+   textured(.786,base+.185,.158,.018,.068,.300,'#b2a79c',linen);
   }
  }else if(id===B.TORCH||id===B.LANTERN){
-  // Compact warm emitter behind a metal cage, not a glowing square cabinet.
-  textured(.33,.115,.33,.34,.071,.34,'#63584b',FIXTURE_MATERIAL.LANTERN_METAL);
-  textured(.365,.182,.365,.27,.046,.27,'#9f8e72',FIXTURE_MATERIAL.LANTERN_METAL);
-  shape(.390,.229,.390,.22,.345,.22,'#f8c88b',-1.28);
-  for(const dx of [.342,.618])for(const dz of [.342,.618])
-   textured(dx,.212,dz,.040,.404,.040,'#716656',FIXTURE_MATERIAL.LANTERN_METAL);
-  for(const y of [.218,.598]){
-   textured(.34,y,.336,.32,.032,.040,'#5c524a',FIXTURE_MATERIAL.LANTERN_METAL);
-   textured(.34,y,.618,.32,.032,.040,'#5c524a',FIXTURE_MATERIAL.LANTERN_METAL);
+  // Portable lantern: empty cage, thin uprights, tiny warm core.
+  // Keep existing light source properties / item IDs entirely untouched.
+  const metal=FIXTURE_MATERIAL.LANTERN_METAL;
+  for(const px of [.309,.624])for(const pz of [.309,.624])
+   textured(px,.045,pz,.066,.102,.066,'#41464a',metal);
+  textured(.296,.136,.296,.409,.064,.409,'#3c4548',metal);
+  textured(.323,.190,.323,.353,.035,.353,'#99846b',metal);
+  textured(.350,.216,.350,.30,.020,.30,'#433c38',metal);
+  // Smaller emissive glass wick. The light glows inside open air, not on a
+  // huge square panel hiding all of the rest of the model.
+  textured(.480,.232,.480,.041,.080,.041,'#4d423b',metal);
+  shape(.453,.307,.453,.094,.160,.094,'#f4ca8e',-1.22);
+  shape(.472,.455,.472,.057,.075,.057,'#ffe2ad',-1.34);
+  // Four dark legs and two restraining rings keep the luminous core readable.
+  for(const px of [.319,.641])for(const pz of [.319,.641])
+   textured(px,.211,pz,.040,.366,.040,'#4b5153',metal);
+  for(const height of [.244,.533]){
+   for(const pz of [.318,.649])textured(.322,height,pz,.351,.029,.035,'#756657',metal);
+   for(const px of [.318,.649])textured(px,height,.345,.035,.029,.305,'#756657',metal);
   }
-  textured(.314,.62,.314,.372,.073,.372,'#766554',FIXTURE_MATERIAL.LANTERN_METAL);
-  textured(.353,.689,.353,.295,.045,.295,'#594e43',FIXTURE_MATERIAL.LANTERN_METAL);
-  textured(.467,.734,.465,.068,.071,.072,'#8c7a63',FIXTURE_MATERIAL.LANTERN_METAL);
+  // Vent hood and arched carry handle; separate layered silhouettes.
+  textured(.291,.579,.291,.418,.061,.418,'#3e4347',metal);
+  textured(.319,.641,.319,.362,.034,.362,'#806d59',metal);
+  textured(.359,.675,.359,.282,.038,.282,'#42494d',metal);
+  for(const px of [.411,.556])textured(px,.714,.465,.035,.122,.067,'#716959',metal);
+  textured(.410,.817,.464,.182,.031,.069,'#a48b69',metal);
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');

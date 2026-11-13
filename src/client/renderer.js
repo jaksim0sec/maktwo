@@ -97,6 +97,7 @@ void main(){
   uv=mix(uv,uv.yx,float(quarter&1));
   uv*=vec2(1.-2.*float(quarter==1||quarter==2),1.-2.*float(quarter>=2));
   uv.x*=1.-2.*float((vTurns>>2)&1);
+  if(vMaterial>=95&&vMaterial<=98)uv*=2.15; // fixture fibres must read on sub-voxel furniture
   tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
  }
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
