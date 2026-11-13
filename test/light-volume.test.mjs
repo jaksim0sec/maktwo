@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildLightVolume,makeOccluderSnapshot,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH} from '../src/core/lightVolume.js';
+import {buildLightVolume,makeOccluderSnapshot,makeDaylightSnapshot,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH} from '../src/core/lightVolume.js';
 import {World} from '../src/core/world.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 
@@ -38,4 +38,28 @@ test('occlusion snapshot reads loaded chunks without generating new chunks',()=>
  assert.equal(world.chunks.size,count);
  const idx=(x,y,z)=>(((z-origin[2])*LIGHT_HEIGHT+y)*LIGHT_WIDTH)+(x-origin[0]);
  assert.equal(snapshot[idx(4,30,4)],1);assert.equal(snapshot[idx(5,30,4)],0);
+});
+
+test('city daylight enters an opening, fades in a deep room, and keeps lamp RGB independent',()=>{
+ const width=24,height=5,depth=3,blocks=new Uint8Array(width*height*depth);
+ const index=(x,y,z)=>(z*height+y)*width+x;
+ const skyTop=new Uint8Array(width*depth).fill(1);
+ for(let x=5;x<width;x++)for(let z=0;z<depth;z++)blocks[index(x,4,z)]=2;
+ const options={width,height,depth,skyTop};
+ const volume=buildLightVolume(blocks,[],options);
+ const light=x=>volume[index(x,2,1)*4+3];
+ assert.equal(light(3),255);
+ assert.ok(light(6)>light(10)&&light(10)>light(17));
+ assert.equal(light(17),1);
+ assert.equal(volume[index(6,2,1)*4],0);
+});
+test('roofs above the daylight volume block sky without streaming new chunks',()=>{
+ const world=new World({mode:'flat'});
+ world.set(3,60,3,B.CEILING_FINISH);
+ const count=world.chunks.size;
+ const {skyTop}=makeDaylightSnapshot(world,[0,20,0]);
+ assert.equal(skyTop[3*LIGHT_WIDTH+3],0);
+ assert.equal(skyTop[3*LIGHT_WIDTH+4],1);
+ assert.equal(skyTop[47*LIGHT_WIDTH+47],0);
+ assert.equal(world.chunks.size,count);
 });
