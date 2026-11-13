@@ -64,6 +64,7 @@ import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, vert
 import { CITY_SEED, CITY_BUILDING_OPTIONS } from "../../src/worldgen/eternal-night-game.js";
 import { BUILDING_TYPES, createDistrictPlan, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
 import { buildingAt, cutPolygon, cutPolygonSpans, storeyAt } from "../../src/worldgen/eternal-night-buildings.js";
+import { BLUEPRINTS } from "../../src/worldgen/eternal-night-blueprints.js";
 import { segmentY } from "../../src/worldgen/eternal-night-walkways.js";
 
 for(const [id, value] of Object.entries({
@@ -246,7 +247,7 @@ function floorPlan(ctx,v,f,px,pz,detail) {
   if(detail) {
     ctx.save();ctx.clip("evenodd");
     for(const r of [...f.corridors,...f.rooms]) {
-      ctx.fillStyle=r.kind.endsWith("corridor")?"#e4e7cb40":r.kind==="shop"?"#e7ad6038":"#9dd3de30";
+      ctx.fillStyle=r.kind==="open-corridor"||r.kind==="balcony"?"#85d7bd80":r.kind.endsWith("corridor")?"#e4e7cb40":r.kind==="shop"?"#e7ad6055":r.kind==="classroom"?"#b1acf46b":"#9dd3de45";
       ctx.fillRect(px(r.x0),pz(r.z0),px(r.x1)-px(r.x0),pz(r.z1)-pz(r.z0));
     }
     ctx.restore();
@@ -270,6 +271,7 @@ function floorPlan(ctx,v,f,px,pz,detail) {
   for(let i=0;i<f.outline.length;i++) {
     const a=f.outline[i],b=f.outline[(i+1)%f.outline.length];
     const door=f.doors.find(p=>p.edge===i);
+    ctx.strokeStyle=f.railEdges?.[i]?"#7fc1a9":"#0e131b";
     ctx.beginPath();ctx.moveTo(px(a[0]),pz(a[1]));
     if(door) {
       const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
@@ -445,7 +447,8 @@ function draw() {
   const zone = zoneAt(layout,x,z);
   const value = v => Number(v).toFixed(3);
   const location = `X ${x.toFixed(1)} · Y ${Number(y.toFixed(2))} · Z ${z.toFixed(1)}`;
-  const info = volume ? `${volume.typology} #${volume.id+1} · ${storeyAt(volume,y).level+1}/${volume.floors.length}층 · 호화도 ${value(luxury)}` :
+  const selectedFloor=volume&&storeyAt(volume,y);
+  const info = volume ? `${BLUEPRINTS[selectedFloor.blueprint]?.name??volume.typology} #${volume.id+1} · ${storeyAt(volume,y).level+1}/${volume.floors.length}층 · 호화도 ${value(luxury)}` :
     path ? ({through:"상가 관통형",annex:"공중 점포 증축형",stacked:"다층 교량형",hung:"매달린 통로형"}[path.typology]??pathName[path.kind]) :
     zone===CORE_ZONE.DISTRICT&&y>=layout.floorY ? "빈 공간 · 호화도 없음" : zoneNames[zone];
   const sectionName = column?.section>=0 ? `섹션 ${column.section+1} · 상위 호화도 ${value(column.luxury)} · 노이즈 ${value(column.noise)}` : "";

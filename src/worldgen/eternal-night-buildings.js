@@ -1,3 +1,5 @@
+import {BLUEPRINTS,fitBlueprint} from './eternal-night-blueprints.js';
+
 export const BUILDING_DEFAULTS = Object.freeze({unit:1, buildingDensity:.67});
 
 export const stairModule = unit => ({rise:unit/4, run:unit*.35, width:unit*1.2, landing:unit*1.4});
@@ -117,7 +119,7 @@ export function designBuilding(volume, unit, random) {
   const near=volume.highRise?Math.round(axisOrigin+nearTarget)-axisOrigin:nearTarget;
   const far=near-half*stair.run;
   const shaft=rect(su,far-stair.landing,eu,near,'stair');
-  const atrium=mall ? rect(-hw*.68,-hd*.62,-passage-unit,hd*.62,'atrium') : null;
+  const atrium=mall && !volume.blueprint ? rect(-hw*.68,-hd*.62,-passage-unit,hd*.62,'atrium') : null;
   const count=Math.round((volume.y1-volume.y0)/storeyHeight);
   const entryLevel=volume.support===null && count>=2 ? 1 : 0;
   const floors=[], stairs=[], ports=[];
@@ -128,10 +130,20 @@ export function designBuilding(volume, unit, random) {
   const retreat=Math.min(capX*(highRise?.82:1),capZ*(highRise?.58:1),hw*(highRise?.17+.16*random(72):.09+.12*random(72)),(highRise?7:3)*unit);
   const chamfer=Math.min(hw*.22,hd*.20,unit*(.75+2.4*random(71)));
 
-  function geometry(band,program,pattern=0) {
+  function geometry(band,program,pattern=0,blueprint) {
     // Rear and side wings step inward at different rates while the stair core stays fixed.
-    const left=hw-band*retreat*(highRise?.17+.2*random(74):.3), right=hw-band*retreat*(highRise?.35+.35*random(75):.5);
+    const left=hw-band*retreat*(highRise?.17+.2*random(74):.3);
+    const right=hw-band*retreat*(highRise?.35+.35*random(75):.5);
+    const coreRight=Math.max(passage,eu+unit*.22);
     const frontDepth=hd-(highRise?band*retreat*.28:0), backDepth=hd-band*retreat;
+    if(blueprint){
+      const upperHousing=volume.blueprint==='arcade'&&blueprint==='gallery';
+      const fittedRight=upperHousing?Math.min(right,coreRight+unit*.8):right;
+      const fitted=fitBlueprint(blueprint,{left,right:fittedRight,frontDepth,backDepth,passage,
+        coreRight,unit,point,rect,wall});
+      if(fitted)return fitted;
+      if(band>0)return geometry(0,program,pattern,blueprint);
+    }
     const c=Math.min(left*.36,right*.36,backDepth*.36,chamfer*(highRise?1+.38*band*random(76):1));
     const c2=chamfer*(.35+.55*random(73));
     const front=-frontDepth+c+unit*.4, back=backDepth-c-unit*.4;
@@ -207,7 +219,7 @@ export function designBuilding(volume, unit, random) {
     return {outline,corridors,rooms,partitions,front,left,frontDepth,backDepth,rearEdge,sideEdge};
   }
 
-  const setbacks=highRise?[0,1.05+.25*random(77),.4+.18*random(78),1.55+.35*random(79),2]:[0,1,2];
+  const setbacks=volume.blueprint?[0,.45,1,1.55,2]:highRise?[0,1.05+.25*random(77),.4+.18*random(78),1.55+.35*random(79),2]:[0,1,2];
   const shapes=new Map();
   const cuts=[.10+.06*random(80),.30+.09*random(81),.56+.07*random(82),.80+.10*random(83)];
   for (let level=0; level<count; level++) {
@@ -228,19 +240,35 @@ export function designBuilding(volume, unit, random) {
       program=random(417+level)<.56?'workshops':'exchange';
     // Nonperiodic two-storey clusters replace the identical 4-floor cycle.
     const pattern=highRise?Math.floor(random(519+Math.floor(level/2))*6):0;
-    const key=band+':'+program+':'+pattern;
-    if(!shapes.has(key))shapes.set(key,geometry(setbacks[band],program,pattern));
-    const shape=shapes.get(key),y=volume.y0+level*storeyHeight;
+    // A broad commercial podium can support a narrower residential upper plan.
+    const baseBlueprint=level===0?volume.blueprint:floors[0].blueprint;
+    const blueprint=baseBlueprint==='arcade'&&band>=3?'gallery':baseBlueprint;
+    let key=blueprint?band+':'+blueprint:band+':'+program+':'+pattern;
+    if(!shapes.has(key))shapes.set(key,geometry(blueprint==='ring'||blueprint==='department'?0:setbacks[band],program,pattern,blueprint));
+    let shape=shapes.get(key);
+    if(shape.blueprint)program=BLUEPRINTS[shape.blueprint].program;
+    else if(blueprint){
+      key=band+':'+program+':'+pattern;
+      if(!shapes.has(key))shapes.set(key,geometry(setbacks[band],program,pattern));
+      shape=shapes.get(key);
+    }
+    const y=volume.y0+level*storeyHeight;
     const holes=[];
     if (level>0) holes.push(shaft);
     if(hasAtrium)holes.push(atrium);
+    if(shape.voidRect&&(level>0||shape.blueprint==='ring'))holes.push(shape.voidRect);
     floors.push({...shape,band,key,program,level,y,top:y+storeyHeight,holes,doors:[]});
     if (level!==entryLevel && level!==0 && !skyLevels.has(level)) continue;
-    for (const [u,v,du,dv,edge] of [[0,-shape.frontDepth,0,-1,0],[0,shape.backDepth,0,1,shape.rearEdge],[-shape.left,shape.front+unit*.8,-1,0,shape.sideEdge]]) {
+    const slots=shape.ports??[
+      {u:0,v:-shape.frontDepth,dx:0,dz:-1,edge:0},
+      {u:0,v:shape.backDepth,dx:0,dz:1,edge:shape.rearEdge},
+      {u:-shape.left,v:shape.front+unit*.8,dx:-1,dz:0,edge:shape.sideEdge}
+    ];
+    for (const {u,v,dx:du,dz:dv,edge,width=unit*(highRise?2.35:1.4)} of slots) {
       const [x,z]=point(u,v), [dx,dz]=turn?[dv,-du]:[du,dv];
-      const port={x,y,z,dx,dz,edge,width:unit*(highRise?2.35:1.4),building:volume.id,level,open:false};
+      const port={x,y,z,dx,dz,edge,width,building:volume.id,level,open:false};
       // Additions expose only the roof-facing doorway selected when they are joined.
-      if (level===0 && volume.support===null && edge===0) {
+      if (level===0 && volume.support===null && du===0 && dv===-1) {
         port.open=true;
         floors[level].doors.push(port);
       }
@@ -248,7 +276,8 @@ export function designBuilding(volume, unit, random) {
     }
   }
 
-  const roof={outline:floors.at(-1).outline,y:volume.y1,holes:[shaft]};
+  const topFloor=floors.at(-1);
+  const roof={outline:topFloor.outline,y:volume.y1,holes:topFloor.voidRect?[shaft,topFloor.voidRect]:[shaft]};
   const landing=rect(su,far-stair.landing,eu,far,'landing');
   const upperLanding=rect(su,near,eu,near+stair.landing,'landing');
   const rail=(u,a,b,y0,y1)=>{
@@ -270,7 +299,7 @@ export function designBuilding(volume, unit, random) {
       }});
   }
   const [roofX,roofZ]=point(su+stair.width*1.5,near+stair.landing*.6);
-  const typology=mall?'백화점형 상업동':['상가·주택','공동주택','중층 상업동','상가 묶음','설비·물류','상층 증축'][volume.type];
+  const typology=floors[0].blueprint?BLUEPRINTS[floors[0].blueprint].name:mall?'백화점형 상업동':['상가·주택','공동주택','중층 상업동','상가 묶음','설비·물류','상층 증축'][volume.type];
   Object.assign(volume,{floors,storeyHeight,stairs,ports,roof,entryLevel,typology,stairFacing:turn?2:4,roofAccess:[roofX,volume.y1,roofZ]});
   return true;
 }

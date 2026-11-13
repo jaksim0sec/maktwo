@@ -35,8 +35,8 @@ const BIOME_MATERIALS={
  meadow:{soil:B.DIRT,surface:()=>B.HIGHLAND_GRASS},
  forest:{soil:B.DIRT,surface:r=>r>.7?B.MOSS:B.GRASS}
 };
-export function generateChunk(chunk,seed,mode='normal'){
- if(mode===CITY_MODE)return stampCityChunk(chunk,seed);
+export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
+ if(mode===CITY_MODE)return stampCityChunk(chunk,seed,cityBlueprints);
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE, profiles=new Array(SIZE*SIZE);
  const studio=isStudioMode(mode),detail=mode!=='flat'&&!studio;
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){

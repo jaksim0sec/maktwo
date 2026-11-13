@@ -164,6 +164,17 @@ function hasLegacyWindow(plan,volume,floor,first,edge,length,height){
  return length>=6&&height>=3&&floor.program!=='workshops'&&hash(volume.id,edge,first,plan.layout.seed)<=.5;
 }
 
+export function sameSilhouetteTier(floor,next){
+ return next&&floor.band===next.band&&(!floor.blueprint||next.outline===floor.outline);
+}
+
+export function blueprintCaps(mesh,plates,y,color,up=true){
+ for(const {x0,x1,z0,z1} of plates){
+  const corners=[[x0,y,z0],[x0,y,z1],[x1,y,z1],[x1,y,z0]];
+  quad(mesh,up?corners:corners.toReversed(),color,up?.93:.58);
+ }
+}
+
 function legacyVertexCount(plan,volume){
  let count=legacyCounts.get(volume);
  if(count!==undefined)return count;
@@ -171,14 +182,15 @@ function legacyVertexCount(plan,volume){
  for(let first=0;first<volume.floors.length;){
   const floor=volume.floors[first];
   let end=first+1;
-  while(end<volume.floors.length&&volume.floors[end].band===floor.band)end++;
+  while(sameSilhouetteTier(floor,volume.floors[end]))end++;
   const height=volume.floors[end-1].top-floor.y;
   const outline=floor.outline;
   for(let edge=0;edge<outline.length;edge++){
    const [ax,az]=outline[edge],[bx,bz]=outline[(edge+1)%outline.length];
-   count+=12;
+   count+=floor.plates?6:12;
    if(hasLegacyWindow(plan,volume,floor,first,edge,Math.hypot(bx-ax,bz-az),height))count+=6;
   }
+  if(floor.plates)count+=floor.plates.length*12;
   first=end;
  }
  legacyCounts.set(volume,count);
@@ -191,7 +203,7 @@ function buildingSilhouette(plan,v,enhanced){
  while(first<v.floors.length){
   const floor=v.floors[first];
   let end=first+1;
-  while(end<v.floors.length&&v.floors[end].band===floor.band)end++;
+  while(sameSilhouetteTier(floor,v.floors[end]))end++;
   const outline=floor.outline,bottom=floor.y,top=v.floors[end-1].top;
   const color=rgb(block(plan.details[v.id].kits[first].body).color);
   for(let edge=0;edge<outline.length;edge++){
@@ -210,6 +222,12 @@ function buildingSilhouette(plan,v,enhanced){
    quad(mesh,[[px-wx,py,pz-wz],[px-wx,py+.55,pz-wz],[px+wx,py+.55,pz+wz],[px+wx,py,pz+wz]],[.64,.58,.37],-1);
   }
   // Close the top and underside of each tier so silhouettes survive flying.
+  if(floor.plates){
+   blueprintCaps(mesh,floor.plates,top,color);
+   if(!enhanced)blueprintCaps(mesh,floor.plates,bottom,color,false);
+   first=end;
+   continue;
+  }
   const center=outline.reduce(([sx,sz],[px,pz])=>[sx+px/outline.length,sz+pz/outline.length],[0,0]);
   for(let i=0;i<outline.length;i++){
    const [ax,az]=outline[i],[bx,bz]=outline[(i+1)%outline.length];

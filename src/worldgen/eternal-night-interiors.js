@@ -7,6 +7,7 @@ import {survivingFixture} from './eternal-night-decay.js';
  */
 export function floorFinish(f,shape,x,z,base) {
  const corridor=shape?.corridor;
+ if(corridor?.kind==='balcony'||corridor?.kind==='open-corridor')return B.ARCH_CONCRETE_PEBBLE_PAINT;
  if(corridor&&f.program!=='workshops') {
   const edge=Math.min(x-corridor.x0,corridor.x1-x,z-corridor.z0,corridor.z1-z);
   // Thin border only where the corridor has enough width. A school-like
@@ -24,7 +25,7 @@ export function floorFinish(f,shape,x,z,base) {
  * Callers check structural holes, staircase/landing geometry and exits.
  */
 export function hasDropCeiling(f,shape) {
- return Boolean(f.program!=='workshops'&&f.top-f.y>=6&&shape?.edge===-1
+ return Boolean(f.program!=='workshops'&&f.top-f.y>=6&&shape?.edge===-1&&shape.corridor?.kind!=='open-corridor'&&shape.corridor?.kind!=='balcony'
   &&(shape.corridor||(
    shape.room&&['market','court','exchange','shops'].includes(f.program)
   )));

@@ -10,7 +10,7 @@ const CARDINAL=[[1,0],[-1,0],[0,1],[0,-1]];
 // One-storey shops and street-front commercial strips retain their low scale.
 export const DISTRICT_DOME_RATIO=1.75;
 export const DISTRICT_HEIGHT_SPREAD=.17;
-export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity},randomAt) {
+export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints=true},randomAt) {
   const {size,step,left,top,luxury,noise,buildable}=grid;
   const {sections,labels,tangentX,tangentZ}=partitioned;
   const occupied=new Uint8Array(buildable.length),lanes=new Uint8Array(buildable.length);
@@ -20,6 +20,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
     return {...bounds,id:volumes.length,type,section:section.id,precinct:section.id,support,y0,luxury:weight,
       gx:(x0-left)/step,gz:(z0-top)/step,gw:(x1-x0)/step,gd:(z1-z0)/step,highRise:true};
   };
+  let ringCount=0;
   if(!buildingDensity)return {volumes,roofLinks,precincts,occupied};
   for(const section of sections) {
     const cells=section.cells.filter(i=>buildable[i]);
@@ -57,7 +58,10 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
       const program=nearSpine?(roll<.52?'market':roll<.78?'shops':'court'):(roll<.6?'housing':roll<.84?'workshops':'shops');
       const min=Math.max(2,Math.ceil((7.2*unit+3.8)/step));
       const max=program==='court'?min+3:program==='market'?min+2:min+1;
+      const longLot=cityBlueprints&&(program==='housing'&&random(102)<.34||program==='market'&&random(102)<.24);
       const lotSizes=[[max,min+1],[min+1,max],[min+1,min],[min,min+1],[min,min],[1,1]];
+      if(longLot)lotSizes.unshift([max+1,min]);
+      if(cityBlueprints&&program==='court'&&random(103)<.35)lotSizes.unshift([min+2,min+2],[min+2,min+1]);
       if(alongX===(random(22)>.18))for(const p of lotSizes)p.reverse();
       // Give small individual shops priority directly along the public alley.
       const laneSide=CARDINAL.some(([dx,dz])=>{
@@ -111,7 +115,23 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity}
           Math.floor((layout.floorTop-v.y0)/pitch)-1);
         if(floors<1)continue;
         v.y1=v.y0+pitch*floors;
+        if(cityBlueprints&&!landmark){
+          const narrow=Math.min(v.x1-v.x0,v.z1-v.z0),long=Math.max(v.x1-v.x0,v.z1-v.z0);
+          const variant=random(106);
+          if(program==='housing'){
+            v.blueprint=long>=unit*13&&long/narrow>=1.28?'gallery':variant<.57?'balcony':undefined;
+          }else if(program==='court'&&narrow>=unit*13&&long>=unit*15){
+            v.blueprint=ringCount<2?'ring':variant<.72?'school':'department';
+          }else if(program==='court'&&long>=unit*14&&variant<.64){
+            v.blueprint='school';
+          }else if(program==='market'&&long>=unit*13){
+            v.blueprint=narrow>=unit*14&&variant<.26?'department':variant<.59?'arcade':'corner';
+          }else if(program==='shops'&&long>=unit*12&&variant<.48){
+            v.blueprint='corner';
+          }
+        }
         if(!designBuilding(v,unit,random))continue;
+        if(v.floors[0].blueprint==='ring')ringCount++;
         if(landmark)landmarks.set(section.district,v);
       }
       if(v.y1>=layout.floorTop)continue;

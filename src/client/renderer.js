@@ -1,7 +1,7 @@
 import {block as itemBlock} from '../core/blocks.js';
 import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
-import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
+import {CITY_MODE,CITY_BLUEPRINT_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {distantCityMesh,distanceSectorVisible} from './city-distance.js';
 import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
@@ -307,11 +307,11 @@ export class Renderer{
      this.farWorker.onerror=event=>this.failFarWorker(event.message);
     }
     this.farJob={cx:ax,cz:az,key};
-    this.farWorker.postMessage({seed:world.seed,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh});
+    this.farWorker.postMessage({seed:world.seed,cityBlueprints:world.version>=CITY_BLUEPRINT_VERSION,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh});
     return;
    }catch(error){this.failFarWorker(error)}
   }
-  const plan=createCityPlan(world.seed),options={enhanced:this.farEnabled,partitionForView:!this.farEnabled};
+  const plan=createCityPlan(world.seed,world.version>=CITY_BLUEPRINT_VERSION),options={enhanced:this.farEnabled,partitionForView:!this.farEnabled};
   if(this.farEnabled&&!this.farMesh)this.farMesh=this.upload(cityFarMesh(plan));
   this.distanceMesh=this.replace(this.distanceMesh,distantCityMesh(plan,ax,az,options));
   if(this.distanceMesh){

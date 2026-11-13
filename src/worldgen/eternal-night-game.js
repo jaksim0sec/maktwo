@@ -18,13 +18,15 @@ export const CITY_BASE_Y=8;
 export const CITY_HEIGHT=768;
 export const CITY_WIDTH=CORE_FLOOR_DEFAULTS.width;
 export const CITY_SEED=9999;
+export const CITY_BLUEPRINT_VERSION=6;
 export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
 
-export function createCityPlan(seed=CITY_SEED) {
-  if(cached?.layout.seed===seed)return cached;
+export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
+  if(cached?.layout.seed===seed&&cached.cityBlueprints===cityBlueprints)return cached;
   const layout=createFloorLayout({seed,floorY:CITY_BASE_Y});
-  const plan=createDistrictPlan(layout,120,CITY_BUILDING_OPTIONS);
+  const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints});
+  plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
   plan.details=plan.volumes.map(v=>{
@@ -48,8 +50,8 @@ function lineDistance(x,z,a,b) {
 
 const inside=insidePolygon;
 
-export function* citySpawnCandidates(seed) {
- const plan=createCityPlan(seed);
+export function* citySpawnCandidates(seed,cityBlueprints=true) {
+ const plan=createCityPlan(seed,cityBlueprints);
  const centerX=plan.layout.centerX,centerZ=plan.layout.centerZ;
  const targetRadius=plan.layout.width*.32;
  const candidates=plan.volumes.filter(v=>v.support===null&&v.floors?.length>=25).map(v=>{
@@ -93,11 +95,15 @@ function inspectShape(f,x,z) {
     if(d<dist){edge=i;dist=d;}
   }
   const room=f.rooms.find(r=>containsRect(r,x,z));
-  const doorRoom=f.rooms.find(({door})=>lineDistance(x,z,door.a,door.b)<.70);
-  const door=doorRoom?.door;
+  let door,doorKind;
+  for(const room of f.rooms){
+    door=room.openings?room.openings.find(opening=>lineDistance(x,z,opening.a,opening.b)<.70):
+      lineDistance(x,z,room.door.a,room.door.b)<.70?room.door:undefined;
+    if(door){doorKind=room.kind;break;}
+  }
   const partition=!door&&f.partitions.find(({a,b})=>lineDistance(x,z,a,b)<.56);
   const corridor=f.corridors.find(r=>containsRect(r,x,z));
-  return {edge,room,door,doorKind:doorRoom?.kind,partition,corridor};
+  return {edge,room,door,doorKind,partition,corridor};
 }
 
 function furnishRoom(room,x,z,kit,seed) {
@@ -145,7 +151,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
   let lastKey,lastCachedShape;
   const columnHash=hash(xi,v.id,zi,seed);
   const roofY=Math.round(v.roof.y);
-  if(inside(v.roof.outline,x,z)&&!(shaft&&containsRect(shaft,x,z)))put(roofY-1,kits.at(-1).body);
+  if(inside(v.roof.outline,x,z)&&!v.roof.holes.some(h=>containsRect(h,x,z)))put(roofY-1,kits.at(-1).body);
   let lastShape=null;
   for(let floorIndex=0;floorIndex<v.floors.length;floorIndex++) {
     const f=v.floors[floorIndex];
@@ -174,7 +180,8 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     const partitionWall=interiorWallFinish(f,kit.roomWall);
     const scarred=hash(Math.floor(x/3),f.level,Math.floor(z/3),seed^0x72b4)<(f.damage??0)*.27;
     const wallFinish=y=>scarred&&(y-floor<2||ceiling-y<2)?(y-floor<2?B.MOLD_PLASTER:B.STAINED_PLASTER):partitionWall;
-    const hole=f.holes.some(h=>containsRect(h,x,z));
+    const hole=f.holes.find(h=>containsRect(h,x,z));
+    if(hole?.kind==='atrium'&&f.blueprint)continue;
 
     if(!hole){
       const finish=floorFinish(f,shape,x,z,kit.floor);
@@ -190,14 +197,18 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     if(hasCeiling)put(ceilingY,ceilingFixture(f,corridor,x,z,v.id,seed));
     // An exposed underside still needs a slab even where the next storey steps back.
     const next=v.floors[floorIndex+1];
-    if((!next||!inside(next.outline,x,z))&&!(shaft&&containsRect(shaft,x,z)))put(ceiling,kit.body);
+    if((!next||!inside(next.outline,x,z))&&!(shaft&&containsRect(shaft,x,z))&&
+      !(next?.blueprint&&next.voidRect&&containsRect(next.voidRect,x,z)))put(ceiling,kit.body);
     if(edge>=0) {
       const a=f.outline[edge],b=f.outline[(edge+1)%f.outline.length],turn=lineTurn(a,b);
       const exit=f.doors.find(d=>Math.abs((x-d.x)*d.dz-(z-d.z)*d.dx)<d.width/2+.38&&Math.abs((x-d.x)*d.dx+(z-d.z)*d.dz)<1.20);
       const stride=kit.wall===4?6:5;
       const bay=mod(Math.floor(Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1])?x-a[0]:z-a[1]),stride);
       const frontEdge=f.key==='shop'?(f.doors[0]?.edge??0):0;
+      const railEdge=f.railEdges?.[edge];
+      const classroomEdge=f.blueprint==='school'||f.blueprint==='ring';
       const span=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const retailEdge=f.shopEdges?.[edge]&&span>=3.4;
       const facade=facadeBay({program:f.program,level:f.level,entryLevel:v.entryLevel,
         edge,bay,stride,frontEdge,span});
       if(exit){
@@ -205,12 +216,22 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
         // above instead of an isolated floating 'entrance' voxel.
         for(let y=floor+3;y<ceiling-1;y++)put(y,kit.body);
         put(ceiling-1,cityPart('entrance',kit.entrance),turn,true);
+      }else if(railEdge){
+        if(!reservedPassage(floor)){
+          const outward=outwardTurn(b[1]-a[1],a[0]-b[0]);
+          const gallery=corridor?.kind==='open-corridor';
+          put(floor,cityPart(gallery?'passage':'balcony',gallery?4:2),outward,true,
+            gallery?CITY_STAIR_STYLE|(bay%3===0?8:0):0);
+          if(gallery&&bay===0)for(let y=floor+1;y<ceiling;y++)put(y,cityPart('column',0),turn,true);
+        }
       }else{
         for(let y=floor;y<ceiling;y++){
           let id=kit.body;
-          if(facade.opening==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)
+          if(retailEdge&&y===ceiling-1&&bay>=1&&bay<=3)
+            id=cityPart('sign',f.blueprint==='department'?0:3);
+          else if((facade.opening==='shopfront'||retailEdge&&bay>0)&&(y===floor+1||y===floor+2)&&y<ceiling-1)
             id=cityPart('window',y===floor+2?3:kit.window);
-          else if(facade.opening==='window'&&(y===floor+2||y===floor+3)&&y<ceiling-1)
+          else if((facade.opening==='window'||classroomEdge&&span>=4.5&&bay>0&&bay<4)&&(y===floor+2||y===floor+3)&&y<ceiling-1)
             id=cityPart('window',f.program==='housing'?4:kit.window);
           else if(facade.vent&&y===floor+2&&y<ceiling-1)
             id=cityPart('ventilation',kit.ventilation);
@@ -226,6 +247,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
         const turn=lineTurn(partition.a,partition.b);
         for(let y=floor;y<ceiling;y++) {
           if(partition.kind==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)put(y,cityPart('window',3),turn);
+          else if(partition.kind==='classroom-wall'&&y===floor+2&&y<ceiling-1)put(y,cityPart('window',3),turn);
           else put(y,wallFinish(y));
         }
       } else if(door) {
@@ -247,7 +269,9 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
           if(overhead===B.FLUORESCENT||overhead===B.BROKEN_FLUORESCENT)put(ceilingY,overhead);
         }
       } else if(room) {
-        const item=furnishRoom(room,x,z,kit,seed);
+        const desk=room.kind==='classroom'&&x>room.x0+1.3&&x<room.x1-1.3&&z>room.z0+1.3&&z<room.z1-1.3
+          &&mod(xi-Math.ceil(room.x0),3)===1&&mod(zi-Math.ceil(room.z0),3)===1;
+        const item=desk?{variant:1,turn:v.stairFacing}:furnishRoom(room,x,z,kit,seed);
 
         if(item){
           const unstocked=hash(xi,f.level,zi,seed^0x631c)<(f.damage??0)*.42;
@@ -365,8 +389,8 @@ function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
 }
 
 /** Rasterize floors and parts into ordinary chunk data shared by the renderer and physics. */
-export function stampCityChunk(chunk,seed) {
-  const plan=createCityPlan(seed),{layout,left,top,step,size}=plan;
+export function stampCityChunk(chunk,seed,cityBlueprints=true) {
+  const plan=createCityPlan(seed,cityBlueprints),{layout,left,top,step,size}=plan;
   for(let lz=0;lz<SIZE;lz++)for(let lx=0;lx<SIZE;lx++) {
     const x=chunk.cx*SIZE+lx+.5,z=chunk.cz*SIZE+lz+.5;
     const gx=Math.floor((x-left)/step),gz=Math.floor((z-top)/step);
