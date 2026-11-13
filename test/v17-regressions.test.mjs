@@ -50,7 +50,7 @@ test('door occlusion depends on open state, not unconditional darkness',()=>{
  const sourceLamp={x:6.5,y:26.5,z:5.5,radius:9,intensity:1,rgb:[1,.5,.25]};
  const get=()=>{const occ=makeOccluderSnapshot(world,origin,width,height,depth),vol=buildLightVolume(occ,[sourceLamp],{width,height,depth,origin});return vol[((7*height+6)*width+6)*4]};
  const shut=get();world.toggleDoor(6,26,6);const open=get();assert.ok(open>shut+20);
- const shader=source('src/client/renderer.js');assert.match(shader,/toBoundary\+\.055/,'thin surfaces sample exterior light generally');
+ assert.equal(makeOccluderSnapshot(world,origin,width,height,depth)[((6*height+6)*width)+6],0);
 });
 test('glass has seamless identical material texels at tile borders and center',()=>{
  const{data,size}=makeTextureLayers(),offset=10*size*size*4;

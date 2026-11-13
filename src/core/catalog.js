@@ -1,12 +1,13 @@
 import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId} from './blocks.js';
 import {RECIPES} from './crafting.js';
+import {CITY_MODE,CITY_SEED} from '../worldgen/eternal-night-game.js';
 import {PART_ID_START} from './part-library.js';
 // One canonical registry for user-visible categories and world definitions.
 // Stable world names are storage keys: NEVER rename an existing entry.
 export const WORLD_PRESETS=Object.freeze([
  {name:'TextureGallery',seed:9999,mode:'materials',label:'텍스처 전시장'},
  {name:'PartsGallery',seed:9999,mode:'parts',label:'건축 부품 전시장'},
- {name:'EternalNightCityLab',seed:9999,mode:'eternal-city-lab',label:'영원한 밤 · 도시 실험'},
+ {name:'EternalNightCityLab',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 도시 실험'},
 ]);
 const placeables=new Set([
  ...LIGHTBAR,B.FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.FLOWER_POT,

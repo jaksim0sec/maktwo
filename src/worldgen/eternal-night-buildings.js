@@ -107,7 +107,11 @@ export function designBuilding(volume, unit, random) {
   const stairStart=passage;
   // Keep the stair core beside the spine on wider sites; let the spine share a landing on narrow sites.
   const su=Math.min(stairStart,hw-2*stair.width-unit*.15), eu=su+2*stair.width;
-  const near=(half*stair.run+stair.landing)/2;
+  // Align the two half-block treads to the voxel grid in the playable city.
+  if(volume.highRise)stair.run=.5;
+  const axisOrigin=turn?cx:cz;
+  const nearTarget=(half*stair.run+stair.landing)/2;
+  const near=volume.highRise?Math.round(axisOrigin+nearTarget)-axisOrigin:nearTarget;
   const far=near-half*stair.run;
   const shaft=rect(su,far-stair.landing,eu,near,'stair');
   const atrium=mall ? rect(-hw*.68,-hd*.62,-passage-unit,hd*.62,'atrium') : null;

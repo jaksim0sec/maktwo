@@ -4,6 +4,7 @@ import {hash} from '../util/math.js';
 import {materialFor} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
+import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
@@ -25,14 +26,14 @@ const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path'
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
-function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false,cityBridge=false,bridgePost=false){
+function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false,cityBridge=false,bridgePost=false,splitTread=null){
  const key=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)
   |(simple?1<<13:0)|((stairRise===undefined?0:Math.round(stairRise*4)+1)<<14)
   |(cityStair?1<<18:0)|(cityStair?(Math.round(treadHeight*4)-1)<<19:0)|(rail?1<<22:0)
-  |(cityBridge?1<<23:0)|(bridgePost?1<<24:0);
+  |(cityBridge?1<<23:0)|(bridgePost?1<<24:0)|((splitTread?splitTread.index+1:0)<<25);
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
- for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost})||[]){
+ for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost,splitTread})||[]){
   const color=piece.emissive?[.97,.90,.78]:COLORS[piece.material],target=piece.alpha?transparent:opaque;
   for(const face of prismFaces(piece,true)){
    const n=prismNormal(face);if(!n)continue;
@@ -152,7 +153,8 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   if(BLOCKS[id].render==='part'){
    const simple=detailY!==undefined&&(detailY===null||y<detailY-4||y>=detailY+12);
    if(simple&&!(style&EXTERIOR_STYLE)&&!authored&&!(style&CITY_STAIR_STYLE))continue;
-   const orientation=state?.facing||0;
+   const split=decodeSplitTread(style);
+   const orientation=authored?.facing??split?.facing??state?.facing??0;
    let connected=null,stairRise;
    if(!simple&&partById(id)?.family==='staircase'){
     const neighbor=(dx,dz,dy=0)=>{
@@ -162,17 +164,18 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
      const a=((nx+SIZE)%SIZE),b=((nz+SIZE)%SIZE),k=((y+dy)*SIZE+b)*SIZE+a;
      const fx=wx+dx,fz=wz+dz;
      const generated=other.styles?.[k]||0;
+     const nextSplit=decodeSplitTread(generated);
      return {id:other.data?.[k]||B.AIR,
-      facing:stateAt(fx,y+dy,fz)?.facing??(generated&TURN_STYLE?generated&7:0),
-      treadHeight:generated&CITY_STAIR_STYLE?(((generated&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined};
+      facing:stateAt(fx,y+dy,fz)?.facing??nextSplit?.facing??(generated&TURN_STYLE?generated&7:0),
+      treadHeight:nextSplit?.low??(generated&CITY_STAIR_STYLE?(((generated&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined)};
     };
     connected=stairConnections(id,orientation,neighbor);
-    if(style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor,style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined);
+    if(split||style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor,split?.low??(style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined));
    }
    const cityGenerated=Boolean(style&CITY_STAIR_STYLE),family=partById(id)?.family;
    const cityStair=cityGenerated&&family==='staircase',cityBridge=cityGenerated&&family==='passage';
    const treadHeight=cityStair?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:1;
-   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),cityBridge,cityBridge&&Boolean(style&8));
+   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),cityBridge,cityBridge&&Boolean(style&8),split);
    emitPart(opaque,solid,wx,y,wz);emitPart(transparent,glass,wx,y,wz);
    continue;
   }

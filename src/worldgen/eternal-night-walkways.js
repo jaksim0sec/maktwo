@@ -255,8 +255,12 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   }
 
   if(towerPorts.length) {
-    const r=layout.mainShaftRadius/Math.SQRT2;
-    const corners=[[1,1],[-1,1],[-1,-1],[1,-1],[1,1]].map(([x,z])=>[layout.centerX+x*r,towerY,layout.centerZ+z*r]);
+    const r=highRise?Math.max(1,layout.mainShaftRadius-5):layout.mainShaftRadius;
+    const sides=highRise?16:4;
+    const corners=Array.from({length:sides+1},(_,i)=>{
+      const angle=Math.PI/4+2*Math.PI*(i%sides)/sides;
+      return [layout.centerX+r*Math.cos(angle),towerY,layout.centerZ+r*Math.sin(angle)];
+    });
     add(makeWalkway('tower',towerPorts,corners,Math.min(width,r),unit));
   }
 

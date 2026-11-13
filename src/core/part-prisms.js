@@ -66,22 +66,33 @@ export function partPrisms(id,x,y,z,state={}){
   // set of handrails in each cell of a continuous switchback flight.
   const variant=partById(id).variant||0,h=Math.max(.25,Math.min(1,state.treadHeight||.5));
   const materials=[96,91,107,115,95],finish=[97,93,109,115,95];
-  geometry=[
-   {x:0,y:0,z:0,w:1,h:h-.04,d:1,material:materials[variant],solid:true,structural:true},
-   {x:0,y:h-.04,z:0,w:1,h:.04,d:1,material:finish[variant],solid:true,structural:true}
-  ];
+  geometry=[];
+  const split=state.splitTread;
+  const tread=(z,d,height)=>{
+   if(height<=0)return;
+   geometry.push(
+    {x:0,y:0,z,w:1,h:height-.04,d,material:materials[variant],solid:true,structural:true},
+    {x:0,y:height-.04,z,w:1,h:.04,d,material:finish[variant],solid:true,structural:true});
+  };
+  if(split){
+   tread(0,.5,split.low);
+   tread(.5,.5,split.high);
+  }else tread(0,1,h);
   if(!state.simple){
-   for(const z of [.07,.75])
-    geometry.push({x:.06,y:h,z,w:.88,h:.012,d:.055,material:variant===2?106:109,solid:false});
+   for(const z of split?(split.low>0?[.07]:[.57]):[.07,.75]){
+    const height=split?(z<.5?split.low:split.high):h;
+    if(height>0)geometry.push({x:.06,y:height,z,w:.88,h:.012,d:.055,material:variant===2?106:109,solid:false});
+   }
    if(state.rail){
     const x=state.facing===2||state.facing===6?.065:.875;
-    const railTop=h+.60;
+    const railBase=split?.low??h;
+    const railTop=railBase+.60;
     // One post at the tread centre rather than two end posts on every metre.
     // Its top follows the sloped rail so successive tread segments connect.
-    const slope=Math.max(0,Math.min(1,state.stairRise??.5));
-    geometry.push({x,y:h-.01,z:.47,w:.055,h:.63+slope*.5,d:.07,material:106,solid:true});
-    geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:.45});
-    geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:.45});
+    const slope=Math.max(0,Math.min(1,state.stairRise??(split?2*(split.high-split.low):.5)));
+    geometry.push({x,y:railBase-.01,z:.47,w:.055,h:.63+slope*.5,d:.07,material:106,solid:true});
+    geometry.push({x,y:railTop,z:0,w:.055,h:.06,d:1,material:106,solid:true,railSide:'external',slopeY:slope});
+    geometry.push({x,y:railTop-.19,z:.08,w:.03,h:.035,d:.84,material:109,solid:false,railSide:'external',slopeY:slope});
    }
   }
  }else if(state.cityBridge&&partById(id)?.family==='passage'){

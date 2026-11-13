@@ -11,27 +11,27 @@ export const CORE_ZONE = Object.freeze({
 
 export const CORE_STRUCTURE = Object.freeze({ SLAB: 1, MAIN_SHAFT: 2, MINI_SHAFT: 3 });
 
-// Prototype dimensions in blocks. The provisional height uses 90 × 6-block storeys.
+// Prototype dimensions in blocks.
 // Plan ratios are relative to the apothem, half the width across parallel sides.
 export const CORE_FLOOR_DEFAULTS = Object.freeze({
-  width: 1024,
-  floorHeight: 540,
+  width: 960,
+  floorHeight: 618,
   slabThickness: 8,
   districtLuxuryMax: 0.94,
   luxuryNoiseAmplitude: 0.080,
   luxuryNoiseDensity: 0.5,
   luxuryNoiseConcentration: 0.5,
   ratios: Object.freeze({
-    centerRadius: 0.225,
-    mainShaftRadius: 0.055,
-    gardenOffset: 0.13,
-    gardenRadius: 0.043,
-    miniShaftOffset: 0.865,
-    miniShaftRadius: 0.04,
-    roadHalfWidth: 0.028,
-    rimWidth: 0.045,
-    luxuryFalloff: 0.42,
-    noiseCellSize: 0.12,
+    centerRadius: 0.18,
+    mainShaftRadius: 0.068,
+    gardenOffset: 0.113,
+    gardenRadius: 0.026,
+    miniShaftOffset: 0.774,
+    miniShaftRadius: 0.05,
+    roadHalfWidth: 0.01,
+    rimWidth: 0.015,
+    luxuryFalloff: 0.652,
+    noiseCellSize: 0.124,
   }),
 });
 

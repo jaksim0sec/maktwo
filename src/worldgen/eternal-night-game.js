@@ -2,24 +2,28 @@ import {SIZE,TURN_STYLE,EXTERIOR_STYLE} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {containsRect,insidePolygon} from './eternal-night-buildings.js';
-import {CORE_ZONE,createFloorLayout,zoneAt} from './eternal-night-core-floor.js';
+import {CORE_FLOOR_DEFAULTS,CORE_ZONE,createFloorLayout,zoneAt} from './eternal-night-core-floor.js';
 import {createDistrictPlan} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
 import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
-import {encodeCityStair,stairOuterRail,walkwayJunction,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
+import {encodeCityStair,encodeSplitTread,stairOuterRail,walkwayJunction,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
+import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 
 export const CITY_MODE='eternal-city-lab';
 export const CITY_BASE_Y=8;
 export const CITY_HEIGHT=768;
-export const CITY_WIDTH=960;
+export const CITY_WIDTH=CORE_FLOOR_DEFAULTS.width;
+export const CITY_SEED=9999;
+export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
 
-export function createCityPlan(seed) {
+export function createCityPlan(seed=CITY_SEED) {
   if(cached?.layout.seed===seed)return cached;
-  const layout=createFloorLayout({seed,width:CITY_WIDTH,floorY:CITY_BASE_Y,floorHeight:CITY_HEIGHT-CITY_BASE_Y-1});
-  const plan=createDistrictPlan(layout,120,{unit:1.5,buildingDensity:.88,highRise:true});
+  const layout=createFloorLayout({seed,floorY:CITY_BASE_Y});
+  const plan=createDistrictPlan(layout,120,CITY_BUILDING_OPTIONS);
+  plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.details=plan.volumes.map(v=>{
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
     return {kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
@@ -95,14 +99,21 @@ function furnishRoom(room,x,z,kit,seed) {
 
 function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
   const xi=Math.floor(x),zi=Math.floor(z),{stairs,landing,access,kits}=detail;
-  const step=stairs.findIndex(t=>containsRect(t,x,z));
+  const stairAlongX=v.stairFacing===2;
+  const step=stairs.findIndex(t=>containsRect(t,x-(stairAlongX?.25:0),z-(stairAlongX?0:.25)));
   const onLanding=landing&&containsRect(landing,x,z);
   const atAccess=access&&containsRect(access,x,z);
-  const shaft=v.roof.holes[0], stairAlongX=v.stairFacing===2;
+  const shaft=v.roof.holes[0];
   const shaftSide=shaft&&(stairAlongX
     ? x>=shaft.x0&&x<shaft.x1&&(Math.abs(z-shaft.z0)<1.1||Math.abs(z-shaft.z1)<1.1)
     : z>=shaft.z0&&z<shaft.z1&&(Math.abs(x-shaft.x0)<1.1||Math.abs(x-shaft.x1)<1.1));
   const stairWallTurn=stairAlongX?0:2;
+  const half=stairs.length/2, firstFlight=step<half;
+  const facing=mod(v.stairFacing+(firstFlight?0:4),8);
+  const rail=step>=0&&stairOuterRail(stairs[step],step,stairs.length,stairAlongX,x,z);
+  const [dx,dz]=facing===0?[0,1]:facing===2?[-1,0]:facing===4?[0,-1]:[1,0];
+  const from=step>=0?stairs.find(t=>containsRect(t,x-dx*.25,z-dz*.25)):null;
+  const to=step>=0?stairs.find(t=>containsRect(t,x+dx*.25,z+dz*.25)):null;
   const shapeCache=new Map();
   const columnHash=hash(xi,v.id,zi,seed);
   const roofY=Math.round(v.roof.y);
@@ -196,21 +207,22 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
     }
     if(atAccess&&empty(ceiling-1)&&mod(xi+zi+v.id,5)===0)put(ceiling-1,B.FLUORESCENT,stairWallTurn>>1);
     if(step>=0) {
-      const tread=stairs[step];
-      const surface=f.y+tread.y-v.y0;
-      const facing=mod(v.stairFacing+(step>=stairs.length/2?4:0),8);
-      const outerRail=stairOuterRail(tread,step,stairs.length,stairAlongX,x,z);
-      const profile=encodeCityStair(surface,facing,outerRail);
-      // Each voxel gets ONE tread whose top coincides with the floor plan.
-      // A legacy showroom staircase contains three independent treads and
-      // should never be stamped repeatedly for a multi-storey stairwell.
-      put(profile.base,cityPart('staircase',kit.staircase),facing,outerRail,
-       CITY_STAIR_STYLE|(profile.quarter<<3));
+      // Stamp both half-cells even when their surfaces cross a voxel Y boundary.
+      const low=Math.round((f.y+(from??stairs[step]).y-v.y0)*4);
+      const high=Math.round((f.y+(to??stairs[step]).y-v.y0)*4);
+      const base=Math.ceil(low/4)-1,top=Math.ceil(high/4)-1;
+      const id=cityPart('staircase',kit.staircase);
+      for(let y=base;y<=top;y++){
+        const a=Math.max(0,Math.min(4,low-y*4)),b=Math.min(4,high-y*4);
+        if(a===b)put(y,id,facing,rail&&y===base,CITY_STAIR_STYLE|((b-1)<<3));
+        else put(y,id,undefined,false,encodeSplitTread(a,b,facing,rail&&y===base));
+      }
     }
     if(onLanding) {
-      const surface=Math.round((f.y+landing.y-v.y0)*2)/2,base=Math.floor(surface);
-      if(surface>base)put(base,B.CONCRETE_SLAB);
-      else put(base-1,kit.floor);
+      const surface=f.y+landing.y-v.y0;
+      const profile=encodeCityStair(surface,facing);
+      put(profile.base,cityPart('staircase',kit.staircase),facing,false,
+       CITY_STAIR_STYLE|(profile.quarter<<3));
     }
     const atrium=f.holes.find(h=>h.kind==='atrium');
     if(atrium&&!hole&&edge<0) {
@@ -307,6 +319,9 @@ export function stampCityChunk(chunk,seed) {
       if(turn!==undefined){
         chunk.styles??=new Uint8Array(chunk.data.length);
         chunk.styles[i]=TURN_STYLE|turn|(exterior?EXTERIOR_STYLE:0)|flags;
+      } else if(flags){
+        chunk.styles??=new Uint8Array(chunk.data.length);
+        chunk.styles[i]=flags;
       } else if(chunk.styles)chunk.styles[i]=0;
     };
     if(zone!==CORE_ZONE.OUTSIDE&&zone!==CORE_ZONE.SKY_GARDEN&&zone!==CORE_ZONE.MAIN_SHAFT&&zone!==CORE_ZONE.MINI_SHAFT) {
@@ -328,7 +343,12 @@ export function stampCityChunk(chunk,seed) {
       return blocked;
     };
     for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage);
-    for(const {link,part} of plan.pathColumns[index])stampWalkway(link,part,x,z,put,empty);
+    for(const {link,part} of plan.pathColumns[index]){
+      if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty);
+    }
+    const tower=plan.tower;
+    if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
+      stampCoreTower(tower,x,z,put);
   }
   return chunk;
 }

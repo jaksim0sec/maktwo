@@ -1,6 +1,11 @@
 // A compact, occlusion-aware voxel light volume. Pure code, safe to run in a Worker.
+import {BLOCK as B,BLOCKS} from './blocks.js';
+import {SIZE} from './chunk.js';
+
+const OPAQUE=BLOCKS.map(block=>block.opaque);
+const LIGHT_CURVE=Uint8Array.from({length:256},(_,i)=>Math.round(255*(1-Math.exp(-1.18*i/128))));
 // X is the fastest axis; the buffer is directly uploadable to WebGL2 TEXTURE_3D.
-export const LIGHT_WIDTH=80, LIGHT_HEIGHT=64, LIGHT_DEPTH=80;
+export const LIGHT_WIDTH=48, LIGHT_HEIGHT=32, LIGHT_DEPTH=48;
 const STEPS=[];
 for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
  if(!dx&&!dy&&!dz)continue;
@@ -17,7 +22,7 @@ class Heap {
 export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIGHT_HEIGHT,depth=LIGHT_DEPTH,origin=[0,0,0]}={}){
  const total=width*height*depth;
  if(occluders.length!==total)throw Error('Light volume dimensions mismatch');
- const output=new Uint8Array(total*4),colors=new Float32Array(total*3),dist=new Float32Array(total),stamp=new Uint16Array(total);
+ const output=new Uint8Array(total*4),dist=new Float32Array(total),stamp=new Uint16Array(total);
  let sourceStamp=0;
  const plane=width*height;
  const inside=(x,y,z)=>x>=0&&x<width&&y>=0&&y<height&&z>=0&&z<depth;
@@ -34,9 +39,9 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
   while(heap.length){
    const [index,cost]=heap.pop();if(cost>dist[index]+1e-4||cost>=radius)continue;
    const x=index%width,y=Math.floor(index/width)%height,z=Math.floor(index/plane);
-   const k=index*3;
-   const fraction=cost/radius,fade=(1-fraction*fraction)**2, power=energy*fade;
-   colors[k]=Math.max(colors[k],tint[0]*power);colors[k+1]=Math.max(colors[k+1],tint[1]*power);colors[k+2]=Math.max(colors[k+2],tint[2]*power);
+   const k=index*4;
+   const fraction=cost/radius,fade=(1-fraction*fraction)**2, power=128*energy*fade;
+   for(let channel=0;channel<3;channel++)output[k+channel]=Math.max(output[k+channel],Math.min(255,Math.round(tint[channel]*power)));
    for(const step of STEPS){
     const xx=x+step.dx,yy=y+step.dy,zz=z+step.dz,dd=cost+step.cost;
     if(dd>radius||!inside(xx,yy,zz))continue;
@@ -54,8 +59,8 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
  }
  // Brightness is the MAXIMUM nearby emitter, not a sum. Adding lamps extends coverage, not peak intensity.
  for(let i=0;i<total;i++){
-  for(let k=0;k<3;k++)output[i*4+k]=Math.round(255*(1-Math.exp(-1.18*colors[i*3+k])));
-  output[i*4+3]=255;
+  for(let k=0;k<3;k++)output[i*4+k]=LIGHT_CURVE[output[i*4+k]];
+  output[i*4+3]=occluders[i]?0:255;
  }
  return output;
 }
@@ -64,12 +69,19 @@ export function makeOccluderSnapshot(world,origin,width=LIGHT_WIDTH,height=LIGHT
  const [ox,oy,oz]=origin;
  // Only loaded chunks are sampled: never generate terrain for a lighting update.
  for(const chunk of world.chunks.values()){
-  const cx=chunk.cx*16,cz=chunk.cz*16;
-  if(cx+16<=ox||cx>=ox+width||cz+16<=oz||cz>=oz+depth)continue;
-  for(let z=Math.max(0,oz-cz);z<Math.min(16,oz+depth-cz);z++)for(let y=Math.max(0,oy);y<Math.min(chunk.data.length/256,oy+height);y++)for(let x=Math.max(0,ox-cx);x<Math.min(16,ox+width-cx);x++){
-   const idx=(y*16+z)*16+x,id=chunk.data[idx];
-   // Avoid importing the block registry into the Worker payload.
-   if(world.isLightBlocking(id,cx+x,y,cz+z,chunk.forms?.[idx]||0))data[(((cz+z-oz)*height)+(y-oy))*width+(cx+x-ox)]=1;
+  const cx=chunk.cx*SIZE,cz=chunk.cz*SIZE;
+  const x0=Math.max(0,ox-cx),x1=Math.min(SIZE,ox+width-cx);
+  const z0=Math.max(0,oz-cz),z1=Math.min(SIZE,oz+depth-cz);
+  const y0=Math.max(0,oy),y1=Math.min(chunk.height,oy+height);
+  if(x0>=x1||z0>=z1||y0>=y1)continue;
+  for(let z=z0;z<z1;z++)for(let y=y0;y<y1;y++){
+   const src=(y*SIZE+z)*SIZE;
+   const dst=((cz+z-oz)*height+y-oy)*width+cx-ox;
+   for(let x=x0;x<x1;x++){
+    const idx=src+x,id=chunk.data[idx];
+    if(id===B.DOOR||id===B.DOOR_TOP)data[dst+x]=Number(world.isLightBlocking(id,cx+x,y,cz+z,0));
+    else if(OPAQUE[id]&&!chunk.forms?.[idx])data[dst+x]=1;
+   }
   }
  }
  return data;

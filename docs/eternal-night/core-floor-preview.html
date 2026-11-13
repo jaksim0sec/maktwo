@@ -34,7 +34,7 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <section class="scan">
 <div class="toolbar">
 <label>평면 <select id="view-mode"><option value="city">현재 높이</option><option value="building">선택 건물 도면</option><option value="district">섹션 범위</option><option value="luxury">상위 호화도</option><option value="noise">상위 노이즈</option></select></label>
-<label for="height-scan">Y</label><input id="height-scan" type="range" min="0" max="539" step="any" value="4"><output id="scan-height">4</output>
+<label for="height-scan">Y</label><input id="height-scan" type="range" min="0" max="617" step="any" value="4"><output id="scan-height">4</output>
 </div>
 <figure class="figure"><figcaption>XZ · 수평 단면</figcaption><canvas id="map" width="512" height="512" aria-label="위치를 선택하는 수평 단면"></canvas></figure>
 <figure class="figure profile"><figcaption>선택 좌표 · Y별 호화도</figcaption><canvas id="profile" width="150" height="512" aria-label="높이를 선택하는 호화도 단면 그래프"></canvas></figure>
@@ -48,8 +48,8 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <aside class="controls">
 <label><span>시드 <output id="seed-value">9999</output></span><input id="seed" type="range" min="0" max="9999" step="1" value="9999"></label>
 <label><span>가로폭 <output id="width-value">960</output></span><input id="width" type="range" min="512" max="4096" step="32" value="960"></label>
-<label><span>코어 높이 <output id="height-value">759</output></span><input id="height" type="range" min="180" max="900" step="1" value="759"></label>
-<label><span>건물 밀도 <output id="density-value">88</output></span><input id="density" type="range" min="0" max="100" step="1" value="88"></label>
+<label><span>코어 높이 <output id="height-value">618</output></span><input id="height" type="range" min="180" max="900" step="1" value="618"></label>
+<label><span>건물 밀도 <output id="density-value">100</output></span><input id="density" type="range" min="0" max="100" step="1" value="100"></label>
 <label><span>건축 기준 단위 <output id="unit-value">1.5</output></span><input id="unit" type="range" min="0.5" max="2" step="0.05" value="1.5"></label>
 <div class="grid" id="noise-controls"></div>
 <div class="grid" id="ratio-controls"></div>
@@ -61,9 +61,18 @@ input[type=range]{width:100%;margin:0;height:20px;accent-color:#a35ad6}.grid{dis
 <script type="module">
 import { CORE_FLOOR_DEFAULTS, CORE_STRUCTURE, CORE_ZONE, createFloorLayout, verticalSpansAt, zoneAt } from "../../src/worldgen/eternal-night-core-floor.js";
 
+import { CITY_SEED, CITY_BUILDING_OPTIONS } from "../../src/worldgen/eternal-night-game.js";
 import { BUILDING_TYPES, createDistrictPlan, districtSample, volumeLuxury } from "../../src/worldgen/eternal-night-districts.js";
 import { buildingAt, cutPolygon, cutPolygonSpans, storeyAt } from "../../src/worldgen/eternal-night-buildings.js";
 import { segmentY } from "../../src/worldgen/eternal-night-walkways.js";
+
+for(const [id, value] of Object.entries({
+  seed:CITY_SEED, width:CORE_FLOOR_DEFAULTS.width, height:CORE_FLOOR_DEFAULTS.floorHeight,
+  density:CITY_BUILDING_OPTIONS.buildingDensity*100, unit:CITY_BUILDING_OPTIONS.unit,
+})){
+  document.getElementById(id).value=value;
+  document.getElementById(id+"-value").textContent=value;
+}
 
 const noiseOptions = [
   ["luxuryNoiseDensity", "노이즈 밀도", 1, 0.01, "물길의 폭과 분포 면적"],

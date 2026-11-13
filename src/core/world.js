@@ -2,6 +2,7 @@ import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} fro
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {CITY_MODE,CITY_HEIGHT,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
+import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {stairConnections,stairRailRise} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {FORMED,supportsForms} from './construction.js';
@@ -20,15 +21,16 @@ export class World{
   if(authored)return authored.facing||0;
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),chunk=this.getChunk(cx,cz,false);
   const style=chunk?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,Math.floor(y),Math.floor(z)-cz*SIZE)]||0;
-  return style&TURN_STYLE?style&7:0;
+  return decodeSplitTread(style)?.facing??(style&TURN_STYLE?style&7:0);
  }
  getShapeState(x,y,z){
   const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE),c=this.getChunk(cx,cz,false);
   const y0=Math.floor(y),variant=y0>=0&&y0<this.height?(c?.styles?.[Chunk.index(Math.floor(x)-cx*SIZE,y0,Math.floor(z)-cz*SIZE)]||0):0;
   const cityStair=Boolean(variant&CITY_STAIR_STYLE);
-  const state={facing:variant&TURN_STYLE?variant&7:0,upper:false,
+  const split=decodeSplitTread(variant);
+  const state={facing:split?.facing??(variant&TURN_STYLE?variant&7:0),upper:false,
    variant:variant&TURN_STYLE?0:variant,
-   ...(cityStair?{cityStair:true,treadHeight:(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4,rail:Boolean(variant&64)}:{}),
+   ...(cityStair?{cityStair:true,treadHeight:split?.high??(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4,rail:Boolean(variant&64),splitTread:split}:{}),
    ...this.blockStates.get(this.stateKey(x,y,z))};
   if(cityStair&&partById(this.get(x,y,z,false))?.family==='passage'){
    state.cityBridge=true;state.cityStair=false;state.bridgePost=Boolean(variant&8);
@@ -41,11 +43,12 @@ export class World{
     const other=this.get(nx,y+dy,nz,false);
     const c=this.getChunk(Math.floor(nx/SIZE),Math.floor(nz/SIZE),false),
      style=c?.styles?.[Chunk.index((nx%SIZE+SIZE)%SIZE,Math.floor(y+dy),(nz%SIZE+SIZE)%SIZE)]||0;
+    const split=decodeSplitTread(style);
     return {id:other,facing:this.partFacing(nx,y+dy,nz),
-     treadHeight:style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined};
+     treadHeight:split?.low??(style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined)};
    };
    state.connected=stairConnections(id,state.facing,neighbor);
-   if(variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor,state.cityStair?state.treadHeight:undefined);
+   if(split||variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor,split?.low??(state.cityStair?state.treadHeight:undefined));
   }
   return state;
  }
@@ -155,7 +158,9 @@ export class World{
   // changes just one cell.
   if(oldId===B.DOOR&&id!==B.DOOR&&this.get(x,y+1,z)===B.DOOR_TOP)this.set(x,y+1,z,B.AIR,{simulate,record});
   else if(oldId===B.DOOR_TOP&&id!==B.DOOR_TOP&&this.get(x,y-1,z)===B.DOOR)this.set(x,y-1,z,B.AIR,{simulate,record});
-  if(id!==B.DOOR)this.blockStates.delete(this.stateKey(x,y,z));this.lights.update(x,y,z,id);this.lightRevision++;
+  if(id!==B.DOOR)this.blockStates.delete(this.stateKey(x,y,z));this.lights.update(x,y,z,id);
+  if(block(oldId).light||block(id).light||isDoor(oldId)||isDoor(id)||(block(oldId).opaque&&!oldForm)!==(block(id).opaque&&!form))
+   this.lightRevision++;
   if(record){const k=key(cx,cz),idx=Chunk.index(lx,y,lz);let edits=this.edits.get(k);if(!edits)this.edits.set(k,edits=new Map());edits.set(idx,id)}
   if(lx===0)this.markDirty(cx-1,cz);if(lx===15)this.markDirty(cx+1,cz);if(lz===0)this.markDirty(cx,cz-1);if(lz===15)this.markDirty(cx,cz+1);
   this.events.emit('block-change',{x,y,z,id});if(simulate){this.schedule(x,y,z);for(const [dx,dy,dz] of [[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]])this.schedule(x+dx,y+dy,z+dz)}return true}
