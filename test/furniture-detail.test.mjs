@@ -6,7 +6,7 @@ import {shapeBoxes} from '../src/core/shapes.js';
 import {fixture,meshChunkData} from '../src/client/mesher.js';
 import {Chunk} from '../src/core/chunk.js';
 test('cargo crate is appended to existing IDs and has matching solid collision',()=>{
- assert.equal(B.CRATE,181);assert.equal(BLOCKS[B.CRATE].id,181);
+ assert.equal(B.CRATE,B.ROUND_FLUORESCENT+1);assert.equal(BLOCKS[B.CRATE].id,B.CRATE);
  assert.ok(shapeBoxes(B.CRATE,0,0,0).length>0);
  const c=new Chunk(0,0,32);c.data[(8*16+8)*16+8]=B.CRATE;
  const mesh=meshChunkData(c).opaque;assert.equal(mesh.length%7,0);assert.ok(mesh.length>200);
