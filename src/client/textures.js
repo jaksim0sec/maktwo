@@ -7,7 +7,8 @@ import {STATION_MATERIALS,STATION_MATERIAL_START} from '../core/station-material
 import {sampleStationTexture} from './station-textures.js';
 import {sampleDetailedMaterial} from './material-art.js';
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label),'석회암 석재','대리석 석재','콘크리트 보 표면','천장 마감 표면'];
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label),'석회암 석재','대리석 석재','콘크리트 보 표면','천장 마감 표면','침대 목재','침대 린넨','침대 이불','랜턴 금속'];
+export const FIXTURE_MATERIAL=Object.freeze({BED_WOOD:95,BED_LINEN:96,BED_COVER:97,LANTERN_METAL:98});
 // Only orientation-safe material families are transformed. Directional seams stay aligned.
 // Modes: 3 = quarter-turns and reflection; 1 = reflection; 0 = unchanged.
 const UV_VARIANTS=new Uint8Array(MATERIALS.length+1);
@@ -115,6 +116,47 @@ export function plankGrain(x,y,size,n=0){
  const vein=Math.sin(v*.63+.22*Math.sin(u*.36))*.043+Math.sin(v*1.65+u*.09)*.018;
  return .96+vein+.023*(n-.5)-(seam<.7?.12:0);
 }
+// 32x32 seamless low-contrast fixture pigments, generated only on atlas upload.
+const fc=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+function fh(x,y,s){
+ let n=Math.imul(x+43,374761393)^Math.imul(y+89,668265263)^Math.imul(s+17,2246822519);
+ n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;
+}
+function fn(u,v,period,seed){
+ const X=u*period,Y=v*period,x=Math.floor(X),y=Math.floor(Y);
+ const fx=X-x,fy=Y-y,tx=fx*fx*(3-2*fx),ty=fy*fy*(3-2*fy);
+ const x0=(x%period+period)%period,y0=(y%period+period)%period,x1=(x0+1)%period,y1=(y0+1)%period;
+ const mix=(a,b,t)=>a+(b-a)*t;
+ return mix(mix(fh(x0,y0,seed),fh(x1,y0,seed),tx),
+            mix(fh(x0,y1,seed),fh(x1,y1,seed),tx),ty);
+}
+export function sampleFixtureTexture(index,x,y,size=32){
+ const u=x/size,v=y/size,s=177+index*67;
+ const broad=fn(u,v,3,s),fine=fn(u,v,8,s+3),speck=fn(u,v,16,s+9),cloud=.62*broad+.27*fine+.11*speck;
+ let light=.97,r=1,g=1,b=1;
+ if(index===0){ // Timbers: directional fibres, subtle warm age
+  const warp=(fn(u,v,4,s+19)-.5)*.17;
+  const fibre=Math.cos((u+warp)*Math.PI*24)*.5+.5;
+  const pores=fn(u,v,16,s+21);
+  light=.89+.19*cloud+.042*(fibre-.5)-.055*Math.max(0,pores-.72);
+  r=1.035;g=.987;b=.925;
+ }else if(index===1){ // Linen: tight woven thread and diffuse creases
+  const weave=(Math.cos(u*Math.PI*64)+Math.cos(v*Math.PI*64))*.012;
+  light=.964+.110*(cloud-.5)+weave-.030*Math.max(0,.35-fine);
+  r=1.018+.030*(broad-.5);g=1.007+.019*(fine-.5);b=.975+.024*(speck-.5);
+ }else if(index===2){ // Muted washed quilt, no geometric printed motifs
+  const weave=(Math.cos(u*Math.PI*48)+Math.cos(v*Math.PI*48))*.009;
+  const wash=fn(u,v,5,s+33);
+  light=.952+.113*(cloud-.5)+weave-.04*Math.max(0,.40-wash);
+  r=.978+.029*(wash-.5);g=1.015+.015*(broad-.5);b=1.014+.023*(fine-.5);
+ }else if(index===3){ // Softly oxidized lantern metal
+  const patina=fc((cloud-.50)*2.3);
+  const brush=(Math.cos(u*Math.PI*44)+Math.cos(v*Math.PI*12))*.013;
+  light=.965+.12*(cloud-.5)+brush-.07*patina;
+  r=1.01-.055*patina;g=1+.01*patina;b=.984-.024*patina;
+ }else throw Error('Unknown fixture texture '+index);
+ return [fc(light,.76,1.10),r,g,b];
+}
 // Compact, intentionally pixelated material art. Every surface has its own
 // spatial structure (chips, fibres, mortar, joints), not just random grayscale.
 // 14 x 32 x 32 RGBA8 ~= 56KiB. Texture array grows by one tiny layer.
@@ -124,6 +166,13 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
   const n=rand(x,y,m),fine=rand(x>>1,y>>1,m+31),patch=rand(x>>2,y>>2,m+71);
   let f=.89+.13*patch+.055*(fine-.5),r=1,g=1,b=1;
   const px=x*32/size,py=y*32/size;
+   if(m>=94){
+    const [light,r,g,b]=sampleFixtureTexture(m-94,x,y,size),i=(m*size*size+y*size+x)*4;
+    out[i]=Math.min(255,Math.round(255*light*r));
+    out[i+1]=Math.min(255,Math.round(255*light*g));
+    out[i+2]=Math.min(255,Math.round(255*light*b));out[i+3]=255;
+    continue;
+   }
    // 30 selected high-impact surfaces receive authored multi-scale pigments and
    // contact darkening baked once at upload, not evaluated by the fragment shader.
    const detailGroup=m>=90?'extra':m>=70?'station':m>=40?'architecture':'base';

@@ -1,7 +1,7 @@
 import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
 import {BLOCK as B,isBed,isBedFoot,itemId, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
-import {materialFor,materialUVTransform} from './textures.js';
+import {materialFor,materialUVTransform,FIXTURE_MATERIAL} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
@@ -287,6 +287,14 @@ export function fixture(dest,id,x,y,z){
  }
 
  const shape=(dx,dy,dz,w,h,d,color,shade=1)=>cube(dest,x+dx,y+dy,z+dz,w,h,d,rgb(color),shade);
+ // Pack material IDs without altering the existing 7-float vertex contract.
+ const textured=(dx,dy,dz,w,h,d,color,material)=>{
+  const paint=rgb(color);
+  for(const face of FACES){
+   const corners=face.corners.map(([a,b,c])=>[x+dx+a*w,y+dy+b*h,z+dz+c*d]);
+   quad(dest,corners,paint,face.shade+4*material);
+  }
+ };
  if(id===B.CRATE){ // Weathered non-emissive cargo box with separated wood slats.
   shape(.085,.06,.085,.83,.75,.83,'#806b52');
   for(const y of [.10,.34,.58])for(const z of [.074,.86]){
@@ -302,44 +310,44 @@ export function fixture(dest,id,x,y,z){
   const frame=itemId(id)===B.BED,foot=isBedFoot(id),base=frame?.26:.025;
   const start=foot?0:.055,end=foot?.945:1;
   if(frame){
-   for(const leg of [.115,.79])shape(leg,.025,foot?.79:.065,.095,.265,.108,'#55473d');
-   for(const side of [.072,.863])shape(side,.185,start,.061,.092,end-start,'#695344');
-   shape(.10,.177,start,.80,.065,end-start,'#826c54');
+   for(const leg of [.115,.79])textured(leg,.025,foot?.79:.065,.095,.265,.108,'#55473d',FIXTURE_MATERIAL.BED_WOOD);
+   for(const side of [.072,.863])textured(side,.185,start,.061,.092,end-start,'#695344',FIXTURE_MATERIAL.BED_WOOD);
+   textured(.10,.177,start,.80,.065,end-start,'#826c54',FIXTURE_MATERIAL.BED_WOOD);
    if(!foot){
-    shape(.08,.162,.034,.84,.49,.062,'#745d4b');
-    shape(.11,.585,.025,.78,.056,.076,'#94745d');
+    textured(.08,.162,.034,.84,.49,.062,'#745d4b',FIXTURE_MATERIAL.BED_WOOD);
+    textured(.11,.585,.025,.78,.056,.076,'#94745d',FIXTURE_MATERIAL.BED_WOOD);
    }else{
-    shape(.10,.20,.882,.80,.215,.066,'#715b4b');
-    shape(.13,.382,.877,.74,.032,.075,'#9b7d66');
+    textured(.10,.20,.882,.80,.215,.066,'#715b4b',FIXTURE_MATERIAL.BED_WOOD);
+    textured(.13,.382,.877,.74,.032,.075,'#9b7d66',FIXTURE_MATERIAL.BED_WOOD);
    }
   }
-  shape(.105,base,start,.79,.109,end-start,'#b0aa9a');
-  shape(.112,base+.104,start,.776,.023,end-start,'#d1c7b5');
-  for(const side of [.106,.879])shape(side,base+.029,start,.013,.082,end-start,'#80776c');
+  textured(.105,base,start,.79,.109,end-start,'#b0aa9a',FIXTURE_MATERIAL.BED_LINEN);
+  textured(.112,base+.104,start,.776,.023,end-start,'#d1c7b5',FIXTURE_MATERIAL.BED_LINEN);
+  for(const side of [.106,.879])textured(side,base+.029,start,.013,.082,end-start,'#80776c',FIXTURE_MATERIAL.BED_LINEN);
   if(foot){
-   shape(.127,base+.128,.035,.744,.036,.87,'#77817c');
-   shape(.13,base+.160,.052,.739,.012,.793,'#8d9990');
-   shape(.125,base+.157,.846,.749,.020,.042,'#616b68');
+   textured(.127,base+.128,.035,.744,.036,.87,'#77817c',FIXTURE_MATERIAL.BED_COVER);
+   textured(.13,base+.160,.052,.739,.012,.793,'#8d9990',FIXTURE_MATERIAL.BED_COVER);
+   textured(.125,base+.157,.846,.749,.020,.042,'#616b68',FIXTURE_MATERIAL.BED_COVER);
   }else{
-   shape(.127,base+.128,.565,.744,.039,.424,'#798782');
-   shape(.132,base+.165,.576,.734,.012,.035,'#bac1b5');
-   shape(.185,base+.132,.126,.63,.044,.329,'#d4c7b8');
-   shape(.205,base+.175,.157,.59,.013,.267,'#e0d6c6');
+   textured(.127,base+.128,.565,.744,.039,.424,'#798782',FIXTURE_MATERIAL.BED_COVER);
+   textured(.132,base+.165,.576,.734,.012,.035,'#bac1b5',FIXTURE_MATERIAL.BED_COVER);
+   textured(.185,base+.132,.126,.63,.044,.329,'#d4c7b8',FIXTURE_MATERIAL.BED_LINEN);
+   textured(.205,base+.175,.157,.59,.013,.267,'#e0d6c6',FIXTURE_MATERIAL.BED_LINEN);
   }
  }else if(id===B.TORCH||id===B.LANTERN){
   // Compact warm emitter behind a metal cage, not a glowing square cabinet.
-  shape(.33,.115,.33,.34,.071,.34,'#63584b');
-  shape(.365,.182,.365,.27,.046,.27,'#9f8e72');
+  textured(.33,.115,.33,.34,.071,.34,'#63584b',FIXTURE_MATERIAL.LANTERN_METAL);
+  textured(.365,.182,.365,.27,.046,.27,'#9f8e72',FIXTURE_MATERIAL.LANTERN_METAL);
   shape(.390,.229,.390,.22,.345,.22,'#f8c88b',-1.28);
   for(const dx of [.342,.618])for(const dz of [.342,.618])
-   shape(dx,.212,dz,.040,.404,.040,'#716656');
+   textured(dx,.212,dz,.040,.404,.040,'#716656',FIXTURE_MATERIAL.LANTERN_METAL);
   for(const y of [.218,.598]){
-   shape(.34,y,.336,.32,.032,.040,'#5c524a');
-   shape(.34,y,.618,.32,.032,.040,'#5c524a');
+   textured(.34,y,.336,.32,.032,.040,'#5c524a',FIXTURE_MATERIAL.LANTERN_METAL);
+   textured(.34,y,.618,.32,.032,.040,'#5c524a',FIXTURE_MATERIAL.LANTERN_METAL);
   }
-  shape(.314,.62,.314,.372,.073,.372,'#766554');
-  shape(.353,.689,.353,.295,.045,.295,'#594e43');
-  shape(.467,.734,.465,.068,.071,.072,'#8c7a63');
+  textured(.314,.62,.314,.372,.073,.372,'#766554',FIXTURE_MATERIAL.LANTERN_METAL);
+  textured(.353,.689,.353,.295,.045,.295,'#594e43',FIXTURE_MATERIAL.LANTERN_METAL);
+  textured(.467,.734,.465,.068,.071,.072,'#8c7a63',FIXTURE_MATERIAL.LANTERN_METAL);
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');

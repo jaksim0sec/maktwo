@@ -27,7 +27,7 @@ test('specialized limestone, marble, beam and ceiling layers preserve block IDs'
  const a=makeTextureLayers(),b=makeTextureLayers();
  assert.equal(a.size,TEXTURE_SIZE);
  assert.equal(a.layers,MATERIALS.length);
- assert.equal(a.layers,94);
+ assert.equal(a.layers,98);
  assert.deepEqual(a.data,b.data);
  const ids=[B.LIMESTONE,B.MARBLE,B.CONCRETE_BEAM,B.CEILING_FINISH];
  assert.deepEqual(ids,[43,44,73,85]);

@@ -58,7 +58,7 @@ test('world anchored inventory faces player but stays upright and its positions 
  assert.ok(tiles.every(c=>c.w<=.5&&c.h<.48));
 });
 test('material layers keep one compact texture array, with varied color per material',()=>{
- const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,94);assert.equal(data.byteLength,layers*32*32*4);
+ const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,98);assert.equal(data.byteLength,layers*32*32*4);
  const hasColor=(m)=>{const offset=m*size*size*4;for(let i=offset;i<offset+size*size*4;i+=4)if(data[i]!==data[i+1]||data[i+1]!==data[i+2])return true;return false};
  assert.ok([0,1,5,9,12].every(hasColor),'materials should have authored color variation');
 });

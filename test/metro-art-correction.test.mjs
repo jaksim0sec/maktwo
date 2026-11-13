@@ -12,7 +12,7 @@ test('blue and crazed ceramic are baked from the rare hairline sampler',()=>{
  assert.equal(hasDetailedMaterial('architecture',4),true);
  const atlas=makeTextureLayers();
  assert.equal(atlas.size,32);
- assert.equal(atlas.layers,94);
+ assert.equal(atlas.layers,98);
  for(const [id,group,kind] of [[B.STATION_STATION_BLUE,'station',8],[B.ARCH_TILE_CRAZED,'architecture',4]]){
   const layer=materialFor(id,0)-1;
   for(const [x,y] of [[3,5],[12,13],[21,23],[29,29]]){

@@ -11,7 +11,7 @@ const materials=[
 
 test('marble materials retain separate stable 32px layers with restrained veining',()=>{
  const atlas=makeTextureLayers();
- assert.equal(atlas.size,32);assert.equal(atlas.layers,94);
+ assert.equal(atlas.size,32);assert.equal(atlas.layers,98);
  assert.deepEqual(materials.map(({id})=>materialFor(id,0)),[92,50]);
  const signatures=[];
  for(const {id,group,index} of materials){
