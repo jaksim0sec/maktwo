@@ -2,6 +2,8 @@ import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';impor
 import {toVoxels} from '../core/scale.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {createStationTrain} from '../worldgen/station-train.js';
+import {STATION_PREVIEW_MODE} from '../worldgen/station-preview.js';
+import {carryTrainPassenger} from '../core/train-collision.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
 export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.stamina=100;this.staminaRecovery=0;this.exhausted=false;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
@@ -40,17 +42,74 @@ export class SubwayTrain extends Entity{
   const train=createStationTrain({x:Math.round(site.x),z:Math.round(site.z),floorY:site.y-1,axis:site.axis});
   super('train',train.x,train.floorY,train.z);
   this.train=train;this.stationId=site.id;this.width=train.width;this.height=4;
+  this.homeX=this.x;this.homeZ=this.z;this.offset=0;this.speed=0;
+  this.doorTarget=0;this.doorOpen=0;this.throttle=false;this.brake=false;
+  this.limit=site.preview?7:10;this.driver=false;this.boardSide=1;
  }
- hurt(){} // A carriage is not a hostile mob or a destructible pickup.
+ hurt(){} // Not a combat entity.
+ setDoors(open){
+  if(this.speed>.035)return false;
+  this.doorTarget=open?1:0;return true;
+ }
+ control(accelerate,brake){this.throttle=Boolean(accelerate);this.brake=Boolean(brake)}
+ advance(dt){
+  dt=Math.max(0,Math.min(.06,dt));
+  const difference=this.doorTarget-this.doorOpen;
+  this.doorOpen=Math.abs(difference)<=dt*.72?this.doorTarget:this.doorOpen+Math.sign(difference)*dt*.72;
+  // Low-speed traction and braking. No chunk edits or scene remeshing.
+  const traction=this.doorOpen<.005&&this.doorTarget===0&&this.throttle?.44:0;
+  const resistance=this.brake?1.35:.14;
+  this.speed=Math.max(0,Math.min(2.75,this.speed+(traction-resistance)*dt));
+  this.offset=Math.max(-this.limit,Math.min(this.limit,this.offset+this.speed*dt));
+  if(this.offset>=this.limit)this.speed=0;
+  this.x=this.homeX+(this.train.axis==='x'?this.offset:0);
+  this.z=this.homeZ+(this.train.axis==='z'?this.offset:0);
+ }
+ doorDistance(player){
+  let distance=Infinity,side=1;
+  for(const car of this.train.carriages)for(const [from]of car.doors)for(const sign of [-1,1]){
+   const along=from+1+this.offset,cross=sign*(this.train.width+1)/2+.5;
+   const x=this.train.axis==='x'?this.homeX+along:this.homeX+cross;
+   const z=this.train.axis==='x'?this.homeZ+cross:this.homeZ+along;
+   const d=Math.hypot(player.x-x,player.z-z);
+   if(d<distance){distance=d;side=sign}
+  }
+  return {distance,side};
+ }
+ nearby(player){
+  return Math.abs(player.y-(this.y+1))<2.6&&this.doorDistance(player).distance<3.6;
+ }
+ driverPosition(){
+  const along=this.train.start+2+this.offset,cross=.5;
+  return {x:this.train.axis==='x'?this.homeX+along:this.homeX+cross,
+   y:this.y+1,z:this.train.axis==='x'?this.homeZ+cross:this.homeZ+along};
+ }
+ platformExit(side=this.boardSide){
+  const along=this.train.carriages[0].doors[0][0]+1+this.offset;
+  const cross=side*(this.train.width+2)/2+.5;
+  return {x:this.train.axis==='x'?this.homeX+along:this.homeX+cross,
+   y:this.y+1,z:this.train.axis==='x'?this.homeZ+cross:this.homeZ+along};
+ }
 }
 export class EntityManager{
  constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0;
+  if(world.mode===STATION_PREVIEW_MODE)
+   this.entities.push(new SubwayTrain({x:0,z:0,y:23,axis:'x',id:'preview',preview:true}));
   if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
    this.entities.push(...createCityPlan(world.seed,world.version).stations.map(site=>new SubwayTrain(site)));
+  world.trainColliders=this.entities.filter(e=>e.type==='train');
  }
  spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null){
+  if(this.world.trainColliders?.length){
+   const shifts=new Map();
+   for(const e of this.world.trainColliders){
+    const before=e.offset;e.advance(dt);
+    if(e.offset!==before)shifts.set(e.id,e.offset-before);
+   }
+   if(shifts.size)carryTrainPassenger(this.world.trainColliders,player,shifts);
+  }
   // Wildlife is sparse and long-lived enough to make a quiet village feel settled.
   // Manual/test animals do not count against the natural population limit.
   const LIMIT=6,SPAWN_INTERVAL=16,MIN_SEPARATION=10,MAX_RANGE=60;

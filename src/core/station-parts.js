@@ -28,10 +28,10 @@ export function stationPartGeometry(id){
  const dark='TRAIN_RUBBER',metal='TRAIN_DOOR_STEEL',skin='TRAIN_CORRUGATED',glass='TRAIN_SMOKED_GLASS',enamel='TRAIN_ENAMEL';
  switch(p.family){
  case 'trainWall':{
-  if(p.variant===4){ // Roof ribs, ventilation cassette and shallow drainage.
-   add(0,.83,0,1,.15,1,enamel,true);
-   for(const z of [.09,.47,.85])add(0,.98,z,1,.02,.065,skin);
-   for(const x of [.1,.82])add(x,.79,.13,.075,.05,.74,metal);
+  if(p.variant===4){ // Structural roof rests on the top of the upper wall, not .79m above it.
+   add(0,0,0,1,.19,1,enamel,true);
+   for(const z of [.09,.47,.85])add(0,.19,z,1,.035,.065,skin);
+   for(const x of [.10,.82])add(x,0,.13,.075,.08,.74,metal);
    break;
   }
   // 8 cm steel side sandwich. Door and window panels are never full cubes.

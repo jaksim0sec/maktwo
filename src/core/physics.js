@@ -1,6 +1,7 @@
 import {block,BLOCK as B} from './blocks.js';import {clamp} from '../util/math.js';
 import {toVoxels} from './scale.js';
 import {doorBounds,isDoor,doorIntersectsBody,DOOR_HEIGHT} from './door.js';
+import {trainCollision} from './train-collision.js';
 import {FORMED,hitFormed} from './construction.js';
 import {partById} from './part-library.js';
 import {partPrisms,partRaycast} from './part-prisms.js';
@@ -35,7 +36,9 @@ function climbStep(world,e,width,height){
  }
  return false;
 }
-export function collides(world,x,y,z,width=.6,height=1.8){const e=1e-5,body={x,y,z,width,height},cell={form:0};
+export function collides(world,x,y,z,width=.6,height=1.8){
+ if(trainCollision(world.trainColliders,x,y,z,width,height))return true;
+ const e=1e-5,body={x,y,z,width,height},cell={form:0};
  for(let bx=Math.floor(x-width/2+e);bx<=Math.floor(x+width/2-e);bx++)
  for(let by=Math.floor(y+e);by<=Math.floor(y+height-e);by++)
  for(let bz=Math.floor(z-width/2+e);bz<=Math.floor(z+width/2-e);bz++){

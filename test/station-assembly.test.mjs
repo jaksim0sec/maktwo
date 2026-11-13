@@ -75,67 +75,56 @@ test('sliding door, glazing, rails, seats and hanging handles have honest physic
  assert.notDeepEqual(doorL,doorR);
  assert.ok(stationPartGeometry(B.PART_STATION_TRAININTERIOR_3).length>=12);
 });
-test('preview contains all twenty tiles and thirty train and station parts',()=>{
+test('preview retains station architecture while train is an independent entity',()=>{
  const {map,at}=chunks(),ids=new Set();
  for(const c of map.values())for(const id of c.data)if(id)ids.add(id);
- for(const m of STATION_MATERIALS)assert.ok(ids.has(m.id),'missing tile '+m.key);
- for(const p of STATION_PARTS)assert.ok(ids.has(p.id),'missing component '+p.key);
+ for(const material of STATION_MATERIALS)assert.ok(ids.has(material.id));
+ for(const id of [B.PART_STATION_TRACK_3,B.PART_STATION_PLATFORM_3,B.PART_STATION_STATIONLINK_1])
+  assert.ok(ids.has(id));
  assert.equal(at(0,21,1),B.PART_STATION_TRACK_3);
- assert.equal(at(0,22,0),B.STATION_TRAIN_RUBBER);
+ assert.equal(at(0,23,0),B.AIR,'no old solid train overlaps the moving entity');
+ assert.equal(at(-13,23,2),B.AIR,'train doors are not static chunk voxels');
+ assert.equal(at(0,25,0),B.AIR,'train roof no longer resides in a chunk');
  assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,10)));
- assert.equal(at(-13,23,2),B.PART_STATION_TRAINWALL_3);
- assert.ok([B.PART_STATION_TRAININTERIOR_2,B.PART_STATION_TRAININTERIOR_3,B.AIR].includes(at(0,23,0)));
- assert.equal(at(0,24,STATION_PREVIEW_SPAWN.z|0),B.AIR);
- assert.ok([B.STATION_PLATFORM_STONE,B.STATION_STATION_ALGAE].includes(at(0,22,STATION_PREVIEW_SPAWN.z|0)));
  assert.ok(WORLD_PRESETS.some(p=>p.mode==='station-preview'));
  assert.ok(PALETTES.blocks.items.includes(B.STATION_PLATFORM_STONE));
  assert.ok(PALETTES.parts.items.includes(B.PART_STATION_TRAINWALL_2));
+ const manager=new EntityManager({mode:'station-preview'});
+ assert.equal(manager.entities.filter(e=>e.type==='train').length,1);
+ assert.equal(manager.world.trainColliders.length,1);
 });
-
-test('the station train has recognizable wheels, two cabs, door pairs, side skirts and gangways',()=>{
- const {map,at}=chunks();
- const BOGIE=B.PART_STATION_TRAINRUNNING_1;
+test('assembled moving train connects the roof and has 8 physically openable door pairs',()=>{
+ const train=createStationTrain(),parts=new Map();
+ const at=(x,y,z)=>parts.get(`${x},${y},${z}`);
+ for(let x=train.start-1;x<=train.end+1;x++)
+  for(let z=-2;z<=2;z++){
+   const put=(y,id)=>parts.set(`${x},${y},${z}`,id);
+   stampStationTrainColumn(train,x,z,put);
+  }
  for(const z of [-1,1])for(const x of [-15,-4,4,15]){
-  assert.equal(at(x,21,z),BOGIE,`missing wheel at ${x},${z}`);
+  assert.equal(at(x,21,z),B.PART_STATION_TRAINRUNNING_1);
   assert.equal(at(x,22,z),B.STATION_TRAIN_RUBBER);
  }
  for(const z of [-2,2])for(const x of [-15,-4,4,15])
-  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2,`missing underbody side sill at ${x},${z}`);
- assert.equal(at(-18,24,0),B.PART_STATION_TRAINRUNNING_3);
- assert.equal(at(18,24,0),B.PART_STATION_TRAINRUNNING_3);
- assert.equal(at(-19,22,0),B.PART_STATION_TRAINRUNNING_4);
- assert.equal(at(19,22,0),B.PART_STATION_TRAINRUNNING_4);
- assert.equal(at(0,23,2),B.PART_STATION_TRAINRUNNING_5);
- assert.equal(at(-1,23,-2),B.PART_STATION_TRAINRUNNING_5);
+  assert.equal(at(x,22,z),B.PART_STATION_TRAINRUNNING_2);
  for(const z of [-2,2])for(const [left,right] of [[-13,-12],[-7,-6],[6,7],[12,13]]){
   assert.equal(at(left,23,z),B.PART_STATION_TRAINWALL_3);
   assert.equal(at(right,23,z),B.PART_STATION_TRAINWALL_4);
-  assert.equal(at(left,24,z),B.PART_STATION_TRAINWALL_3);
  }
- assert.equal(at(0,21,0),B.PART_STATION_TRAINRUNNING_4,'inter-car coupling below gangway floor');
- assert.equal(at(0,22,3),B.STATION_PLATFORM_TACTILE,'platform joins the train side without a track-sized gap');
- assert.equal(at(0,25,0),B.PART_STATION_TRAINWALL_5,'connected roof over the gangway');
- assert.equal(at(0,26,0),B.AIR,'no isolated roof ribs');
- const bogie=stationPartGeometry(BOGIE);
- assert.ok(bogie.length>=16,'Wheel is shaped instead of being painted');
- assert.ok(new Set(bogie.map(p=>p.y)).size>=6,'Radial wheel outline has stepped sections');
- const cab=stationPartGeometry(B.PART_STATION_TRAINRUNNING_3);
- assert.ok(cab.some(p=>p.alpha),'Cab windscreen is genuinely glazed');
- const side=stationPartGeometry(B.PART_STATION_TRAINRUNNING_2);
- assert.ok(side.some(p=>p.material===B.STATION_PLATFORM_ORANGE),'Side livery is legible');
- let preserved=0;
- for(const chunk of map.values()){
-  for(let i=0;i<chunk.data.length;i++){
-   if(chunk.data[i]>=B.PART_STATION_TRAINWALL_1&&chunk.data[i]<=B.PART_STATION_TRAINWALL_5||
-    chunk.data[i]>=B.PART_STATION_TRAINRUNNING_1&&chunk.data[i]<=B.PART_STATION_TRAINRUNNING_5){
-    assert.ok(chunk.styles?.[i]&64,'Train module lacks exterior silhouette style bit');
-    preserved++;
-   }
-  }
- }
- assert.ok(preserved>100);
+ assert.equal(at(0,21,0),B.PART_STATION_TRAINRUNNING_4);
+ assert.equal(at(0,25,0),B.PART_STATION_TRAINWALL_5);
+ const geometry=stationPartGeometry(B.PART_STATION_TRAINWALL_5);
+ assert.equal(Math.min(...geometry.map(p=>p.y)),0,'roof underface must meet wall top');
+ assert.ok(geometry.some(p=>p.y+p.h>.18));
+ assert.equal(train.carriages.reduce((n,c)=>n+c.doors.length*2,0),8);
+ const entity=new EntityManager({mode:'station-preview'}).entities[0];
+ assert.equal(entity.train.start,train.start);
+ assert.ok(entity.setDoors(true));for(let i=0;i<100;i++)entity.advance(1/60);
+ assert.ok(entity.doorOpen>.95);
+ assert.ok(!entity.speed);
+ assert.ok(entity.setDoors(false));for(let i=0;i<100;i++)entity.advance(1/60);
+ assert.equal(entity.doorOpen,0);
 });
-
 test('train assembly also composes cars across chunks when oriented north-south',()=>{
  const train=createStationTrain({x:9,z:18,cars:3,axis:'z'});
  const seen=new Map(),putAt=(x,z)=>(y,id,turn)=>seen.set(`${x},${y},${z}`,{id,turn});

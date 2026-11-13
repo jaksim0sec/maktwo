@@ -45,7 +45,7 @@ The 30 3D units form six five-piece families:
 Each piece is a cluster of clipped 0..1 cuboids. Mesh, physics and selection
 share the same part geometry. Window glass is separately alpha-tagged; seats
 and grab handles are physically shaped rather than painted onto full cubes.
-Door leaves are **static display parts** in this build, not animated doors.
+Door leaves are authored as two dedicated GPU mesh groups per opening. Their motion is a local translation; static train wall part IDs remain unchanged.
 
 ## Assembly preview
 
@@ -87,8 +87,36 @@ track at its upper gallery. Track and narrow guarded footways run from the
 library interchange to each station, with portals through the dome wall.
 Platforms, tactile edges, columns, canopy, signs, infrastructure and decayed
 fixtures use the same registered materials and parts as the assembly preview.
-Each station receives one parked `SubwayTrain` entity. Its asset geometry is
-uploaded once as an entity mesh and is never duplicated into chunk data.
-Versions 5 and 6 retain their previous generation. The entities are static
-rolling stock for now: powered travel and interaction are separate work.
+Each station receives one controllable `SubwayTrain` entity, with shared
+GPU buffers for like-shaped trains. Preview uses the same entity rather than
+stamping a second static carriage. Core-city generation versions 5 and 6
+retain their earlier layouts and version 7 station geometry is preserved.
+
+### Train driving and collision (v1.15.33)
+
+Two 17-block cars are joined by a continuous floor and a roof cassette whose
+bottom meets the upper wall at y=3 exactly. There are two two-column door
+openings per car, on both sides: **8 double-leaf door pairs**, plus ordinary
+window modules and a front cab on each end. Physical door openings remain
+clear for a player rather than repeating a 1-block door frame at both Y levels.
+
+`src/core/train-collision.js` provides broad-phase-trimmed physical boxes
+for the rubber deck, roof, side panels and cab bulkhead, and removes the door
+wall collision only when fully open. It is shared by the ordinary physics
+system; neither riding nor falling onto a train requires a voxel edit.
+A standing passenger is translated with their carriage once per physics tick.
+Door animation is controlled through `O`, boarding/disembarkation through `G`,
+`W` for cautious acceleration and `S` for braking. All have touch buttons when
+near a train. Boarding and doors are disabled when moving; top speed is about
+7.9 km/h. The locomotive is intentionally limited to a short straight stretch.
+
+A single static train formerly produced 139,824 vertices. The continuous
+body model with separate door buffers has 89,640 vertices (36% fewer).
+Material/orientation templates are cached, and 4 station trains share at most
+2 GPU mesh sets based on track axis. Opening doors or moving a train changes
+only the `uEntityOffset` uniform, with no chunk remesh, repeated GPU upload,
+or full-world physics simulation. AABB proxies cost only a few comparisons on
+player collision checks. This is a proxy, not a simulated vehicle chassis.
+
+Desktop and mobile visual rendering still needs direct inspection.
 Desktop and mobile visual rendering still needs direct inspection.

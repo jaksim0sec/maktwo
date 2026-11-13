@@ -3,7 +3,7 @@
 import {BLOCK as B} from '../core/blocks.js';
 import {SIZE} from '../core/chunk.js';
 import {hash} from '../util/math.js';
-import {createStationTrain,stampStationTrainColumn,stampTrainCoupler} from './station-train.js';
+// Vehicle geometry is a separate entity, never stamped into chunk voxels.
 export const STATION_PREVIEW_MODE='station-preview';
 export const STATION_PREVIEW_SPAWN=Object.freeze({x:1.5,y:24,z:10.5});
 const T=Object.freeze({
@@ -12,7 +12,6 @@ const T=Object.freeze({
  link:[B.PART_STATION_STATIONLINK_1,B.PART_STATION_STATIONLINK_2,B.PART_STATION_STATIONLINK_3,B.PART_STATION_STATIONLINK_4,B.PART_STATION_STATIONLINK_5],
  running:[B.PART_STATION_TRAINRUNNING_1,B.PART_STATION_TRAINRUNNING_2,B.PART_STATION_TRAINRUNNING_3,B.PART_STATION_TRAINRUNNING_4,B.PART_STATION_TRAINRUNNING_5]
 });
-const PREVIEW_TRAIN=createStationTrain();
 export function stampStationPreview(chunk,seed){
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,H=chunk.height;
  const put=(lx,y,lz,id,facing=0)=>{
@@ -39,8 +38,6 @@ export function stampStationPreview(chunk,seed){
    else if(az===2)set(21,x%4===0?T.track[4]:T.track[3]);
    else if(x%3===0)set(21,T.track[1]);
    else if(z===0&&x%5===0)set(21,T.track[0]);
-   stampStationTrainColumn(PREVIEW_TRAIN,x,z,set);
-   stampTrainCoupler(PREVIEW_TRAIN,x,z,set);
   }
   // Opposing side platforms: edge marker, tactile bumps, slate and damp grime.
   if(az>=3&&az<=18&&ax<=28){
