@@ -45,9 +45,12 @@ function eyeZ(x,y){return -.010+Math.sqrt(Math.max(0,.174**2-x*x-y*y))}
 function VGeo(v,c,f){let g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(v,3));g.setAttribute('color',new T.Float32BufferAttribute(c,3));g.setIndex(f);g.computeVertexNormals();return g}
 const skinMat=new T.MeshStandardMaterial({vertexColors:true,roughness:.97,side:T.DoubleSide});
 const pointCount=256, ringCount=36;
+// No separate tear-duct bead: leave some of the original skull at the inner corner.
+function medialWeight(x,y){let dx=(x+.151)/.030,dy=(y+.023)/.027;return Math.exp(-(dx*dx+dy*dy)*1.05)}
+function cutShape(p){let [x,y]=p,w=medialWeight(x,y);return [x+.019*w,y+.002*w]}
 let contour=[];
-for(let i=0;i<pointCount/2;i++)contour.push(bez(UP,i/(pointCount/2)));
-for(let i=0;i<pointCount/2;i++)contour.push(bez(LO,1-i/(pointCount/2)));
+for(let i=0;i<pointCount/2;i++)contour.push(cutShape(bez(UP,i/(pointCount/2))));
+for(let i=0;i<pointCount/2;i++)contour.push(cutShape(bez(LO,1-i/(pointCount/2))));
 function skull(front){
  let v=[],col=[],faces=[];
  for(let j=0;j<pointCount;j++){
@@ -57,7 +60,9 @@ function skull(front){
    let t=k/ringCount,r=front?lerp(minRad,1,t):t;
    let x=hx*r*Math.cos(a),y=hy*r*Math.sin(a);
    let z=(front?1:-1)*hz*Math.sqrt(Math.max(0,1-r*r));
-   v.push(x,headY+y,z);
+// At the medial corner the cut fades out in depth across the native face surface.
+if(front)z+=.013*medialWeight(x,y)*Math.pow(1-k/ringCount,2);
+v.push(x,headY+y,z);
    let hash=Math.sin(x*164+y*41+z*67)*Math.cos(x*73-y*111);
    let base=[.53,.47,.45],variation=hash*.027;
    for(let l=0;l<3;l++)col.push(clamp(base[l]+variation*(l===0?1:.82),0,1));
@@ -101,12 +106,12 @@ eye.position.set(0,headY,-.010);subject.add(eye);
 function lid(part,sign){
  let v=[],col=[],faces=[],K=7,M=128;
  for(let j=0;j<=M;j++){
-  let t=j/M,p=bez(part,t),x=p[0],y=p[1],w=Math.pow(Math.sin(Math.PI*t),.85);
+  let t=j/M,p=cutShape(bez(part,t)),x=p[0],y=p[1],w=Math.pow(Math.sin(Math.PI*t),.85);
   for(let k=0;k<K;k++){
    let u=k/(K-1), yy=y+sign*(u-.42)*.025*w;
    let z=lerp(eyeZ(x,y)+.004,frontZ(x,yy)+.008,sstep(.04,.93,u));
    // Subtle lip thickening around, not a tube sitting on the forehead.
-   z+=Math.sin(u*Math.PI)*.003*w;
+   z+=Math.sin(u*Math.PI)*.003*w+.013*medialWeight(x,yy)*(1-u)*(1-u);
    v.push(x,headY+yy,z);
    let cr=lerp(.34,.52,u),cg=lerp(.128,.36,u),cb=lerp(.145,.345,u);
    let dust=Math.sin(j*1.8+k*8.3)*.008;
@@ -119,28 +124,8 @@ function lid(part,sign){
  return new T.Mesh(VGeo(v,col,faces),new T.MeshStandardMaterial({vertexColors:true,roughness:.92,side:T.DoubleSide}));
 }
 subject.add(lid(UP,1),lid(LO,-1));
-// Small angular caruncle at the LEFT corner. Its root starts inside the cut, not outside the head.
-// It is a shallow 3D wedge with tapered width, not a spherical knob or painted texture.
-function tearDuct(){
- let v=[],col=[],faces=[],M=22,K=12;
- for(let j=0;j<=M;j++){
-  let t=j/M,x=lerp(-.170,-.128,t),center=lerp(-.027,-.017,t);
-  let half=(1-t)*.014+.0015*t;
-  for(let k=0;k<=K;k++){
-   let u=k/K,y=center+(u*2-1)*half;
-   let bulge=Math.sin(u*Math.PI)*(1-t)*.008;
-   let z=lerp(frontZ(x,y)-.006,eyeZ(x,y)+.017,.65)+bulge;
-   v.push(x,headY+y,z);
-   let shade=.10*Math.sin(Math.PI*u)*Math.sin(Math.PI*t);
-   col.push(.33+shade,.116+shade*.3,.135+shade*.3);
-  }
- }
- for(let j=0;j<M;j++)for(let k=0;k<K;k++){
-  let a=j*(K+1)+k,b=a+K+1;faces.push(a,b,a+1,a+1,b,b+1);
- }
- return new T.Mesh(VGeo(v,col,faces),new T.MeshStandardMaterial({vertexColors:true,side:T.DoubleSide,roughness:.9}));
-}
-subject.add(tearDuct());
+// The medial canthus is a softly incompletely carved part of the continuous skull.
+// There is deliberately no independent caruncle mesh, tube, or applied image.
 // Neck flows into the rear underside of the head, kept only to give the eye a side-view reference.
 function neck(){
  let v=[],col=[],faces=[],P=22,N=22;
