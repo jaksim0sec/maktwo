@@ -10,6 +10,7 @@ import {segmentY} from './eternal-night-walkways.js';
 import {encodeCityStair,encodeSplitTread,stairOuterRail,walkwayJunction,CITY_STAIR_STYLE} from './eternal-night-stairs.js';
 import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
 import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
+import {stampElevatedStationColumn} from './eternal-night-station-build.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 import {floorEnvironment,lightProbability,survivingFixture} from './eternal-night-decay.js';
 
@@ -31,6 +32,10 @@ export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
   plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
+  plan.stationLines=[0,1].map(line=>({line,y:plan.stations.find(s=>s.line===line)?.y,
+    end:Math.max(0,...plan.stations.filter(s=>s.line===line).map(s=>
+      Math.abs((line===0?s.x:s.z)-(line===0?layout.centerX:layout.centerZ))+
+      (line===0?s.bounds.x1-s.bounds.x0:s.bounds.z1-s.bounds.z0)/2))}));
   plan.details=plan.volumes.map(v=>{
     floorEnvironment(v,layout.centerX,layout.centerZ,seed);
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
@@ -444,6 +449,7 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     const tower=plan.tower;
     if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
       stampCoreTower(tower,x,z,put);
+    if(plan.stations.length)stampElevatedStationColumn(plan,x,z,put);
   }
   return chunk;
 }

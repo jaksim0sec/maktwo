@@ -9,6 +9,7 @@ import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,buildLightVolu
 import {cameraEyeY,dampStepOffset} from './camera.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
+import {stationTrainMesh} from './station-train-mesh.js';
 const VERT=`#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;layout(location=1) in vec3 aColor;layout(location=2) in float aShade;
@@ -250,7 +251,7 @@ export class Renderer{
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
- resetWorld(world){this.farWorker?.terminate();this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
+ resetWorld(world){this.farWorker?.terminate();this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
  queueMesh(world,key,chunk,yMin,yMax,detailY){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
@@ -390,6 +391,7 @@ export class Renderer{
  dynamicData(entities,effects,time){
   const arr=[];
   for(const e of entities){
+   if(e.type==='train')continue;
    if(e.type==='drop'){
     const color=rgb(itemBlock(e.itemId).color),size=.23,phase=Math.sin(time*2+e.id)*.07;
     cube(arr,e.x-size/2,e.y+phase,e.z-size/2,size,size,size,color,.92);
@@ -489,8 +491,14 @@ export class Renderer{
    gl.uniform2f(this.u.fogRange,24,62);
   }
 
+  this.trainMeshes??=new Map();const trains=[];
+  for(const e of entities)if(e.type==='train'&&Math.hypot(e.x-cx,e.z-cz)<maxDistance+25&&Math.abs(e.y-player.y)<70){
+   let mesh=this.trainMeshes.get(e.id);
+   if(!mesh){const data=stationTrainMesh(e.train);mesh={opaque:this.upload(data.opaque),transparent:this.upload(data.transparent)};this.trainMeshes.set(e.id,mesh)}
+   trains.push(mesh);this.drawMesh(mesh.opaque);
+  }
   const data=this.dynamicData(entities,effects,performance.now()*.001);this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
-  gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);for(const m of visible)this.drawMesh(m.transparent);for(const mesh of trains)this.drawMesh(mesh.transparent);gl.depthMask(true);gl.disable(gl.BLEND);
   if(blurActive)this.applyDistanceBlur(width,height,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:260);
   if(this.hologram?.render(vp,performance.now()*.001))this.lastDrawCalls++;
   player.visualStepOffset=dampStepOffset(player.visualStepOffset,dt);

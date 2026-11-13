@@ -1,5 +1,7 @@
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels} from '../core/scale.js';
+import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
+import {createStationTrain} from '../worldgen/station-train.js';
 let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
 export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.stamina=100;this.staminaRecovery=0;this.exhausted=false;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
@@ -33,8 +35,19 @@ export class Mob extends Entity{constructor(type,x,y,z){super(type,x,y,z);this.w
 export class ItemDrop{
  constructor(itemId,x,y,z,count=1){this.id=NEXT++;this.type='drop';this.itemId=itemId;this.count=count;this.x=x;this.y=y;this.z=z;this.age=0;this.dead=false}
 }
+export class SubwayTrain extends Entity{
+ constructor(site){
+  const train=createStationTrain({x:Math.round(site.x),z:Math.round(site.z),floorY:site.y-1,axis:site.axis});
+  super('train',train.x,train.floorY,train.z);
+  this.train=train;this.stationId=site.id;this.width=train.width;this.height=4;
+ }
+ hurt(){} // A carriage is not a hostile mob or a destructible pickup.
+}
 export class EntityManager{
- constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0}
+ constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0;
+  if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
+   this.entities.push(...createCityPlan(world.seed,world.version).stations.map(site=>new SubwayTrain(site)));
+ }
  spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null){
@@ -49,7 +62,7 @@ export class EntityManager{
     if(!e.count)e.dead=true;
    }
   }
-  this.entities=this.entities.filter(e=>!e.dead&&(e.type==='drop'?e.age<180:e.age<(e.natural?180:240))&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
+  this.entities=this.entities.filter(e=>e.type==='train'||!e.dead&&(e.type==='drop'?e.age<180:e.age<(e.natural?180:240))&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
   this.spawnTimer-=dt;
   if(this.spawnTimer<=0){
    this.spawnTimer=SPAWN_INTERVAL;
@@ -60,18 +73,18 @@ export class EntityManager{
     if(clear){for(let y=55;y>1;y--){if(this.world.get(x,y-1,z)!==0&&this.world.get(x,y,z)===0&&this.world.get(x,y+1,z)===0){this.spawn('sheep',x+.5,y,z+.5,{natural:true});break}}}
    }
   }
-  for(const e of this.entities)if(e.type!=='drop'&&Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
+  for(const e of this.entities)if(e.type!=='drop'&&e.type!=='train'&&Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
  }
 
  hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity,padding=0){
   let choice=null,best=Math.min(maxDistance,blockDistance+1e-4);
   const assist=Math.min(.24,Math.max(0,padding));
-  for(const e of this.entities){if(e.dead||e.type==='drop')continue;
+  for(const e of this.entities){if(e.dead||e.type==='drop'||e.type==='train')continue;
    const r=e.width*.5+assist,vertical=assist*.5;
    const hit=intersectAabb(origin,direction,[e.x-r,e.y-vertical,e.z-r],[e.x+r,e.y+e.height+vertical,e.z+r]);
    if(hit&&hit.distance>=0&&hit.distance<best){best=hit.distance;choice=e}
   }
   return choice;
  }
- attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){if(e.type==='drop')continue;const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}
+ attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){if(e.type==='drop'||e.type==='train')continue;const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}
 }

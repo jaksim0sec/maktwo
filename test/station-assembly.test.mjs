@@ -10,6 +10,8 @@ import {materialFor,makeTextureLayers,MATERIALS} from '../src/client/textures.js
 import {stampStationPreview,STATION_PREVIEW_SPAWN} from '../src/worldgen/station-preview.js';
 import {createStationTrain,stampStationTrainColumn} from '../src/worldgen/station-train.js';
 import {WORLD_PRESETS,PALETTES} from '../src/core/catalog.js';
+import {createCityPlan,stampCityChunk} from '../src/worldgen/eternal-night-game.js';
+import {EntityManager} from '../src/entities/entities.js';
 
 const chunks=()=>{const map=new Map();
  for(let cz=-2;cz<=2;cz++)for(let cx=-2;cx<=2;cx++){
@@ -145,4 +147,21 @@ test('train assembly also composes cars across chunks when oriented north-south'
  assert.equal(id(11,23,train.z+train.carriages[0].doors[0][0]),B.PART_STATION_TRAINWALL_3);
  assert.equal(id(9,23,train.z+train.carriages[0].to+2),undefined,'the center of each gangway remains open');
  assert.equal(id(9,25,train.z+train.carriages[0].to+2),B.PART_STATION_TRAINWALL_5);
+});
+
+test('four suspended city stations share two library levels and own trains as entities',()=>{
+ const plan=createCityPlan(9999,7);
+ assert.equal(plan.stations.length,4);
+ assert.equal(new Set(plan.stations.map(s=>s.y)).size,2);
+ assert.equal(createCityPlan(9999,6).stations.length,0,'saved earlier cities retain their layout');
+ const manager=new EntityManager({mode:'eternal-city-lab',version:7,seed:9999});
+ assert.equal(manager.entities.filter(e=>e.type==='train').length,4);
+ for(const site of plan.stations){
+  const x=Math.round(site.x),z=Math.round(site.z),cx=Math.floor(x/16),cz=Math.floor(z/16);
+  const chunk=stampCityChunk(new Chunk(cx,cz,768),9999,7);
+  const at=(y,cross=0)=>site.axis==='x'?chunk.get(x-cx*16,y,z+cross-cz*16):chunk.get(x+cross-cx*16,y,z-cz*16);
+  assert.equal(at(site.y-2,1),B.PART_STATION_TRACK_3);
+  assert.equal(at(site.y-1,3),B.STATION_PLATFORM_TACTILE);
+  assert.equal(at(site.y+7,3),B.STATION_STATION_CREAM);
+ }
 });

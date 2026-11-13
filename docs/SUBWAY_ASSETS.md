@@ -79,6 +79,16 @@ and the simplified mesh retains its main solid frame and translucent
 glazing. This prevents the whole train body from disappearing when it
 falls outside the fine-detail Y range.
 
-The preview does not alter `eternal-city-lab` generation or existing saved worlds.
-There is no autonomous moving train or passenger simulation. Render tests must be
-done separately on desktop and mobile, especially the alpha-blended windows.
+## Core-city stations
+
+New generation version 7 places four suspended stations at the reserved sites:
+two on the east/west track at the library's lower gallery, two on the north/south
+track at its upper gallery. Track and narrow guarded footways run from the
+library interchange to each station, with portals through the dome wall.
+Platforms, tactile edges, columns, canopy, signs, infrastructure and decayed
+fixtures use the same registered materials and parts as the assembly preview.
+Each station receives one parked `SubwayTrain` entity. Its asset geometry is
+uploaded once as an entity mesh and is never duplicated into chunk data.
+Versions 5 and 6 retain their previous generation. The entities are static
+rolling stock for now: powered travel and interaction are separate work.
+Desktop and mobile visual rendering still needs direct inspection.
