@@ -81,19 +81,31 @@ export function stationTrainMesh(train){
    solid(a,1.60,outside,w,.05,.014,orange);
    const windowStart=a+(index===0?1.8:.20),windowEnd=b-(index===doors.length?1.8:.20);
    if(windowEnd-windowStart<.4){cladding(a,1.87,w,1.70,enamel);return}
+   // Wide continuous window belt, restrained aluminum surrounds.
    cladding(a,1.87,w,.22,enamel);
    cladding(a,3.22,w,.35,enamel);
    cladding(a,2.09,windowStart-a,1.13,enamel);
    cladding(windowEnd,2.09,b-windowEnd,1.13,enamel);
    const width=windowEnd-windowStart;
-   cladding(windowStart,2.09,width,.07,rubber);
-   cladding(windowStart,3.15,width,.07,rubber);
-   for(const x of [windowStart,(windowStart+windowEnd)/2,windowEnd-.08])cladding(x,2.16,.08,.99,rubber);
-   box(transparent,windowStart+.06,2.16,c+.045,width-.12,.99,.024,glass);
-   if(index>0&&index<doors.length){
-    const inside=side<0?lo+.13:hi-.65;
-    solid(a+.3,1.15,inside,w-.6,.42,.52,seat);
-    solid(a+.3,1.57,side<0?inside:inside+.40,w-.6,.42,.12,seat);
+   cladding(windowStart,2.09,width,.042,rubber);
+   cladding(windowStart,3.18,width,.042,rubber);
+   for(const x of [windowStart,windowEnd-.044])cladding(x,2.12,.044,1.06,steel);
+   if(width>2.25)cladding((windowStart+windowEnd)/2-.025,2.14,.05,1.04,steel);
+   box(transparent,windowStart+.05,2.15,c+.045,width-.10,1.01,.024,glass);
+   const outsideTrim=side<0?c-.014:c+.12;
+   solid(windowStart,2.075,outsideTrim,width,.020,.018,steel);
+   solid(a+.10,1.91,outsideTrim,w-.20,.035,.018,steel);
+   if(index>0&&index<doors.length&&w>.85){
+    const inside=side<0?lo+.13:hi-.65,back=side<0?inside:inside+.40;
+    const span=w-.58,count=Math.max(2,Math.floor(span/.75)),step=span/count;
+    solid(a+.27,1.22,inside,span,.17,.50,steel);
+    for(let j=0;j<count;j++){
+     const px=a+.29+j*step,cw=Math.max(.15,step-.055);
+     solid(px,1.39,inside+.035,cw,.13,.45,seat);
+     solid(px,1.53,back,cw,.39,.115,seat);
+    }
+    for(const x of [a+.31,a+w/2,a+w-.38])solid(x,1.04,inside+.12,.055,.32,.27,steel);
+    solid(a+.25,1.94,back-.02,w-.50,.035,.14,steel);
     solid(a+.25,3.35,inside,w-.5,.045,.42,steel);
    }
   };
@@ -105,6 +117,9 @@ export function stationTrainMesh(train){
    solid(left-.41,1.57,c-.045,.28,.43,.21,rubber);
    solid(left-.315,1.65,c-.085,.09,.25,.29,orange);
    cladding(left,3.51,doorWidth,.06,steel);
+   // Fixed overhead marker, independent from the animated door leaves.
+   solid(left+.24,3.525,c-.033,doorWidth-.48,.052,.020,rubber);
+   solid(left+doorWidth/2-.085,3.54,c-.046,.17,.026,.025,orange);
 
    for(const leaf of [-1,1]){
     const steelFirst=doorSteel.length/7,glassFirst=doorGlass.length/7;
@@ -182,11 +197,20 @@ export function stationTrainMesh(train){
   for(const dz of [-.133,.11])solid(leverX-.25,leverY+.079,leverZ+dz,.39,.027,.024,steel);
   for(const dx of [-.19,-.095,0,.095])solid(leverX+dx,leverY+.08,leverZ+.15,.024,.012,.028,enamel);
  }
+ // Paired continuous passenger grab rails with restrained hanging loops.
+ // Static assembly only, so there is no additional per-frame animation cost.
+ for(const c of [center-.82,center+.72]){
+  solid(start+2.85,3.52,c,length-5.7,.05,.060,steel);
+  for(let a=start+4.2;a<end-2.5;a+=2.5){
+   solid(a,3.34,c+.012,.05,.18,.038,steel);
+   solid(a+.02,3.18,c+.012,.035,.15,.038,rubber);
+   solid(a-.055,3.11,c-.01,.15,.046,.085,rubber);
+  }
+ }
  for(let a=start+4;a<end-2;a+=3){
-  solid(a,3.65,center-.82,1.8,.06,.10,steel);
-  if((a-start)%2===0)solid(a,3.73,center-.21,1.5,.06,.42,enamel);
-  if((a-start)%4===0)solid(a+.15,3.716,center-.17,1.20,.02,.34,B.STATION_STATION_CREAM,true);
-  for(const c of [center-.80,center+.70])solid(a+.38,3.39,c,.055,.27,.08,steel);
+  solid(a,3.70,center-.22,1.8,.05,.44,enamel);
+  if(Math.floor(a-start)%2===0)solid(a+.16,3.716,center-.16,1.20,.020,.32,B.STATION_STATION_CREAM,true);
+  for(const c of [center-.82,center+.72])solid(a+.38,3.52,c,.06,.24,.09,steel);
  }
  const levers=trainControls(train).filter(handle=>handle.kind==='lever').map(({at:[a,y,c],side})=>{
   return [-1,0,1].map(state=>{
