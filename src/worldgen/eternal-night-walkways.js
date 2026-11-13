@@ -137,6 +137,9 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   };
   for(const volume of buildings)insert(structureBuckets,volume);
   const clearDeck=(a,b,except)=>{
+    for(const site of grid.stations??[]){
+      if(Math.abs(Math.min(a[1],b[1])-site.y)<unit*5&&intersectsBox(a,b,site.bounds,margin))return false;
+    }
     if(!clearHoles(a,b)||!clearCore(a,b)||!insideCoreFloor(a)||!insideCoreFloor(b))return false;
     for(const key of keys(spanBox(a,b),margin))for(const root of structureBuckets.get(key)??[]) {
       if(root.id===except||Math.min(a[1],b[1])>=root.y1+unit||Math.max(a[1],b[1])+unit*2.5<=root.y0)continue;

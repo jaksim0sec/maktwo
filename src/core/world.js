@@ -1,6 +1,6 @@
 import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
-import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
+import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {stairConnections,stairRailRise,signConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
@@ -11,8 +11,8 @@ import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?CITY_BLUEPRINT_VERSION:GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
+ constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?CITY_STATION_VERSION:GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false);this.chunks.set(k,c);const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms??=new Uint8Array(c.data.length);for(const [idx,form] of forms)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
  c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);this.events.emit('chunk-load',c)}return c}
@@ -218,7 +218,7 @@ export class World{
   const originals=new Map();
   for(const entry of selected){
    let base=originals.get(entry.k);
-   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION);originals.set(entry.k,base)}
+   if(!base){base=generateChunk(new Chunk(entry.cx,entry.cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false);originals.set(entry.k,base)}
    const bx=entry.bx,by=entry.by,bz=entry.bz;
    const original=base.get(bx-entry.cx*SIZE,by,bz-entry.cz*SIZE);
    this.edits.get(entry.k)?.delete(entry.idx);
@@ -236,7 +236,7 @@ export class World{
  spawn(){
   if(this.mode===CITY_MODE){
    let fallback;
-   for(const pos of citySpawnCandidates(this.seed,this.version>=CITY_BLUEPRINT_VERSION)){
+   for(const pos of citySpawnCandidates(this.seed,this.version>=CITY_BLUEPRINT_VERSION?this.version:false)){
     fallback??=pos;
     const {x,y,z}=pos;
     if(block(this.get(x,y-1,z)).opaque&&this.get(x,y,z)===B.AIR&&this.get(x,y+1,z)===B.AIR)return pos;
@@ -253,7 +253,7 @@ export class World{
  }return{x:.5,y:30,z:.5}}
  save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.saveKey,this.snapshot());return true}
  loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.saveKey)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){// Saved city edits and player positions refer to the old floor plans.
- if(this.mode===CITY_MODE&&!(d.generationVersion>=CITY_BLUEPRINT_VERSION))this.version=GENERATION_VERSION;
+ if(this.mode===CITY_MODE)this.version=d.generationVersion>=CITY_BLUEPRINT_VERSION?Math.min(d.generationVersion,CITY_STATION_VERSION):GENERATION_VERSION;
  if(d.generationVersion!==this.version){try{const backup='mcweb:'+this.saveKey+':before-generator-unification';if(!this.storage.getItem(backup))this.storage.setItem(backup,JSON.stringify(d))}catch{}}this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state);
  for(const [k,arr] of d.forms||[])this.forms.set(k,new Map(arr.filter(([idx,form])=>FORMED[form]&&supportsForms(this.edits.get(k)?.get(idx)))));
  for(const [k,arr] of d.mounts||[])this.mounts.set(k,new Map(arr.filter(([,mount])=>isWallItem(mount?.id))));

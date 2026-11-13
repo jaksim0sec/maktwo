@@ -2,6 +2,7 @@ import {CORE_ZONE, districtIdAt, sampleFloorRect} from './eternal-night-core-flo
 import {BUILDING_DEFAULTS, buildingAt, cutPolygon, designBuilding, stairRisers} from './eternal-night-buildings.js';
 import {designRoofWalkway, designWalkways, segmentY} from './eternal-night-walkways.js';
 import {populatePrecincts} from './eternal-night-precincts.js';
+import {planCoreStations,stationIntersectsCell} from './eternal-night-stations.js';
 function populate(layout, grid, partitioned, {unit,buildingDensity,highRise}) {
   const {size, step, left, top, luxury, noise, buildable} = grid;
   const {labels, sections, tangentX, tangentZ} = partitioned;
@@ -313,6 +314,8 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
     ids[i]=districtIdAt(layout,left+(i%size+.5)*step,top+(Math.floor(i/size)+.5)*step);
   }
   const buildable=new Uint8Array(cells);
+  const stations=highRise&&options.cityBlueprints!==false&&options.stationSites!==false
+    ?planCoreStations(layout,unit):{hub:null,stations:[]};
   const reserved=[[layout.centerX,layout.centerZ,layout.centerRadiusSq],
     ...layout.miniShaftCenters.map(([x,z])=>[x,z,layout.miniShaftRadiusSq])];
   for(let i=0;i<cells;i++){
@@ -320,10 +323,11 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
     const x=left+(i%size)*step,z=top+Math.floor(i/size)*step;
     buildable[i]=[[0,0],[1,0],[0,1],[1,1]].every(([dx,dz])=>
       districtIdAt(layout,x+dx*step,z+dz*step)===ids[i]) &&
+      !stationIntersectsCell(stations.stations,x,z,step) &&
       reserved.every(([cx,cz,r2])=>
         (clamp(cx,x,x+step)-cx)**2 + (clamp(cz,z,z+step)-cz)**2>r2) ? 1 : 0;
   }
-  const grid={size,step,left,top,zones,luxury,noise,ids,buildable};
+  const grid={size,step,left,top,zones,luxury,noise,ids,buildable,stations:stations.stations,stationHub:stations.hub};
   const partitioned=partition(layout,grid);
   const {volumes,occupied,roofLinks,precincts,lanes}=highRise?
     populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints:options.cityBlueprints},fract):populate(layout,grid,partitioned,{unit,buildingDensity,highRise});

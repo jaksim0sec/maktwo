@@ -19,13 +19,15 @@ export const CITY_HEIGHT=768;
 export const CITY_WIDTH=CORE_FLOOR_DEFAULTS.width;
 export const CITY_SEED=9999;
 export const CITY_BLUEPRINT_VERSION=6;
+export const CITY_STATION_VERSION=7;
 export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
 
 export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
   if(cached?.layout.seed===seed&&cached.cityBlueprints===cityBlueprints)return cached;
   const layout=createFloorLayout({seed,floorY:CITY_BASE_Y});
-  const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints});
+  const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints:cityBlueprints!==false,
+    stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION});
   plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
