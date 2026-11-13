@@ -30,6 +30,7 @@ body.holo-open #inventory-close{display:block}
 /* V1.9 spatial HUD and underwater atmosphere */
 #inventory-close{display:none!important}
 .status-ring{position:relative;width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;color:#efaaa5;pointer-events:none}
+#quick-row{display:flex;align-items:center;gap:6px;max-width:calc(100vw - 20px)}#quick-row #hotbar-dock{min-width:0}
 .status-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
 .ring-track,.ring-fill{fill:none;stroke-width:3;stroke-linecap:round}
 .ring-track{stroke:#ffffff21}.ring-fill{stroke:currentColor;transition:stroke-dasharray .15s linear;filter:drop-shadow(0 0 3px currentColor)}
