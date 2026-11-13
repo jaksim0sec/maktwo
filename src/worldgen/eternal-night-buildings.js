@@ -217,8 +217,17 @@ export function designBuilding(volume, unit, random) {
       volume.program==='housing'?['shops','housing','workshops','exchange','housing']:['market','workshops','housing','exchange','housing'];
     let program=highRise?order[band]:undefined;
     if(highRise&&(level===entryLevel||skyLevels.has(level)))program=level/count>.8?'housing':'exchange';
+
     if(hasAtrium&&highRise)program='court';
-    const pattern=highRise?(Math.floor((volume.phase??0)*7)+level)%4:0;
+    // Rare maintenance/refuge floors increase with elevation. Preserve the shaft
+    // and all authored entrance/skybridge levels; only the room programme varies.
+    const fraction=level/Math.max(1,count-1);
+    const eventChance=.035+.12*fraction*fraction;
+    const reserve=!skyLevels.has(level)&&level>entryLevel+2&&level<count-2&&!hasAtrium;
+    if(highRise&&reserve&&random(311+level)<eventChance)
+      program=random(417+level)<.56?'workshops':'exchange';
+    // Nonperiodic two-storey clusters replace the identical 4-floor cycle.
+    const pattern=highRise?Math.floor(random(519+Math.floor(level/2))*6):0;
     const key=band+':'+program+':'+pattern;
     if(!shapes.has(key))shapes.set(key,geometry(setbacks[band],program,pattern));
     const shape=shapes.get(key),y=volume.y0+level*storeyHeight;

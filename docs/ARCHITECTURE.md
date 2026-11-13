@@ -39,6 +39,33 @@ columns only in that world. Mesh jobs select a vertical band with a one-voxel
 halo. The renderer simplifies distant authored facade parts and keeps detailed
 interiors near the camera. Lighting follows the player vertically.
 
+## Deterministic high-rise ageing and texture orientation
+
+The city has no per-frame random lighting decisions. The generator evaluates
+a center-tower distance `d = hypot(x-centerX, z-centerZ)` **once per building**,
+then precomputes each floor's age and illumination probability:
+
+- `p_lit(d) = 0.055 + 0.82 / (1 + (d / 215)^2)`
+- `damage(d,h) = clamp(0.10 + 0.49(1-p_lit(d)) + 0.20 smoothstep(h) + 0.12 (stratumHash - 0.5), 0, 0.92)`
+- `p_fixture = p_lit(d) * (1 - 0.22 damage)`, where `h = floorIndex / max(1, floorCount-1)`.
+
+Fixed per-position integer hashes determine which authored fixtures survive.
+Unpowered fluorescent fittings use the existing broken fitting ID, so the
+existing light-volume system handles the correct result without renderer
+branches or new light types. Higher maintenance/refuge floors are sampled
+from `0.035 + 0.12 h²`, excluding the entry, shaft and skybridge floor
+levels. Spatial damage affects finish and room furnishing only, never the
+stairs, exterior load-bearing geometry or door clearance.
+
+The material atlas keeps the same textures and seven-float vertex stride.
+Orientation-safe natural concrete/stone and weathering layers can select
+one of four rotations plus optional mirroring from the existing per-quad
+position hash. Directional materials limit transforms to reflection or none.
+A transform is encoded into the already-used seventh vertex float; the
+WebGL fragment shader only unpacks its orientation bits before the single
+existing atlas sample. No extra textures, voxels, vertex attributes, or
+per-fragment hashes are added. Greedy faces continue to merge identically.
+
 ## Terrain research and limits
 
 The shared terrain profile combines low-frequency domain warp, ridge fields and curved canyon cuts, informed by the approach of domain-warp noise generators and erosion-shaped terrain mods. It does **not** simulate sediment or hydraulic erosion. Heights are capped at 57 in the existing 64-high chunk layout. A future full mountain overhaul needs vertical chunk sections and distant-terrain LOD first; raising the global chunk height in-place would double memory and could regenerate old terrain.

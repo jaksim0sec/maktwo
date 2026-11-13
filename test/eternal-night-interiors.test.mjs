@@ -42,10 +42,10 @@ test('rasterized school-like corridor has distinct floors, suspended ceiling and
  for(let z=corridor.z0+1;z<corridor.z1-1;z++){
   const x=Math.floor(cx)+.5,zz=Math.floor(z)+.5;
   if(get(x,Math.round(f.top)-2,zz)===B.CEILING_FINISH)ceiling++;
-  if(get(x,Math.round(f.top)-2,zz)===B.FLUORESCENT)lights++;
+  if([B.FLUORESCENT,B.BROKEN_FLUORESCENT].includes(get(x,Math.round(f.top)-2,zz)))lights++;
   if(get(x,Math.round(f.y)-1,zz)===B.ARCH_TILE_LARGE_PORCELAIN)centerTiles++;
  }
  assert.ok(ceiling>=3,'ceiling panels exist');
- assert.ok(lights>=1,'repeating ceiling lights exist');
+ assert.ok(lights>=1,'repeating ceiling fittings persist, including unpowered fixtures');
  assert.ok(centerTiles>=3,'corridor floor separates from wall cladding');
 });

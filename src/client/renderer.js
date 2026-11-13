@@ -64,9 +64,11 @@ void main(){
  vec3 tinted=vColor;
  if(vMaterial>0){
   vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vPos.xz:(axis.x>axis.z?vPos.zy:vPos.xy);
-  if(vTurns==1)uv=vec2(-uv.y,uv.x);
-  else if(vTurns==2)uv=-uv;
-  else if(vTurns==3)uv=vec2(uv.y,-uv.x);
+  // D4 symmetry with turn/reflection bits already packed in aShade.
+  int quarter=vTurns&3;
+  uv=mix(uv,uv.yx,float(quarter&1));
+  uv*=vec2(1.-2.*float(quarter==1||quarter==2),1.-2.*float(quarter>=2));
+  uv.x*=1.-2.*float((vTurns>>2)&1);
   tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
  }
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.

@@ -1,4 +1,5 @@
 import {BLOCK as B} from '../core/blocks.js';
+import {survivingFixture} from './eternal-night-decay.js';
 
 /** Small-scale inhabited spaces use layered finishes instead of treating
  * structural floor, corridor, room, ceiling and light as the same material.
@@ -29,13 +30,14 @@ export function hasDropCeiling(f,shape) {
   )));
 }
 
-export function ceilingFixture(f,corridor,x,z,buildingId) {
+export function ceilingFixture(f,corridor,x,z,buildingId,seed=0) {
  if(!corridor)return B.CEILING_FINISH;
  const alongX=corridor.x1-corridor.x0>=corridor.z1-corridor.z0;
  const center=alongX?(corridor.z0+corridor.z1)/2:(corridor.x0+corridor.x1)/2;
  const minor=alongX?z:x,major=Math.floor(alongX?x:z);
  const phase=((major+buildingId)%6+6)%6;
- return Math.floor(minor)===Math.floor(center)&&phase===0?B.FLUORESCENT:B.CEILING_FINISH;
+ const fitting=Math.floor(minor)===Math.floor(center)&&phase===0;
+ return fitting?(survivingFixture(B.FLUORESCENT,x,Math.round(f.top)-2,z,seed,f.lightChance??1)||B.BROKEN_FLUORESCENT):B.CEILING_FINISH;
 }
 
 export function interiorWallFinish(f,base) {

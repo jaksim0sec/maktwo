@@ -5,6 +5,19 @@ import {ARCH_MATERIALS,ARCH_MATERIAL_START} from '../core/architectural-material
 import {sampleArchitectureTexture} from './architecture-texture-sampler.js';
 export const TEXTURE_SIZE=32;
 export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label)];
+// Only orientation-safe material families are transformed. Directional seams stay aligned.
+// Modes: 3 = quarter-turns and reflection; 1 = reflection; 0 = unchanged.
+const UV_VARIANTS=new Uint8Array(MATERIALS.length+1);
+for(const id of [4,8,9,12,18,19,22,23,24,25,35,36])UV_VARIANTS[id]=3;
+for(let id=46;id<=55;id++)UV_VARIANTS[id]=3; // stone, concrete
+for(let id=61;id<=63;id++)UV_VARIANTS[id]=3; // non-directional metal weathering
+for(const id of [6,10,20,21,28,29,31,33])UV_VARIANTS[id]=1; // maintain wood, rust streaks, shutters and brick direction
+export const textureTransformMode=id=>UV_VARIANTS[id]||0;
+export function materialUVTransform(id,random,authoredTurn=0){
+ const mode=textureTransformMode(id),sample=Math.min(7,Math.floor(random*8));
+ const rotation=(mode>>1)*(sample&3),mirror=(mode&1)*(sample&4);
+ return authoredTurn?authoredTurn|mirror:rotation|mirror;
+}
 export function materialFor(id,face){
  if(id>=ARCH_MATERIAL_START&&id<ARCH_MATERIAL_START+ARCH_MATERIALS.length)return 41+id-ARCH_MATERIAL_START;
  switch(id){

@@ -1,7 +1,7 @@
 import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
 import {BLOCK as B, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
-import {materialFor} from './textures.js';
+import {materialFor,materialUVTransform} from './textures.js';
 import {doorBounds,DOOR_HEIGHT} from '../core/door.js';
 import {shapeBoxes,isStairs,isSlab,rotateCellXZ,isPanel,diagonalPanel} from '../core/shapes.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
@@ -123,8 +123,13 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
      return p;
     });
     // Tiny world-coordinate variation only per merged face, never per vertex.
-    const color=COLORS[id],variation=id===B.GLASS?1:.95+hash(xyz[0],xyz[1],xyz[2],visualSeed)*.06;
-    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],(id===B.GLASS?1:shade)+4*materialFor(id,faceIndex)+512*(mat>>>14));
+    const color=COLORS[id],variationSeed=hash(xyz[0],xyz[1],xyz[2],visualSeed);
+    const variation=id===B.GLASS?1:.95+variationSeed*.06;
+    const material=materialFor(id,faceIndex);
+    // One deterministic transform per greedy quad, encoded in existing vertex bits.
+    const turns=materialUVTransform(material,variationSeed,id===B.WATER?0:(mat>>>14)&3);
+    quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],
+      (id===B.GLASS?1:shade)+4*material+512*turns);
     k+=width;
    }
   }

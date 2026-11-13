@@ -11,6 +11,7 @@ import {encodeCityStair,encodeSplitTread,stairOuterRail,walkwayJunction,CITY_STA
 import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
 import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
+import {floorEnvironment,lightProbability,survivingFixture} from './eternal-night-decay.js';
 
 export const CITY_MODE='eternal-city-lab';
 export const CITY_BASE_Y=8;
@@ -27,6 +28,7 @@ export function createCityPlan(seed=CITY_SEED) {
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
   plan.library=createCoreLibrary(layout,plan.tower);
   plan.details=plan.volumes.map(v=>{
+    floorEnvironment(v,layout.centerX,layout.centerZ,seed);
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
     return {kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
       stairs:v.stairs[0]?.treads??[],landing:v.stairs[0]?.landing,access:v.stairs[0]?.upperLanding};
@@ -160,14 +162,22 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
     lastShape=shape;
     const {edge,corridor,room,door,doorKind,partition}=shape;
     const partitionWall=interiorWallFinish(f,kit.roomWall);
+    const scarred=hash(Math.floor(x/3),f.level,Math.floor(z/3),seed^0x72b4)<(f.damage??0)*.27;
+    const wallFinish=y=>scarred&&(y-floor<2||ceiling-y<2)?(y-floor<2?B.MOLD_PLASTER:B.STAINED_PLASTER):partitionWall;
     const hole=f.holes.some(h=>containsRect(h,x,z));
-    if(!hole)put(floor-1,floorFinish(f,shape,x,z,kit.floor));
+
+    if(!hole){
+      const finish=floorFinish(f,shape,x,z,kit.floor);
+      // Weathering is sparse and clustered into four-block patches, not pixel noise.
+      const damp=hash(Math.floor(x/4),f.level,Math.floor(z/4),seed^0x1872)<(f.damage??0)*.23;
+      put(floor-1,damp&&finish===B.ARCH_TILE_LARGE_PORCELAIN?B.WET_TILE:finish);
+    }
     // An independent suspended surface lives BELOW the upper structural slab,
     // and is absent at roof openings, stairwells and bridge clearances.
     const ceilingY=ceiling-1;
     const hasCeiling=!hole&&step<0&&!onLanding&&!atAccess&&!shaftSide
       &&!reservedPassage(ceilingY)&&hasDropCeiling(f,shape);
-    if(hasCeiling)put(ceilingY,ceilingFixture(f,corridor,x,z,v.id));
+    if(hasCeiling)put(ceilingY,ceilingFixture(f,corridor,x,z,v.id,seed));
     // An exposed underside still needs a slab even where the next storey steps back.
     const next=v.floors[f.level+1];
     if((!next||!inside(next.outline,x,z))&&!(shaft&&containsRect(shaft,x,z)))put(ceiling,kit.body);
@@ -201,18 +211,18 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
       }
     } else if(!hole && step<0 && !onLanding && !atAccess) {
       if(shaftSide&&!corridor) {
-        for(let y=floor;y<ceiling;y++)put(y,partitionWall);
+        for(let y=floor;y<ceiling;y++)put(y,wallFinish(y));
       } else if(partition) {
         const turn=lineTurn(partition.a,partition.b);
         for(let y=floor;y<ceiling;y++) {
           if(partition.kind==='shopfront'&&(y===floor+1||y===floor+2)&&y<ceiling-1)put(y,cityPart('window',3),turn);
-          else put(y,partitionWall);
+          else put(y,wallFinish(y));
         }
       } else if(door) {
         const turn=lineTurn(door.a,door.b);
         // Shops open onto an actual corridor; private rooms and storage have
         // a single usable door. Signage belongs outside, never on a back wall.
-        for(let y=floor+2;y<ceiling;y++)put(y,partitionWall);
+        for(let y=floor+2;y<ceiling;y++)put(y,wallFinish(y));
         const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
         const atDoor=midX===xi&&midZ===zi;
         if(atDoor&&doorKind!=='shop') {
@@ -222,15 +232,27 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false) {
       } else if(corridor) {
         // Older, low-headroom corridors keep their legacy ceiling light;
         // enclosed high corridors use the suspended integrated light panel.
-        if(!hasCeiling&&ceilingFixture(f,corridor,x,z,v.id)===B.FLUORESCENT)
-          put(ceilingY,B.FLUORESCENT);
+        if(!hasCeiling){
+          const overhead=ceilingFixture(f,corridor,x,z,v.id,seed);
+          if(overhead===B.FLUORESCENT||overhead===B.BROKEN_FLUORESCENT)put(ceilingY,overhead);
+        }
       } else if(room) {
         const item=furnishRoom(room,x,z,kit,seed);
-        if(item)put(floor,cityPart('interior',item.variant),item.turn);
-        if(xi===Math.floor((room.x0+room.x1)/2)&&zi===Math.floor((room.z0+room.z1)/2))put(ceiling-1,f.program==='housing'?B.ROUND_FLUORESCENT:B.FLUORESCENT);
+
+        if(item){
+          const unstocked=hash(xi,f.level,zi,seed^0x631c)<(f.damage??0)*.42;
+          // Abandoned storage occurs on upper floors too. Only room-owned
+          // furnishing positions are used; walkable corridors stay clear.
+          put(floor,unstocked?B.CRATE:cityPart('interior',item.variant),item.turn);
+        }
+        if(xi===Math.floor((room.x0+room.x1)/2)&&zi===Math.floor((room.z0+room.z1)/2)){
+          const lit=f.program==='housing'?B.ROUND_FLUORESCENT:B.FLUORESCENT;
+          put(ceiling-1,survivingFixture(lit,xi,ceiling-1,zi,seed,f.lightChance)||B.BROKEN_FLUORESCENT);
+        }
       }
     }
-    if(atAccess&&empty(ceiling-1)&&mod(xi+zi+v.id,5)===0)put(ceiling-1,B.FLUORESCENT,stairWallTurn>>1);
+    if(atAccess&&empty(ceiling-1)&&mod(xi+zi+v.id,5)===0)
+      put(ceiling-1,survivingFixture(B.FLUORESCENT,xi,ceiling-1,zi,seed,f.lightChance)||B.BROKEN_FLUORESCENT,stairWallTurn>>1);
     if(step>=0) {
       // Stamp both half-cells even when their surfaces cross a voxel Y boundary.
       const low=Math.round((f.y+(from??stairs[step]).y-v.y0)*4);
@@ -275,7 +297,7 @@ function stampAnnex(part,x,z,put,empty) {
   } else if(outer>.2&&(along<1.2||along>length-1.2)&&empty(y))put(y,cityPart('interior',0),turn);
 }
 
-function stampWalkway(link,part,x,z,put,empty) {
+function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
   if(!inside(part.outline,x,z))return;
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
   const surface=part.y??segmentY(part,x,z);
@@ -325,7 +347,11 @@ function stampWalkway(link,part,x,z,put,empty) {
       }
     }
   }
-  if(!edge&&bay===2&&style!=='open'&&empty(level+2))put(level+2,B.FLUORESCENT,axisTurn(dx,dz));
+  if(!edge&&bay===2&&style!=='open'&&empty(level+2)){
+   const distance=Math.hypot(x-centerX,z-centerZ);
+   const lit=survivingFixture(B.FLUORESCENT,x,level+2,z,seed,lightProbability(distance));
+   put(level+2,lit||B.BROKEN_FLUORESCENT,axisTurn(dx,dz));
+  }
   // The skybridge has no independent shop signage unless an actual annex bay exists.
 }
 
@@ -375,7 +401,7 @@ export function stampCityChunk(chunk,seed) {
     };
     for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage);
     for(const {link,part} of plan.pathColumns[index]){
-      if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty);
+      if(link.kind!=='tower')stampWalkway(link,part,x,z,put,empty,layout.centerX,layout.centerZ,seed);
     }
     const library=plan.library;
     if(Math.abs(x-library.x)<=library.radius+4&&Math.abs(z-library.z)<=library.radius+4){
