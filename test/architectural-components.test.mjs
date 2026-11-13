@@ -8,7 +8,7 @@ import {meshChunk} from '../src/client/mesher.js';
 import {partPosition} from '../src/worldgen/part-gallery.js';
 
 test('13 part families have five true independent block types',()=>{
- assert.equal(PART_FAMILIES.length,13);assert.equal(PARTS.length,65);
+ assert.equal(PART_FAMILIES.length,14);assert.equal(PARTS.length,70);
  const signatures=new Set();
  for(const part of PARTS){
   assert.equal(part.id,PART_ID_START+part.section*5+part.variant);

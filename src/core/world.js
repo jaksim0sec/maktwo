@@ -1,5 +1,6 @@
 import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {STATION_PREVIEW_MODE,STATION_PREVIEW_SPAWN} from '../worldgen/station-preview.js';
 import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
@@ -243,6 +244,7 @@ export class World{
    }
    if(fallback)return fallback;
   }
+  if(this.mode===STATION_PREVIEW_MODE)return {...STATION_PREVIEW_SPAWN};
   if(this.mode==='materials')return {x:18.5,y:25,z:38.5};
    if(this.mode==='parts')return partGallerySpawn(0);
   if(this.mode.startsWith('building:'))return {x:9.5,y:25,z:-2.5};

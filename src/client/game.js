@@ -348,7 +348,7 @@ class Game{
  }
  refreshWorldChoices(){
   const menu=$('world');if(!menu)return;
-  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode==='eternal-city-lab').map(w=>{
+  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode==='eternal-city-lab'||w.mode==='station-preview').map(w=>{
    const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
   }));
   menu.value=this.world.name;

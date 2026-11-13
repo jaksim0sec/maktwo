@@ -3,6 +3,7 @@ import {integratedTerrain} from './integrated.js';
 import {stampArchitectureV3} from './architecture-v3.js';
 import {stampMaterialGallery} from './material-gallery.js';
 import {stampPartGallery} from './part-gallery.js';
+import {STATION_PREVIEW_MODE,stampStationPreview} from './station-preview.js';
 import {CITY_MODE,CITY_BASE_Y,stampCityChunk} from './eternal-night-game.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17, GENERATION_VERSION=5;
@@ -37,6 +38,7 @@ const BIOME_MATERIALS={
 };
 export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
  if(mode===CITY_MODE)return stampCityChunk(chunk,seed,cityBlueprints);
+ if(mode===STATION_PREVIEW_MODE)return stampStationPreview(chunk,seed);
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE, profiles=new Array(SIZE*SIZE);
  const studio=isStudioMode(mode),detail=mode!=='flat'&&!studio;
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){

@@ -20,8 +20,8 @@ test('new materials are append-only, textured, and fit the existing array format
  assert.ok(BLOCKS.length>=77); // IDs 0-76 remain stable after v2 additions
  const tex=makeTextureLayers();
  assert.equal(tex.layers,MATERIALS.length);
- assert.equal(tex.layers,70);
- assert.equal(tex.data.length,70*32*32*4);
+ assert.equal(tex.layers,90);
+ assert.equal(tex.data.length,tex.layers*32*32*4);
  for(let id=55;id<=76;id++)assert.ok(materialFor(id,0)<=tex.layers);
  assert.ok(BLOCKS[B.FLUORESCENT].light);
  assert.equal(BLOCKS[B.BROKEN_FLUORESCENT].light,undefined);

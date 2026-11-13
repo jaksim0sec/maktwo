@@ -1,6 +1,7 @@
 // Independently placeable architecture specimens. No full-building assembly.
 // Parts own their shape, material and creative item; existing IDs stay fixed.
 import {ARCH_MATERIAL_START} from './architectural-materials.js';
+import {stationPartById,stationPartGeometry} from './station-parts.js';
 export const PART_ID_START=116;
 export const PART_FAMILIES=Object.freeze([
   {
@@ -157,11 +158,12 @@ export const PARTS=Object.freeze(PART_FAMILIES.flatMap((family,section)=>family.
  key:'PART_'+family.key.toUpperCase()+'_'+(variant+1),
  name:family.label+' · '+name,section,variant,family:family.key
 }))));
-export const partById=id=>id>=PART_ID_START&&id<PART_ID_START+PARTS.length?PARTS[id-PART_ID_START]:null;
+export const partById=id=>id>=PART_ID_START&&id<PART_ID_START+PARTS.length?PARTS[id-PART_ID_START]:stationPartById(id);
 const tiles=[86,87,88,89,90],stones=[91,92,93,94,95],concretes=[96,97,98,99,100],bricks=[101,102,103,104,105],metals=[106,107,108,109,110],floors=[111,112,113,114,115];
 // Every part is a stand-alone 1x1x1 buildable module. Coordinates are local to its own cell.
 // Materials are stable full-block IDs; 32px texture layer is inherited from each material.
 export function partGeometry(id){
+ if(stationPartById(id))return stationPartGeometry(id);
  const p=partById(id);if(!p)return null;
  const v=p.variant,a=[];
  const put=(x,y,z,w,h,d,mat,alpha=false,solid=true,meta=null)=>{
