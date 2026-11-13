@@ -87,7 +87,11 @@ export function drawShapeIcon(ctx,id){
 }
 export function drawItemIcon(ctx,id,x,y,size=64){
  ctx.save();ctx.translate(x,y);ctx.scale(size/64,size/64);
- if(isBed(id)){
+ if(id===B.IRON_BLADE||id===B.STEEL_BAR){
+  poly(ctx,[[12,49],[20,53],[49,19],[48,10],[40,14]],id===B.IRON_BLADE?'#b7c3c4':'#858e92');
+  poly(ctx,[[12,49],[18,54],[27,42],[22,38]],'#755c45');
+  if(id===B.IRON_BLADE)poly(ctx,[[17,36],[29,47],[33,42],[21,32]],'#575f61');
+ }else if(isBed(id)){
   const framed=itemId(id)===B.BED,offset=framed?0:6;
   ctx.translate(0,offset);
   if(framed){

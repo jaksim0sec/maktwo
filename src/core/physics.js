@@ -88,12 +88,12 @@ export function intersectDoor(origin,direction,x,y,z,state){
  return intersectAabb(origin,direction,[b.x,y+.04,b.z],[b.x+b.w,y+.04+DOOR_HEIGHT,b.z+b.d]);
 }
 // 3D voxel DDA with face normal, also works through chunk boundaries.
-export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hitDecor=false}={}){let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z);const d=direction,step=[Math.sign(d.x),Math.sign(d.y),Math.sign(d.z)],coords=[x,y,z],dir=[d.x,d.y,d.z],pos=[origin.x,origin.y,origin.z];const tDelta=dir.map(v=>v===0?Infinity:Math.abs(1/v));const tMax=dir.map((v,i)=>v===0?Infinity:((step[i]>0?coords[i]+1-pos[i]:pos[i]-coords[i])/Math.abs(v)));let normal={x:0,y:0,z:0},t=0;
+export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hitDecor=false,solidOnly=false}={}){let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z);const d=direction,step=[Math.sign(d.x),Math.sign(d.y),Math.sign(d.z)],coords=[x,y,z],dir=[d.x,d.y,d.z],pos=[origin.x,origin.y,origin.z];const tDelta=dir.map(v=>v===0?Infinity:Math.abs(1/v));const tMax=dir.map((v,i)=>v===0?Infinity:((step[i]>0?coords[i]+1-pos[i]:pos[i]-coords[i])/Math.abs(v)));let normal={x:0,y:0,z:0},t=0;
  const cell={form:0,pickMount:true,mount:null};
  for(let n=0;n<256&&t<=maxDistance;n++){
   const id=world.get(x,y,z,true,cell);
   let hit=null;
-  if(id!==B.AIR&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
+  if(id!==B.AIR&&(!solidOnly||block(id).solid)&&(hitWater||id!==B.WATER)&&(hitDecor||block(id).render!=='cross')){
    if(FORMED[cell.form])hit=hitFormed(FORMED[cell.form],x,y,z,origin,direction);
    else if(partById(id))hit=partRaycast(partPrisms(id,x,y,z,world.getShapeState?.(x,y,z)||{}),origin,direction,maxDistance);
    else if(id===B.FENCE){
@@ -127,7 +127,7 @@ export function raycast(world,origin,direction,maxDistance=6,{hitWater=false,hit
     }
    }
   }
-  if(cell.mount){
+  if(cell.mount&&!solidOnly){
    const mounted=hitMount(cell.mount,origin,direction,intersectAabb);
    if(mounted&&mounted.distance>=t-1e-5&&mounted.distance<=maxDistance&&(!hit||mounted.distance<hit.distance)){
     return {x,y,z,id:cell.mount.id,distance:mounted.distance,mounted:true};

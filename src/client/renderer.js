@@ -1,3 +1,6 @@
+import {weaponView} from './weapon-view.js';
+import {weaponBasis} from '../core/combat.js';
+import {raycast} from '../core/physics.js';
 import {block as itemBlock} from '../core/blocks.js';
 import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
@@ -514,7 +517,7 @@ export class Renderer{
   for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);
   return new Float32Array(arr)
  }
- frame(world,player,entities,effects,dt=1/60){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*(this.hologram?.opened?Math.max(this.renderScale,.96):this.renderScale),width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
+ frame(world,player,entities,effects,dt=1/60,combat=null){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*(this.hologram?.opened?Math.max(this.renderScale,.96):this.renderScale),width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
   this.lastDrawCalls=1;this.lastDistanceDrawCalls=0;
   const walkingSpeed=player.fly||!player.grounded?0:Math.min(7,Math.hypot(player.vx,player.vz));
   this.walkAmount+=(Math.min(1,walkingSpeed/5)-this.walkAmount)*(1-Math.exp(-dt*8));
@@ -545,7 +548,26 @@ export class Renderer{
    gl.drawArrays(gl.TRIANGLES,0,72);gl.disable(gl.BLEND);
   }
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniform3f(this.u.entityOffset,0,0,0);
-  const camY=toMeters(cameraEyeY(player)),vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(player.yaw+walkSway,player.pitch,toMeters(player.x),camY,toMeters(player.z)));gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,toMeters(player.x),camY,toMeters(player.z));gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
+  const swing=combat?.pose(),baseYaw=player.yaw+walkSway;
+  const eye=[player.x,cameraEyeY(player),player.z];
+  let yaw=baseYaw,pitch=player.pitch;
+  if(swing){
+   const {forward,right,up}=weaponBasis(baseYaw,pitch);
+   const shift=eye.map((_,i)=>forward[i]*swing.extension*.19-right[i]*swing.arc*swing.weight*.077-up[i]*swing.weight*.034);
+   const length=Math.hypot(...shift);
+   if(length>.001){
+    const ray={x:shift[0]/length,y:shift[1]/length,z:shift[2]/length},origin={x:eye[0],y:eye[1],z:eye[2]};
+    let limit=raycast(world,origin,ray,length+.09,{solidOnly:true})?.distance??length+.09;
+    for(const train of world.trainColliders??[])limit=train.shellDistance(origin,ray,limit);
+    const available=Math.max(0,Math.min(1,(limit-.09)/length));
+    for(let i=0;i<3;i++)eye[i]+=shift[i]*available;
+   }
+   yaw+=swing.arc*swing.weight*.11;
+   pitch-=swing.extension*.079;
+  }
+  const [camX,camY,camZ]=eye.map(toMeters);
+  const vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
+  gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
   if(city)gl.uniform3f(this.u.LowerFog,.087,.135,.143);
   this.updateLightVolume(world,player);
@@ -641,7 +663,19 @@ export class Renderer{
    drawDoors(e,mesh,false);
   }
   gl.uniform3f(this.u.entityOffset,0,0,0);
-  const data=this.dynamicData(entities,effects,performance.now()*.001);
+  const time=performance.now()*.001;
+  const scene=this.dynamicData(entities,effects,time);
+  let data=scene;
+  if(combat&&(combat.main||combat.off)){
+   const held=weaponView(combat,eye,baseYaw,player.pitch,time,this.walkAmount,(center,ray,reach)=>{
+    const origin={x:center[0],y:center[1],z:center[2]};
+    let room=raycast(world,origin,ray,reach,{solidOnly:true})?.distance??reach;
+    for(const train of world.trainColliders??[])room=train.shellDistance(origin,ray,room);
+    return room;
+   });
+   data=new Float32Array(scene.length+held.length);
+   data.set(scene);data.set(held,scene.length);
+  }
   this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);

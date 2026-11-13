@@ -1,3 +1,4 @@
+import {Combat,weapons} from '../core/combat.js';
 import {WorldManager} from '../core/world.js';
 import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
@@ -16,7 +17,7 @@ const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));const savedPlayer=loadPlayerState(localStorage,this.world.name,this.world.height);if(savedPlayer)Object.assign(this.player,savedPlayer);if(this.world.mode==='parts'&&!savedPlayer)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.player=new Player(...Object.values(this.world.spawn()));const savedPlayer=loadPlayerState(localStorage,this.world.name,this.world.height);if(savedPlayer)Object.assign(this.player,savedPlayer);if(this.world.mode==='parts'&&!savedPlayer)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -125,6 +126,7 @@ class Game{
  setPanel(name){
   if(this.cinematic&&name!=='cinematic')return;
   const prior=this.panel;this.panel=name||null;
+  if(this.panel)this.combat.cancel();
   if(this.panel!=='inventory')this.openContainer=null;
   if(this.panel!=='inventory'){this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
   this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
@@ -248,6 +250,7 @@ class Game{
    const count=this.world.drainPlacedWater(this.player.x,this.player.y,this.player.z,24);
    this.status(count?`주변에 설치된 물 ${count}칸 정리 완료 · 자동 저장`:'주변에 정리할 설치된 물이 없어요');
   });
+  bindClick('offhand-weapon',()=>this.toggleOffhand());
   bindClick('mode',()=>this.toggleCreative());
   bindClick('flight-toggle',()=>this.toggleFlight());
   $('sky-brightness')?.addEventListener('input',e=>{this.skyBrightness=Number(e.target.value)/100;
@@ -342,6 +345,7 @@ class Game{
    if(e.code.startsWith('Digit')&&i>=1&&i<=7){const index=i-1;if(index<this.paletteItems.length)this.select(index)}
    if(e.code==='KeyL')this.togglePalette();
    if(e.code==='KeyQ'){this.select(-1,{toggle:false});return}
+   if(e.code==='KeyX'){this.toggleOffhand();return}
    if(e.code==='KeyF')this.toggleFlight();
    if(e.code==='KeyR')this.changeForm();
    if(e.code==='KeyT')this.rotateForm();
@@ -357,9 +361,32 @@ class Game{
   this.mining.reset();this.showMining(0);
   document.querySelectorAll('.slot').forEach(el=>{const active=Number(el.dataset.slot)===this.selected;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
   $('block-name').textContent=this.selected<0?'':blockLabel(this.paletteItems[this.selected]);
+  this.updateEquipment();
   this.updateFormControls();this.updateControlHint();if(this.panel==='inventory')this.updateHologram();
  }
 
+ updateEquipment(){
+  const selected=this.paletteItems[this.selected];
+  if(this.offWeapon!==null&&!this.inventory.has(this.offWeapon))this.offWeapon=null;
+  const main=weapons[selected]?selected:null;
+  const distinct=this.offWeapon!==main||this.inventory.count(main)>=2;
+  const off=weapons[main]?.hands===2||!distinct?null:this.offWeapon;
+  this.combat.equip(main,off);
+  const button=$('offhand-weapon');
+  if(button){
+   button.hidden=weapons[main]?.hands===2||!(main||this.offWeapon);
+   button.textContent=this.offWeapon?'왼손 해제 · X':'왼손 장착 · X';
+   button.setAttribute('aria-pressed',String(Boolean(off)));
+  }
+ }
+ toggleOffhand(){
+  if(this.uiOpen||this.cinematic)return;
+  if(this.offWeapon){this.offWeapon=null;this.updateEquipment();return}
+  const id=this.paletteItems[this.selected];
+  if(weapons[id]?.hands!==1)return;
+  this.offWeapon=id;
+  this.select(-1,{toggle:false});
+ }
  renderStatusRing(id,value,max){const el=$(id);if(!el)return;const rounded=Math.ceil(Math.max(0,Math.min(max,value)));if(el.getAttribute('aria-valuenow')===String(rounded))return;el.setAttribute('aria-valuenow',String(rounded));el.querySelector('.ring-fill').setAttribute('stroke-dasharray',`${Math.max(0,Math.min(100,value/max*100))} 100`);el.querySelector('.ring-value').textContent=String(rounded)}
  status(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2100)}
  updatePartGalleryControls(){const panel=$('part-gallery-controls');if(panel)panel.hidden=this.world.mode!=='parts';}
@@ -418,7 +445,7 @@ class Game{
   if(!name||!this.manager.worlds.has(name)){this.status('불러올 게임을 선택해 주세요');return}
   if(name===this.world.name||this.travel(name))this.requestGameFocus();
  }
- travel(name){if(!this.saveGameState())return false;this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.applyGraphics();this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
+ travel(name){if(!this.saveGameState())return false;this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.offWeapon=null;this.combat.cancel();this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.spawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.applyGraphics();this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
  bedPair(target){
   const {id,x,y,z}=target;
   const facing=this.world.getShapeState(x,y,z).facing;
@@ -483,6 +510,7 @@ class Game{
   if(type==='death'){
    this.cinematic.respawn=this.respawnPosition();
    this.selected=-1;
+   this.offWeapon=null;
    this.survivalInventory.clearCarried();
    this.renderHotbar();
    this.saveGameState();
@@ -574,6 +602,12 @@ class Game{
   const miningMode=input.mine;
   const aim=this.input.locked?null:(input.aim||this.input.canvasCursor());
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
+  if(this.combat.main||(this.combat.off&&this.selected<0)||this.combat.attack){
+   if(input.use)this.combat.start(ray,p);
+   if(this.combat.main||input.use||this.combat.attack){
+    this.target=null;this.mining.reset();this.showMining(0);return;
+   }
+  }
   this.target=raycast(this.world,origin,ray,7.5,{hitWater:!miningMode&&this.selected>=0,hitDecor:miningMode});
   let interactionDistance=this.target?.distance??7.5;
   if(input.use||miningMode){
@@ -692,9 +726,12 @@ class Game{
   this.effects.tick(dt);
   if(this.entities.collected){this.entities.collected=false;this.renderHotbar();this.refreshInventoryUI()}
   if(p.dead)this.beginCinematic('death');
-  else this.interaction(dt,input);
+  else{
+   this.interaction(dt,input);
+   this.combat.tick(dt,this.world,this.entities,p,cameraEyeY(p),this.effects);
+  }
  }
- frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
+ frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
  hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 원거리 ${(this.renderer.distanceMesh?.count??0)+(this.renderer.farMesh?.count??0)} verts / ${this.renderer.lastDistanceDrawCalls??0} draw · 전체 ${this.renderer.lastDrawCalls??0} draw · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';this.renderStatusRing('health',p.hp,p.maxHp);this.renderStatusRing('stamina',p.stamina,100);document.body.classList.toggle('submerged',this.world.get(p.x,p.y+p.eye,p.z,false)===B.WATER);$('flight').textContent=p.fly?'비행 중':'걷는 중'}
 }

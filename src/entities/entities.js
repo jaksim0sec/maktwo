@@ -189,15 +189,15 @@ export class EntityManager{
   for(const e of this.entities)if(e.type!=='drop'&&e.type!=='train'&&Math.abs(e.x-player.x)<64&&Math.abs(e.z-player.z)<64)e.update(this.world,dt,player);
  }
 
- hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity,padding=0){
-  let choice=null,best=Math.min(maxDistance,blockDistance+1e-4);
+ hitRay(origin,direction,maxDistance=3.8,blockDistance=Infinity,padding=0,details=false){
+  let choice=null,best=Math.min(maxDistance,blockDistance+(details?0:1e-4));
   const assist=Math.min(.24,Math.max(0,padding));
   for(const e of this.entities){if(e.dead||e.type==='drop'||e.type==='train')continue;
    const r=e.width*.5+assist,vertical=assist*.5;
    const hit=intersectAabb(origin,direction,[e.x-r,e.y-vertical,e.z-r],[e.x+r,e.y+e.height+vertical,e.z+r]);
    if(hit&&hit.distance>=0&&hit.distance<best){best=hit.distance;choice=e}
   }
-  return choice;
+  return details&&choice?{entity:choice,distance:best}:choice;
  }
  attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){if(e.type==='drop'||e.type==='train')continue;const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}
 }
