@@ -79,14 +79,15 @@ export function stationPartGeometry(id){
    add(.47,0,.47,.062,1,.062,metal,true);
    add(.38,.92,.45,.24,.035,.10,metal);
    for(const y of [.23,.73])add(.425,y,.42,.15,.035,.14,metal);
-  }else if(p.variant===2){ // Roof-mounted suspended grips, thinner than the old frame.
+  }else if(p.variant===2){ // Real suspended grips: hanger, neck and dark ring.
    add(.06,.94,.43,.88,.043,.13,metal);
    for(const x of [.16,.47,.78]){
     add(x+.032,.76,.485,.025,.18,.045,metal);
-    add(x,.70,.465,.090,.067,.08,'TRAIN_RUBBER');
-    add(x,.58,.465,.025,.12,.08,'TRAIN_RUBBER');
-    add(x+.065,.58,.465,.025,.12,.08,'TRAIN_RUBBER');
-    add(x,.565,.465,.09,.031,.08,'TRAIN_RUBBER');
+    add(x+.010,.707,.466,.078,.042,.080,'TRAIN_DOOR_STEEL');
+    add(x,.65,.465,.022,.075,.08,'TRAIN_RUBBER');
+    add(x+.070,.65,.465,.022,.075,.08,'TRAIN_RUBBER');
+    add(x,.633,.465,.092,.030,.08,'TRAIN_RUBBER');
+    add(x+.010,.720,.467,.073,.022,.076,'TRAIN_RUBBER');
    }
   }else if(p.variant===3){
    for(const x of [.08,.88])add(x,.50,.80,.035,.39,.05,metal);
@@ -210,8 +211,12 @@ export function stationPartGeometry(id){
  case 'stationLink':{
   if(p.variant===0){
    add(0,0,.04,1,.12,.92,'PLATFORM_STONE',true);
-   for(const x of [.045,.85])add(x,.12,.80,.085,.78,.10,metal,true);
-   for(const y of [.47,.84])add(0,y,.81,1,.055,.075,'STATION_PIPE');
+   for(const x of [.065,.865]){
+    add(x,.12,.79,.060,.73,.085,metal,true);
+    add(x-.016,.115,.767,.092,.048,.120,'TRAIN_RUBBER');
+   }
+   for(const y of [.47,.84])add(0,y,.81,1,.047,.068,'STATION_PIPE');
+   add(0,.888,.799,1,.015,.088,'TRAIN_DOOR_STEEL');
   }else if(p.variant===1){
    add(0,.83,.32,1,.13,.36,'STATION_PIPE');
    for(const x of [.07,.86])add(x,.67,.39,.06,.18,.23,metal);
@@ -233,9 +238,12 @@ export function stationPartGeometry(id){
    add(0,0,0,1,.16,.33,'PLATFORM_STONE',true);
    add(0,0,.34,1,.32,.33,'PLATFORM_STONE',true);
    add(0,0,.68,1,.50,.32,'PLATFORM_STONE',true);
-   for(const x of [.035,.91]){
-    add(x,.18,.33,.055,.51,.64,'STATION_PIPE');
-    add(x,.65,.33,.055,.05,.64,metal);
+   for(const [z,y] of [[.01,.165],[.345,.325],[.69,.505]])
+    add(.065,y,z,.87,.024,.065,'TRAIN_DOOR_STEEL');
+   for(const x of [.05,.905]){
+    add(x,.18,.33,.046,.51,.64,'STATION_PIPE');
+    add(x,.65,.33,.046,.047,.64,metal);
+    add(x,.175,.30,.074,.037,.093,'TRAIN_RUBBER');
    }
   }break;
  }
