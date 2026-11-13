@@ -3,7 +3,7 @@ import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {CITY_MODE,CITY_HEIGHT,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
-import {stairConnections,stairRailRise} from './part-prisms.js';import {LightIndex} from './lighting.js';
+import {stairConnections,stairRailRise,signConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {fenceJoints} from './fence-joints.js';
 import {panelJoints,panelNeighbor,panelKind} from './panel-joints.js';
@@ -58,6 +58,12 @@ export class World{
    };
    state.connected=stairConnections(id,state.facing,neighbor);
    if(split||variant&TURN_STYLE)state.stairRise=stairRailRise(state.facing,neighbor,split?.low??(state.cityStair?state.treadHeight:undefined));
+  }
+  if(partById(id)?.family==='sign'){
+   state.connected=signConnections(id,state.facing,(dx,dz,dy=0)=>{
+    const nx=Math.floor(x)+dx,ny=y0+dy,nz=Math.floor(z)+dz;
+    return {id:this.get(nx,ny,nz,false),facing:this.partFacing(nx,ny,nz)};
+   });
   }
   return state;
  }

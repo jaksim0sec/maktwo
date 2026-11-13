@@ -131,7 +131,7 @@ export const PART_FAMILIES=Object.freeze([
       "가로 판간판",
       "돌출 세로간판",
       "채널 문자 간판",
-      "조명 간판",
+      "낡은 겹간판",
       "천막 간판"
     ]
   },
@@ -417,24 +417,45 @@ export function partGeometry(id){
   break;
  }
  case 'sign':{
-  const backing=[metals[0],metals[1],metals[0],metals[3],floors[4]][v];
-  // Common subassemblies: fixings, box frame, interchangeable face, relief glyph.
-  put(.08,.17,.61,.84,.10,.16,metals[0]);
-  put(.12,.24,.62,.11,.58,.08,metals[0]);
-  put(.77,.24,.62,.11,.58,.08,metals[0]);
-  if(v===1){put(.34,.28,.30,.32,.63,.12,metals[1]);put(.39,.35,.22,.22,.48,.07,stones[4]);}
-  else{
-   put(.18,.33,.48,.64,.48,.11,backing);
-   put(.24,.39,.40,.52,.32,.09,[tiles[2],stones[4],bricks[3],tiles[1],floors[3]][v]);
-   // Three-dimensional characters: simple geometric strokes, not random stripes.
-   for(const x of [.31,.50,.68]){put(x,.46,.34,.065,.18,.055,v===3?stones[4]:dark);put(x-.03,.45,.34,.12,.043,.055,v===3?stones[4]:dark);}
+  // All signboards are non-emissive aged metal or painted timber; no neon and no light sources.
+  const backing=[metals[0],metals[1],bricks[3],stones[2],floors[4]][v];
+  const panel=[stones[4],tiles[0],bricks[1],concretes[2],floors[3]][v];
+  if(v===1){ // Wall-mounted blade sign; same-facing modules stack vertically.
+   put(.30,.02,.23,.40,.96,.34,backing);
+   put(.345,.075,.175,.31,.85,.065,panel);
+   put(.25,.01,.17,.50,.035,.43,metals[0],false,true,{railSide:'bottom'});
+   put(.25,.955,.17,.50,.035,.43,metals[0],false,true,{railSide:'top'});
+   for(const y of [.23,.48,.73]){
+    put(.405,y,.15,.19,.058,.045,metals[0],false,false);
+    put(.40,y+.06,.147,.051,.13,.048,metals[1],false,false);
+   }
+   for(const y of [.24,.76])put(.46,y,.58,.08,.065,.29,metals[1]);
+  }else{
+   // One nearly full-cell backing lets N adjacent cells become one long hoarding.
+   put(0,.24,.53,1,.64,.13,backing);
+   put(.022,.285,.465,.956,.54,.075,panel);
+   put(0,.875,.475,1,.053,.17,metals[0]);
+   put(0,.205,.475,1,.055,.17,metals[1]);
+   put(.0,.215,.465,.048,.71,.18,metals[0],false,true,{railSide:'left'});
+   put(.952,.215,.465,.048,.71,.18,metals[0],false,true,{railSide:'right'});
+   // Faded relief lettering is deliberately unlit and segmented.
+   for(const x of [.18,.45,.71]){
+    put(x,.42,.410,.07,.25,.058,v===3?metals[1]:metals[0],false,false);
+    put(x-.035,.42,.409,.145,.05,.059,metals[0],false,false);
+    if(v===2)put(x-.025,.60,.407,.13,.035,.06,metals[1],false,false);
+   }
+   if(v===4){
+    put(.035,.90,.32,.93,.055,.49,metals[1]); // Old projecting rain cap.
+    for(const x of [.14,.83])put(x,.11,.48,.048,.20,.08,metals[0]);
+   }
+   if(v===3){
+    put(.11,.31,.398,.78,.057,.055,metals[1],false,false);
+    put(.11,.72,.398,.78,.028,.055,metals[1],false,false);
+   }
   }
-  if(v===2){put(.13,.79,.45,.74,.065,.08,metals[1]);}
-  if(v===3){for(const x of [.2,.8])put(x,.22,.40,.055,.62,.06,metals[0]);put(.2,.82,.40,.66,.065,.1,stones[4]);}
-  if(v===4){put(.08,.82,.22,.84,.10,.56,metals[4]);put(.09,.76,.13,.82,.05,.10,metals[0]);}
   break;
  }
- case 'interior':{
+case 'interior':{
   const mat=[floors[4],floors[4],metals[3],stones[0],metals[1]][v];
   if(v===0){ // Recessed storage cupboard, fitted drawers and handles.
    put(.11,0,.16,.78,.88,.66,mat);

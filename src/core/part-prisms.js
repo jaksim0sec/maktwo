@@ -33,6 +33,19 @@ function footprint(piece,angle,joints){
  // Deduplicate clipped vertices on exactly intersecting corners.
  return out.filter((v,i)=>!out.slice(0,i).some(p=>Math.hypot(p[0]-v[0],p[1]-v[1])<EPS));
 }
+// A sign can share its perimeter with aligned horizontal or stacked vertical signs.
+export function signConnections(id,facing,neighborAt){
+ const part=partById(id);
+ if(part?.family!=='sign')return null;
+ const same=(dx,dz,dy=0)=>{
+  const other=neighborAt(dx,dz,dy);
+  return other?.id===id&&((other.facing||0)&7)===(facing&7);
+ };
+ if(part.variant===1)return {top:same(0,0,1),bottom:same(0,0,-1)};
+ if(facing&1)return {left:false,right:false}; // Diagonal cells do not share a full edge.
+ const [dx,dz]=[[1,0],[0,1],[-1,0],[0,-1]][(facing>>1)&3];
+ return {left:same(-dx,-dz),right:same(dx,dz)};
+}
 export function stairConnections(id,facing,neighborAt){
  const part=partById(id);
  if(part?.family!=='staircase'||(facing&1))return {left:false,right:false};

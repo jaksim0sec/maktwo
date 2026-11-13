@@ -10,7 +10,7 @@ import {panelJoints,panelNeighbor,panelKind} from '../core/panel-joints.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
-import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise} from '../core/part-prisms.js';
+import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections} from '../core/part-prisms.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -33,7 +33,8 @@ function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,tread
   |(simple?1<<13:0)|((stairRise===undefined?0:Math.round(stairRise*4)+1)<<14)
   |(cityStair?1<<18:0)|(cityStair?(Math.round(treadHeight*4)-1)<<19:0)|(rail?1<<22:0)
   |(cityBridge?1<<23:0)|(bridgePost?1<<24:0)|((splitTread?splitTread.index+1:0)<<25);
- const key=joints?`${baseKey}:${joints.left.direction}:${joints.right.direction}:${+joints.left.joined}${+joints.right.joined}${+joints.bottom}${+joints.top}`:baseKey;
+ const key=(joints?`${baseKey}:${joints.left.direction}:${joints.right.direction}:${+joints.left.joined}${+joints.right.joined}${+joints.bottom}${+joints.top}`:baseKey)+
+  (connected?.top?':T':'')+(connected?.bottom?':B':'');
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
  for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost,splitTread,panelJoints:joints})||[]){
@@ -211,6 +212,10 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
     connected=stairConnections(id,orientation,neighbor);
     if(split||style&TURN_STYLE)stairRise=stairRailRise(orientation,neighbor,split?.low??(style&CITY_STAIR_STYLE?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:undefined));
    }
+   if(partById(id)?.family==='sign')connected=signConnections(id,orientation,(dx,dz,dy=0)=>{
+    const other=neighbor(dx,dy,dz);
+    return {id:other.id,facing:other.state?.facing||0};
+   });
    const cityGenerated=Boolean(style&CITY_STAIR_STYLE),family=partById(id)?.family;
    const cityStair=cityGenerated&&family==='staircase',cityBridge=cityGenerated&&family==='passage';
    const treadHeight=cityStair?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:1;
