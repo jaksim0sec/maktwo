@@ -54,6 +54,35 @@ test('four anisotropic tree silhouettes have real branch and crown triangles, no
  assert.notDeepEqual(treeMesh(0),treeMesh(1));
  assert.notDeepEqual(treeMesh(1),treeMesh(2));
 });
+test('compact botanical silhouettes use normal night lighting, not emissive leaf shaders',()=>{
+ const limits=[7.6,9,7.9,8.6],widthLimits=[8.3,6.0,8.1,8.1];
+ for(let kind=0;kind<4;kind++)for(let variant=0;variant<4;variant++){
+  const tree=treeMesh(kind,variant),floor=leafLitterMesh(kind,variant);
+  let minY=Infinity,maxY=-Infinity,minX=Infinity,maxX=-Infinity;
+  let darkResponsive=0,wood=0;
+  for(let i=0;i<tree.length;i+=7){
+   const shade=tree[i+6],x=tree[i],y=tree[i+1];
+   assert.ok(shade>0,'negative vertex shade bypasses ambient lighting');
+   if(shade<1)darkResponsive++;
+   else wood++;
+   minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+   minX=Math.min(minX,x);maxX=Math.max(maxX,x);
+  }
+  for(let i=6;i<floor.length;i+=7)
+   assert.ok(floor[i]>0&&floor[i]<1,'fallen leaves must also receive darkness');
+  assert.ok(maxY-minY<=limits[kind],'tree exceeds new scale budget');
+  assert.ok(maxX-minX<=widthLimits[kind],'canopy exceeds new scale budget');
+  assert.ok(darkResponsive>tree.length/7*.35,'canopy must use light-responsive plain color');
+  assert.ok(wood>0,'real wooden branches must remain');
+  assert.ok(tree.length/7<11000,'smaller branching leaves must fit performance budget');
+ }
+ const maxima=TREE_SPECIES.flatMap(t=>[t.bark,...t.crown,...t.litter]);
+ for(const hex of maxima){
+  assert.match(hex,/^#[0-9a-f]{6}$/i);
+  assert.ok(Math.max(...[1,3,5].map(j=>parseInt(hex.slice(j,j+2),16)))<=242,
+   'do not bring back overexposed neon tones');
+ }
+});
 test('one render anchor emits full model and fallen petals in the seven-float worker contract',()=>{
  const c=new Chunk(0,0,64);
  c.set(4,23,4,B.TREE_SAKURA);c.set(7,23,4,B.FALLEN_SAKURA);

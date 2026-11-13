@@ -86,3 +86,33 @@ studio chunk independence, and the v8/v9 generation gate.
 Still required: in-game desktop and phone visual comparison (silhouette,
 crowns, density, color bloom and tile seams). Do not call this visual design
 fully finished before inspecting those screenshots.
+
+## Visual correction: smaller trees, actual leaves, night illumination
+
+The initial four meshes were too tall and wide, with multiple **closed
+ellipsoid leaf shells** resembling round balloons. They also used **negative
+per-vertex shade values** (for example `-.78`, `-.93`) for some petals
+and foliage highlights. The shared shader explicitly treats every negative
+shade as **emissive**, bypassing scene brightness and local light-volume
+sampling. That was the direct cause of the neon trees appearing bright at
+night, not an issue to conceal by darkening screenshots or changing the
+entire world's exposure.
+
+The corrected asset uses the existing lighting shader unchanged:
+
+- Every foliage and fallen-leaf triangle now has a **positive light-responsive
+  shade**; no botanical leaf or flower triangle emits light.
+- Dense ellipsoid shells are gone. Sparse twig sprays support **separate
+  pointed leaves**, cherry blossoms, lobed maple leaves and distinct ginkgo
+  fans with intentional gaps revealing real branches.
+- Individual tree height is now approximately **6.5–8.1 blocks** rather than
+  the previous ~9.8–11.5. Crown width is roughly **4.5–7.3 blocks**.
+- Species palettes remain visibly differentiated in subdued anime hues, not
+  fluorescent pink/yellow/green. Ground litter uses the same restrained colors.
+- Four original authored variants and all eight block IDs are maintained.
+  The existing city placements, saves, inventory and independent 7-float
+  mesh formats are unchanged.
+- Mesh budget is below 11,000 vertices per tree; templates remain cached.
+
+Actual PC/mobile screenshots under the game's nighttime lighting are still
+necessary to judge artistic quality. No harvest/drop mechanics added.

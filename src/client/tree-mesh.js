@@ -25,48 +25,72 @@ function stem(out,from,to,r0,r1,color,seedShade=1){
   triangle(out,a,b,c,color,sh,true);triangle(out,a,c,d0,color,sh,true);
  }
 }
-function petal(out,kind,center,scale,angle,color,bright){
- // Variable outline: pink cherry oval, two-lobed ginkgo fan,
- // serrated maple star or an elongated green leaf.
- const corners=kind===0?7:kind===1?9:kind===2?11:7;
- const radius=kind===1?1.13:kind===2?1.18:1;
- const cx=center[0],cy=center[1],cz=center[2];
- const p=[];
- for(let i=0;i<corners;i++){
-  const a=i*2*PI/corners,notch=kind===1&&i===0?.52:1;
-  const r=radius*(kind===2?(i%2?.45:1):kind===0?.88+.12*Math.sin(a*2):notch);
-  const ox=Math.cos(a)*r*scale,oy=Math.sin(a)*r*scale*.75;
-  const ca=Math.cos(angle),sa=Math.sin(angle);
-  p.push([cx+ox*ca+oy*sa*.18,cy+oy*.84,cz+ox*sa-oy*ca*.18]);
+// Unlit-looking foliage was caused by NEGATIVE vertex shade values, which the
+// shared shader interprets as emissive. Every botanical triangle now uses a
+// positive, non-emissive shade in [0,1], including fallen leaves.
+function petal(out,kind,center,scale,angle,color,shade){
+ const c=Math.cos(angle),sn=Math.sin(angle),lift=.16*Math.sin(angle*1.8);
+ // Local leaf plane tilts in 3D to reveal alternating surfaces, without disks.
+ const at=(dx,dy)=>[center[0]+dx*c-dy*sn*.35,center[1]+dy*.82+dx*lift,
+  center[2]+dx*sn+dy*c*.35];
+ const base=at(0,0);
+ const pair=(a,b)=>triangle(out,base,at(...a),at(...b),color,shade,true);
+ if(kind===0){
+  // Individual five-point blossoms, with visible spaces between petals.
+  for(let j=0;j<5;j++){
+   const a=j*2*PI/5+angle*.12;
+   pair([Math.cos(a-.31)*scale*.48,Math.sin(a-.31)*scale*.48],
+        [Math.cos(a)*scale,Math.sin(a)*scale]);
+  }
+ }else if(kind===1){
+  // Two-lobed ginkgo fan with a notch and radiating fan veins.
+  const rim=[[-.35,.18],[-.95,.76],[-.38,1],[0,.68],[.38,1],[.95,.76],[.35,.18]];
+  for(let j=0;j<rim.length-1;j++)
+   pair(rim[j].map(v=>v*scale),rim[j+1].map(v=>v*scale));
+ }else if(kind===2){
+  // Five unequal, pointed maple lobes rather than a spherical red surface.
+  for(let j=0;j<5;j++){
+   const a=j*2*PI/5+angle*.1,reach=(j%2? .78:1.08)*scale;
+   pair([Math.cos(a-.32)*reach*.46,Math.sin(a-.32)*reach*.46],
+        [Math.cos(a)*reach,Math.sin(a)*reach]);
+  }
+ }else{
+  // Long folded leaves with a narrow attachment and raised central ridge.
+  const tip=at(scale*1.25,scale*.25),mid=at(scale*.47,scale*.22);
+  const left=at(scale*.49,scale*.59),right=at(scale*.49,-scale*.49);
+  triangle(out,base,left,mid,color,shade,true);
+  triangle(out,mid,right,tip,color,shade*.92,true);
  }
- const shade=bright?-.93:32.9;
- for(let i=0;i<p.length;i++)triangle(out,center,p[i],p[(i+1)%p.length],color,shade,true);
 }
 function foliageBlob(out,kind,center,radii,palette,random){
- const n=8,rings=[],H=kind===1?1.18:kind===0?.78:1;
- const ys=[-.70,-.31,.27,.67],sizes=[.23,.84,1,.20];
- const jitter=Array.from({length:n},()=>.88+random()*.25);
- for(let ring=0;ring<4;ring++){
-  const points=[];
-  for(let i=0;i<n;i++){
-   const a=2*PI*i/n+Math.sin(i*3.7)*.09,r=sizes[ring]*jitter[i];
-   points.push([center[0]+Math.cos(a)*r*radii[0],center[1]+ys[ring]*radii[1]*H,
-    center[2]+Math.sin(a)*r*radii[2]]);
+ // Open sprays of separate pointed leaves. No closed oval / ball / spherical shell.
+ // Branches remain visible through intentional gaps in the crown.
+ const count=kind===0?7:kind===1?7:kind===2?7:11;
+ for(let i=0;i<count;i++){
+  const spiral=i*2.399963229728653;
+  const r=.23+.74*Math.sqrt(random());
+  const theta=spiral+(random()-.5)*.58;
+  const spread=.36+.64*random();
+  const end=[center[0]+Math.cos(theta)*r*radii[0],
+   center[1]+(random()-.5)*1.44*radii[1],
+   center[2]+Math.sin(theta)*r*radii[2]];
+  const join=[center[0]+(end[0]-center[0])*.57,
+   center[1]+(end[1]-center[1])*.71,center[2]+(end[2]-center[2])*.57];
+  const twig=rgb('#61554d');
+  // Slender visible twig, no cylindrical foliage volume.
+  const width=.013;
+  const left=[join[0]-width,join[1],join[2]],right=[join[0]+width,join[1],join[2]];
+  triangle(out,left,end,right,twig,.64,true);
+  const leafColor=palette[(i+Math.floor(random()*palette.length))%palette.length];
+  petal(out,kind,end,(kind===0?.19:kind===1?.23:kind===2?.22:.26)*spread,
+   theta+(random()-.5)*1.1,leafColor,.68+.22*random());
+  if(i%5===0){
+   const a=theta+1.3,side=[
+    join[0]+Math.cos(a)*radii[0]*.21,
+    join[1]+radii[1]*.13,
+    join[2]+Math.sin(a)*radii[2]*.21];
+   petal(out,kind,side,.14+.065*random(),a,palette[(i+2)%palette.length],.62+.20*random());
   }
-  rings.push(points);
- }
- for(let ring=0;ring<3;ring++)for(let i=0;i<n;i++){
-  const j=(i+1)%n,c=palette[(i+ring*3+Math.floor(random()*3))%palette.length];
-  const shine=random()>.72;
-  const shade=shine?-.78:32+(.83+.18*random());
-  triangle(out,rings[ring][i],rings[ring+1][i],rings[ring+1][j],c,shade);
-  triangle(out,rings[ring][i],rings[ring+1][j],rings[ring][j],c,shade);
- }
- for(let k=0;k<2;k++){
-  const a=random()*PI*2,reach=.72+.40*random();
-  petal(out,kind,[center[0]+Math.cos(a)*radii[0]*reach,center[1]+(random()-.3)*radii[1],
-   center[2]+Math.sin(a)*radii[2]*reach],
-   .16+.11*random(),a,palette[Math.floor(random()*palette.length)],random()>.3);
  }
 }
 export function treeMesh(kind,variant=0){
@@ -135,10 +159,10 @@ export function leafLitterMesh(kind,variant=0){
     p1=[x+orth[0]*size*.65,y+.01,z+orth[1]*size*.65],
     p2=[x-dir[0]*size*.7,y,z-dir[1]*size*.7],
     p3=[x-orth[0]*size*.60,y+.007,z-orth[1]*size*.60];
-  triangle(out,c,p0,p1,color,-.84,true);
-  triangle(out,c,p1,p2,color,-.76,true);
-  triangle(out,c,p2,p3,color,-.78,true);
-  triangle(out,c,p3,p0,color,-.85,true);
+  triangle(out,c,p0,p1,color,.74,true);
+  triangle(out,c,p1,p2,color,.68,true);
+  triangle(out,c,p2,p3,color,.70,true);
+  triangle(out,c,p3,p0,color,.72,true);
  }
  const result=new Float32Array(out);
  LEAF_TEMPLATES.set(key,result);return result;
