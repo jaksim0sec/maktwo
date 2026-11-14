@@ -74,19 +74,19 @@ void main(){
  if(uCityDaylight){
   vec3 sun=normalize(vec3(.42,.86,-.29));
   float facing=max(0.,dot(normal,sun));
-  // Keep skylight occlusion intact. Only actual outdoor exposure receives
-  // cool sky reflections; enclosed rooms retain their low daylight floor.
+  // Cool low-energy night ambient sets the scene's blue-black shadows.
+  // The brighter sky contribution still depends on occluded skylight.
   float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+6).toFixed(1)},vPos.y);
   float skyFill=daylight*daylight*(.55+.45*daylight);
   float hemisphere=normal.y*.5+.5;
-  vec3 fill=mix(vec3(.150,.156,.166),vec3(.170,.178,.187),hemisphere);
-  vec3 skyTint=mix(vec3(.080,.091,.102),vec3(.295,.385,.485),outdoorHeight);
+  vec3 fill=mix(vec3(.115,.158,.230),vec3(.142,.191,.280),hemisphere);
+  vec3 skyTint=mix(vec3(.080,.091,.102),vec3(.290,.435,.610),outdoorHeight);
   ambient=fill+skyTint*skyFill
    +vec3(.45,.39,.30)*facing*smoothstep(.75,1.,daylight)*outdoorHeight;
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.12,.14,.16)*max(0.,uBrightness-.35);
-  if(uDistant)ambient=vec3(.298,.365,.428); // cool facade separation in distant LOD
+  if(uDistant)ambient=vec3(.270,.366,.494); // blue distance fill at equal luminance
  }
  // Keep authored block colors unchanged; light range is controlled by each source.
  vec3 tinted=vColor;

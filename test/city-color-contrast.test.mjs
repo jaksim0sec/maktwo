@@ -13,7 +13,7 @@ test('city sky and distance haze separate from the buildings',()=>{
 test('outdoor skylight and directional sunlight remain sky-occlusion gated',()=>{
  assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
  assert.match(src,/vec3\(\.45,\.39,\.30\)\*facing\*smoothstep\(\.75,1\.,daylight\)\*outdoorHeight/);
- assert.match(src,/if\(uDistant\)ambient=vec3\(\.298,\.365,\.428\)/);
+ assert.match(src,/if\(uDistant\)ambient=vec3\(\.270,\.366,\.494\)/);
  assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
  assert.match(src,/texelFetch\(uLightVolume,cell,0\)/);
  assert.match(src,/gl\.uniform1f\(this\.u\.brightness,\.35\+\.43\*skyLight\)/);
@@ -30,7 +30,7 @@ test('street shade brightens noticeably, while sheltered interior ambient remain
 });
 
 test('cool sky reflections increase only on outdoor-exposed cells',()=>{
- assert.match(src,/vec3 skyTint=mix\(vec3\(\.080,\.091,\.102\),vec3\(\.295,\.385,\.485\),outdoorHeight\)/);
+ assert.match(src,/vec3 skyTint=mix\(vec3\(\.080,\.091,\.102\),vec3\(\.290,\.435,\.610\),outdoorHeight\)/);
  assert.match(src,/float outdoorHeight=smoothstep/);
  assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
  assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
@@ -41,4 +41,17 @@ test('cool sky reflections increase only on outdoor-exposed cells',()=>{
  const high=[.295,.385,.485].map(c=>c*fill(.80));
  assert.ok(low[2]-low[0]<.001,'underground blue contribution remains negligible');
  assert.ok(high[2]-high[0]>.1,'exposed sky retains cool contrast');
+});
+
+test('night ambient regains blue separation without raising sealed-room brightness',()=>{
+ assert.match(src,/vec3 fill=mix\(vec3\(\.115,\.158,\.230\),vec3\(\.142,\.191,\.280\),hemisphere\)/);
+ assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
+ assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
+ assert.match(src,/daylight=mix\(daylight,light\.a,weight\)/);
+ assert.match(src,/emission\*=mix\(\.68,\.88,outdoorHeight\)/);
+ const old=[.160,.167,.176],blue=[.1285,.1745,.255];
+ const lum=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
+ assert.ok(blue[2]>blue[0]*1.7,'night surfaces must look blue instead of grey');
+ assert.ok(lum(blue)/lum(old)<1.08,'cool shadow should not brighten a sealed room');
+ assert.ok(lum(blue)/lum(old)>.93,'color correction must preserve readable surfaces');
 });
