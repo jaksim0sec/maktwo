@@ -5,7 +5,7 @@ import {observerHeads} from './observer-poses.js';
 
 // 소심한 관찰자: distant, solitary sightings; the gaze moves before the feet.
 export const OBSERVER_NAME='소심한 관찰자';
-const HEIGHT=2.27, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.48;
+const HEIGHT=2.36, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.90;
 const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -45,6 +45,20 @@ export class ObserverPack {
  }
  supported(p) {
   return this.loaded(p)&&collides(this.loadedWorld,p.x,p.y-.13,p.z,.31,.14);
+ }
+ // Swept collision, including the forward lean of the authored charge poses.
+ // Testing only the destination allowed a fast stride to cross a thin wall.
+ walkClear(from,to,yaw,sprinting=false){
+  const length=distance(from,to);
+  const steps=Math.max(1,Math.ceil(length/.12));
+  const forward=sprinting?.79:.29,width=sprinting?.54:.40;
+  const fx=Math.sin(yaw)*forward,fz=Math.cos(yaw)*forward;
+  for(let i=1;i<=steps;i++){
+   const t=i/steps,p=shifted(from,(to.x-from.x)*t,(to.z-from.z)*t);
+   if(!this.supported(p)||this.blocked(p)||
+      this.blocked(shifted(p,fx,fz),width,sprinting?1.95:HEIGHT))return false;
+  }
+  return true;
  }
  clear(a,b){
   if(!this.loaded(a)||!this.loaded(b))return false;
@@ -154,6 +168,8 @@ export class ObserverPack {
      if(!this.supported(p)||this.blocked(p)){walkable=false;break;}
     }
     if(!walkable)continue;
+    const face=Math.atan2(player.x-start.x,player.z-start.z);
+    if(!this.walkClear(start,seen,face))continue;
     const rank=shade*5+hash(n,6,4,this.world.seed)-distance(start,seen)*.10;
     if(rank>best){choice={start,seen};best=rank;}
     break;
@@ -177,7 +193,7 @@ export class ObserverPack {
    walking:false,retreat:false,target:site.seen,nextMove:Infinity,
    sighting:{start:site.start,seen:site.seen,phase:'approach',firstSeen:null,until:0,
     deadline:this.clock+12}});
-  s.yaw=Math.atan2(site.seen.x-site.start.x,site.seen.z-site.start.z);
+  s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
   this.previous=null;
  }
  spawn(player,range){
@@ -357,12 +373,17 @@ export class ObserverPack {
    const scene=s.sighting;
    if(scene){
     const inView=this.onScreen(player,s);
-    if(inView&&scene.firstSeen===null)scene.firstSeen=this.clock;
-    if(scene.phase==='approach'&&distance(s,scene.seen)<.4){
-     scene.phase='watch';scene.until=this.clock+1.4+hash(s.id,8,4,this.world.seed)*.9;
+    if(inView&&scene.firstSeen===null){
+     // A glimpse is a mutual look, not the back of an already fleeing creature.
+     scene.firstSeen=this.clock;scene.phase='watch';
+     scene.until=this.clock+1.45+hash(s.id,8,4,this.world.seed)*.65;
      s.target=null;
     }
-    if(scene.phase==='watch'&&(this.clock>=scene.until||s.focus>1.2||d<10)){
+    if(scene.phase==='approach'&&distance(s,scene.seen)<.4){
+     scene.phase='watch';scene.until=this.clock+1.45+hash(s.id,8,4,this.world.seed)*.65;
+     s.target=null;
+    }
+    if(scene.phase==='watch'&&this.clock>=scene.until){
      scene.phase='withdraw';s.target=scene.start;
     }
     if(scene.phase==='approach'&&this.clock>=scene.deadline){
@@ -413,22 +434,25 @@ export class ObserverPack {
    if(s.target&&(!centered||s.retreat||s.sighting)){
     const length=distance(s,s.target);
     if(length<.4){s.target=null;}else{
-     const speed=s.sighting?(s.sighting.phase==='withdraw'?1.6:1.45):s.retreat?1.5:.72;
+     const sprinting=s.sighting?.phase==='withdraw';
+     const speed=sprinting?3.5:s.sighting?1.45:s.retreat?1.5:.72;
      const step=Math.min(length,dt*speed);
      const dx=(s.target.x-s.x)/length,dz=(s.target.z-s.z)/length;
-     const desiredYaw=Math.atan2(dx,dz);
+     const desiredYaw=s.sighting?.phase==='approach'
+      ?Math.atan2(player.x-s.x,player.z-s.z):Math.atan2(dx,dz);
      const turn=Math.atan2(Math.sin(desiredYaw-s.yaw),Math.cos(desiredYaw-s.yaw));
-     // Move with actual feet, not an instant facing/teleport of the whole pack.
-     s.yaw+=clamp(turn,-dt*1.8,dt*1.8);
-     // A few cheap alternate footholds allow the observer to edge along walls.
-     const side=s.id%2?1:-1;
-     const next=[0,side*.55,-side*.55,side*1.1,-side*1.1].map(angle=>{
-      const x=dx*Math.cos(angle)-dz*Math.sin(angle),z=dz*Math.cos(angle)+dx*Math.sin(angle);
-      return shifted(s,x*step,z*step);
-     }).find(p=>this.supported(p)&&!this.blocked(p));
-     if(next){
-      s.x=next.x;s.z=next.z;s.phase+=step*5.1;s.walking=true;
-     }else{s.target=null;s.nextMove=this.clock+1.2;}
+     // Face the viewer during the peek. Turn around before sprinting away.
+     s.yaw+=clamp(turn,-dt*(sprinting?4.2:2.1),dt*(sprinting?4.2:2.1));
+     if(!sprinting||Math.abs(Math.atan2(Math.sin(desiredYaw-s.yaw),Math.cos(desiredYaw-s.yaw)))<.50){
+      const side=s.id%2?1:-1;
+      const next=[0,side*.55,-side*.55,side*1.1,-side*1.1].map(angle=>{
+       const x=dx*Math.cos(angle)-dz*Math.sin(angle),z=dz*Math.cos(angle)+dx*Math.sin(angle);
+       return shifted(s,x*step,z*step);
+      }).find(p=>this.walkClear(s,p,s.yaw,sprinting));
+      if(next){
+       s.x=next.x;s.z=next.z;s.phase+=step*(sprinting?2.9:5.1);s.walking=true;
+      }else if(!s.sighting){s.target=null;s.nextMove=this.clock+1.2;}
+     }
     }
    }
    // The torso faces travel; only the neck and lone eye quietly follow the player.
@@ -547,6 +571,11 @@ export function observerPose(view,time){
   return {from:'idle',to:member.region,blend:Math.sin(Math.PI*t)**.72};
  }
  if(view.track){
+  if(view.track.walking&&view.track.sighting?.phase==='withdraw'){
+   // Reuse the existing charge animation as a repeated fleeing run.
+   const f=((view.track.phase%4)+4)%4,i=Math.floor(f);
+   return {from:'charge'+(i+1),to:'charge'+((i+1)%4+1),blend:f-i};
+  }
   if(view.track.walking){
    const f=((view.track.phase%6)+6)%6,i=Math.floor(f);
    return {from:'walk'+i,to:'walk'+((i+1)%6),blend:f-i};
