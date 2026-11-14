@@ -167,7 +167,7 @@ test('narrow straight city corridor creates a true frontal encounter even when n
 });
 test('peripheral visibility alone cannot trigger the gaze countdown',()=>{
  const pack=make();
- const away={x:10,y:10,z:-18};
+ const away={x:14,y:10,z:-18};
  pack.viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
  assert.equal(pack.onScreen(player,away),true);
  assert.equal(pack.faceVisible(player,away),false);
