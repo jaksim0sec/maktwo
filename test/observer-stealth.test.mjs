@@ -145,3 +145,30 @@ test('retreat reuses the charge pose and the fast movement still respects walls'
  assert.ok(pose.from.startsWith('charge')&&pose.to.startsWith('charge'),
   'withdrawal should use the charge animation instead of walk');
 });
+
+test('narrow straight city corridor creates a true frontal encounter even when no side-spawn fits',()=>{
+ const corridor={...world,get(x,y,z,create){
+  assert.equal(create,false);
+  return y<10||(Math.abs(Math.floor(x))>=4&&y<25)?B.STONE:B.AIR;
+ }};
+ for(const aspect of [16/9,9/16]){
+  const pack=new ObserverPack(corridor,{count:3}),view={aspect,tan:Math.tan(65*Math.PI/360)};
+  let faceTime=0,firstFace=null,seenId=null;
+  for(let i=0;i<450;i++){
+   pack.tick(.18,player,48,view);
+   for(const s of pack.views)if(pack.faceVisible(player,s)){
+    faceTime+=.18;firstFace??=pack.clock;seenId??=s.id;
+   }
+  }
+  assert.ok(pack.active, 'cannot block all spawning on a corridor with clear ahead space');
+  assert.ok(faceTime>1.0,'player must see a frontal observer rather than only a peripheral silhouette');
+  assert.ok(firstFace!==null&&seenId!==null);
+ }
+});
+test('peripheral visibility alone cannot trigger the gaze countdown',()=>{
+ const pack=make();
+ const away={x:10,y:10,z:-18};
+ pack.viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
+ assert.equal(pack.onScreen(player,away),true);
+ assert.equal(pack.faceVisible(player,away),false);
+});
