@@ -418,7 +418,7 @@ export class ObserverPack {
   for(const view of this.views){
    if(view.member?.dead||view.track?.presence<.2||distance(view,origin)>limit+2)continue;
    const {from,to,blend}=observerPose(view,this.clock);
-   const a=observerHeads[from],b=observerHeads[to];
+   const a=observerHeads[view.track?.walking?'idle':from],b=observerHeads[view.track?.walking?'idle':to];
    const x=mix(a[0],b[0],blend),z=mix(a[2],b[2],blend),y=mix(a[1],b[1],blend);
    const c=Math.cos(view.yaw),s=Math.sin(view.yaw);
    const neck=view.track?.headYaw??0,cn=Math.cos(neck),sn=Math.sin(neck);
