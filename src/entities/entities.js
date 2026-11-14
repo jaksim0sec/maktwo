@@ -172,8 +172,8 @@ export class EntityManager{
  }
  spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
- tick(dt,player,inventory=null,renderRange=48){
-  this.observers?.tick(dt,player,renderRange);
+ tick(dt,player,inventory=null,renderRange=48,viewport){
+  this.observers?.tick(dt,player,renderRange,viewport);
   for(const train of this.world.trainColliders){
    const step=train.advance(dt,this.world,player);
    if(step)carryTrainPassenger(train,player,step);
