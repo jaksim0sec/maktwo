@@ -56,3 +56,15 @@ test('roof shadows outrank lamp-lit positions',()=>{
  assert.equal(pack.shadowScore(p,[]),2);
  assert.ok(pack.shadowScore(p,[{x:5,y:12,z:5,radius:8}])<pack.shadowScore(p,[]));
 });
+
+test('lighting candidates use array focus and are cached between short AI ticks',()=>{
+ let queries=0;
+ const lit={...world,lightRevision:19,lights:{inBounds(x0,x1,z0,z1,{focus}){
+  assert.deepEqual(focus,[0,10,0]);
+  queries++;return [];
+ }}};
+ const pack=new ObserverPack(lit,{count:1});
+ pack.clock=5;pack.lightCandidates(player);
+ pack.clock+=.18;pack.lightCandidates(player);
+ assert.equal(queries,1);
+});
