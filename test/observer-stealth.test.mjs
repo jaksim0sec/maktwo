@@ -68,3 +68,35 @@ test('lighting candidates use array focus and are cached between short AI ticks'
  pack.clock+=.18;pack.lightCandidates(player);
  assert.equal(queries,1);
 });
+
+
+test('a shy observer walks from off-screen into view and withdraws within five seconds',()=>{
+ const pack=make(),viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
+ let started=false,seen=false,finished=false,firstTrack=null,seenAt=null;
+ for(let i=0;i<230;i++){
+  pack.tick(.18,player,48,viewport);
+  const active=[...pack.active.stalkers.values()].find(s=>s.sighting);
+  if(active&&!started){
+   started=true;firstTrack=active;
+   assert.equal(pack.onScreen(player,active),false,'entry must not pop into view');
+  }
+  if(active===firstTrack&&pack.onScreen(player,active)){
+   seen=true;seenAt??=pack.clock;
+  }
+  if(seen&&!firstTrack.sighting){finished=true;break;}
+ }
+ assert.ok(started,'at least one edge-of-view event should be scheduled');
+ assert.ok(seen,'a walkable sighting should be visible without rotating the camera');
+ assert.ok(finished,'the observer must leave view without staying indefinitely');
+ assert.ok(pack.clock-seenAt<5.3,'the sighting must end within five seconds of being noticed');
+});
+test('portrait viewport selects a genuinely visible peripheral position',()=>{
+ const pack=make(),viewport={aspect:9/16,tan:Math.tan(65*Math.PI/360)};
+ let seen=false;
+ for(let i=0;i<260;i++){
+  pack.tick(.18,player,48,viewport);
+  const active=[...pack.active.stalkers.values()].find(s=>s.sighting);
+  if(active&&pack.onScreen(player,active)){seen=true;break;}
+ }
+ assert.ok(seen,'mobile portrait framing must still allow an encounter');
+});
