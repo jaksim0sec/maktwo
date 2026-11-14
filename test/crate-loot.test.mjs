@@ -13,6 +13,9 @@ test('seed and XYZ determine valid, varied crate loot with weapons',()=>{
  for(const [id,n] of base){assert.ok(BLOCKS[id]&&n>0&&n<=999);}
  const rolls=Array.from({length:48},(_,i)=>crateLoot(543,-19+i,35,47));
  assert.ok(new Set(rolls.map(loot=>JSON.stringify([...loot]))).size>5);
+ assert.ok(Array.from({length:16},(_,i)=>crateLoot(543+i,-19,35,47))
+  .some(loot=>JSON.stringify([...loot])!==JSON.stringify([...base])),
+  'changing world seed must change at least some loot');
  assert.ok(rolls.some(loot=>loot.has(B.WOOD_CLUB)||loot.has(B.STEEL_BAR)));
  assert.ok(Array.from({length:12},(_,i)=>crateLoot(543+i,-19,35,47))
   .some(loot=>JSON.stringify([...loot])!==JSON.stringify([...base])));
