@@ -114,7 +114,8 @@ export class ObserverPack {
    const p=this.spot(player,placed,lights,Math.min(range*.83,36));
    if(!p)continue;
    placed.push(p);
-   const yaw=Math.atan2(player.x-p.x,player.z-p.z)+(hash(i,7,1,this.world.seed)-.5)*.75;
+   const side=hash(i,7,1,this.world.seed)<.5?-1:1;
+   const yaw=Math.atan2(player.x-p.x,player.z-p.z)+side*(.36+hash(i,8,1,this.world.seed)*.34);
    stalkers.set(i,{...p,id:i,yaw,phase:hash(i,9,4,this.world.seed)*6,
     walking:false,hidden:false,presence:1,focus:0,headYaw:0,headPitch:0,eyeYaw:0,eyePitch:0,
     target:null,nextMove:this.clock+2+i*1.8,hideUntil:0,retreat:false});
@@ -287,7 +288,7 @@ export class ObserverPack {
      if(p){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,presence:1,
        focus:0,target:null,retreat:false,nextMove:this.clock+1.6});
-      s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(.5-hash(s.id,11,8,this.world.seed))*.9;
+      s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(s.id%2?-.58:.58);
      }else s.hideUntil=this.clock+3;
     }
     continue;
@@ -341,7 +342,7 @@ export class ObserverPack {
    const ease=(value,target,rate)=>value+(target-value)*clamp(dt*rate,0,1);
    s.headYaw=ease(s.headYaw,clamp(relative,-.53,.53),2.3);
    s.headPitch=ease(s.headPitch,clamp(vertical,-.22,.20),1.5);
-   s.eyeYaw=ease(s.eyeYaw,clamp(relative-s.headYaw,-.32,.32),4.5);
+   s.eyeYaw=ease(s.eyeYaw,clamp(relative-s.headYaw+Math.sin(this.clock*1.65+s.id*2.8)*.025,-.32,.32),4.5);
    s.eyePitch=ease(s.eyePitch,clamp(vertical-s.headPitch,-.16,.16),3.8);
    if(!s.walking&&Math.abs(relative)>1.35&&s.focus<.3)
     s.yaw+=clamp(relative,-dt*.18,dt*.18);
@@ -378,7 +379,7 @@ export class ObserverPack {
      for(const [s,p] of moves){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,focus:0,
        presence:1,retreat:false,target:null,nextMove:this.clock+1.5});
-      s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
+      s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(s.id%2?-.58:.58);
      }
      for(const s of g.stalkers.values())if(!moves.some(([o])=>o===s))s.hidden=true;
      g.point={x:moves[0][1].x,y:moves[0][1].y,z:moves[0][1].z};
