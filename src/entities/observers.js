@@ -3,7 +3,10 @@ import {SIZE} from '../core/chunk.js';
 import {hash} from '../util/math.js';
 import {observerHeads} from './observer-poses.js';
 
+// 소심한 관찰자: distant, solitary sightings; the gaze moves before the feet.
+export const OBSERVER_NAME='소심한 관찰자';
 const HEIGHT=2.27, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.48;
+const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -70,40 +73,51 @@ export class ObserverPack {
   if(dir.x*look.x+dir.y*look.y+dir.z*look.z<.27)return true;
   return ![head,shifted(point,0,0,HEIGHT*.52),shifted(point,0,0,.28)].some(p=>this.clear(eye,p));
  }
- spawn(player,range){
+ shadowScore(p,lights=[]){
+  const head=shifted(p,0,0,1.5);
+  const roof=Boolean(raycast(this.loadedWorld,head,{x:0,y:1,z:0},12,{solidOnly:true}));
+  const lamp=lights.some(l=>Math.abs(l.y-head.y)<5&&Math.hypot(l.x-p.x,l.z-p.z)<Math.min(7,(l.radius??7)*.80));
+  return (roof?2:0)-(lamp?3:0);
+ }
+ lightCandidates(player){
+  return this.world.lights?.inBounds(player.x-38,player.x+38,player.z-38,player.z+38,
+   {minY:player.y-6,maxY:player.y+13,limit:48,focus:player})??[];
+ }
+ spot(player,others=[],lights=[],range=32,near=null){
   const eye=shifted(player,0,0,player.eye),look=player.direction();
-  const bearing=Math.atan2(look.x,look.z);
-  for(let n=0;n<18;n++){
-   const index=this.serial++;
-   const angle=bearing+(n%2===0?1:-1)*(.62+hash(index,1,2,this.world.seed)*2.51);
-   const radius=Math.min(range*.74,38)*( .65+hash(index,2,2,this.world.seed)*.35);
-   if(radius<13)continue;
-   const point=this.footAt(shifted(player,Math.sin(angle)*radius,Math.cos(angle)*radius));
-   if(!point||distance(point,player)<13)continue;
-   const yaw=Math.atan2(player.x-point.x,player.z-point.z),formation=this.layout(point,yaw);
-   if(!this.formation(point,yaw)||!formation.every(p=>this.supported(p)&&this.invisible(eye,look,p)))continue;
-   let reveal=null, peekSide=0;
-   const head=shifted(point,0,0,EYE);
-   if(!this.clear(head,eye)){
-    for(const side of [-1,1]){
-     const shift=side*.75, probe=shifted(head,Math.cos(yaw)*shift,-Math.sin(yaw)*shift,-.13);
-     if(this.clear(probe,eye)&&this.clear(head,probe)){peekSide=side;break}
-    }
-    if(!peekSide){
-     for(const step of [1.3,-1.3,2.6,-2.6,3.9,-3.9]){
-      const probe=shifted(point,Math.cos(yaw)*step,-Math.sin(yaw)*step);
-      if(this.canMove(point,probe,yaw,yaw)&&this.formation(probe,yaw)&&this.supported(probe)&&this.clear(shifted(probe,0,0,EYE),eye)){
-       reveal=probe;break;
-      }
-     }
-     if(!reveal)continue;
-    }
-   }
-   this.previous=null;
-   this.active={point,yaw,size:this.count,members:new Map(),age:0,at:reveal,peekSide,mode:'watch',phase:0,
-    alert:0,intent:false,dir:null,vy:0,fallY:null,charge:0,nextThreat:0,blocked:false,lookTime:0};
-   return;
+  const heading=Math.atan2(look.x,look.z);
+  let best=null,score=-Infinity;
+  for(let i=0;i<24;i++){
+   const n=this.serial++,side=i%2?-1:1;
+   const angle=heading+side*(1.02+hash(n,1,3,this.world.seed)*2.02);
+   const radius=Math.max(13,Math.min(range-2,15+hash(n,2,5,this.world.seed)*15));
+   const p=this.footAt(shifted(player,Math.sin(angle)*radius,Math.cos(angle)*radius));
+   if(!p||distance(p,player)<12||others.some(o=>distance(o,p)<MIN_SEPARATION)||
+      (near&&distance(p,near)>18)||!this.invisible(eye,look,p))continue;
+   const shade=this.shadowScore(p,lights);
+   const rank=shade*6+(near?Math.max(0,12-distance(p,near))*.12:0)+hash(n,3,2,this.world.seed);
+   if(rank>score){best={...p,shade};score=rank;}
   }
+  // A single ambiguous silhouette is acceptable in the open; never gather a crowd there.
+  return best&&!(best.shade<1&&others.length>0)?best:null;
+ }
+ spawn(player,range){
+  const lights=this.lightCandidates(player),stalkers=new Map(),placed=[];
+  for(let i=0;i<this.count;i++){
+   const p=this.spot(player,placed,lights,Math.min(range*.83,36));
+   if(!p)continue;
+   placed.push(p);
+   const yaw=Math.atan2(player.x-p.x,player.z-p.z)+(hash(i,7,1,this.world.seed)-.5)*.75;
+   stalkers.set(i,{...p,id:i,yaw,phase:hash(i,9,4,this.world.seed)*6,
+    walking:false,hidden:false,presence:1,focus:0,headYaw:0,headPitch:0,eyeYaw:0,eyePitch:0,
+    target:null,nextMove:this.clock+2+i*1.8,hideUntil:0,retreat:false});
+  }
+  if(!stalkers.size)return;
+  const lead=stalkers.values().next().value;
+  this.previous=null;
+  this.active={point:{x:lead.x,y:lead.y,z:lead.z},yaw:lead.yaw,size:this.count,
+   members:new Map(),stalkers,age:0,at:null,peekSide:0,mode:'watch',phase:0,
+   alert:0,intent:false,dir:null,vy:0,fallY:null,charge:0,nextThreat:0,blocked:false,lookTime:0};
  }
  // Simple authored-risk rule: an exposed edge a short distance away. No drop-height scoring.
  edge(player,dx,dz){
@@ -139,7 +153,7 @@ export class ObserverPack {
   if(member.dead)return;
   const g=this.active;
   member.hp=0;member.dead=true;member.hitAt=this.clock;member.yaw=g.yaw;
-  member.at=this.layout(g.point,g.yaw,g.size)[index];
+  member.at=g.stalkers?.get(index)??this.layout(g.point,g.yaw,g.size)[index];
   g.members.set(index,member);this.count--;
  }
  canMove(from,to,yaw=this.active.yaw,previousYaw=yaw){
@@ -243,6 +257,88 @@ export class ObserverPack {
    if(this.canMove(p,p,yaw,g.yaw))g.yaw=yaw;
   }
  }
+ // Individual stalking replaces synchronized group translation in normal gameplay.
+ stepStalkers(player,dt){
+  const g=this.active,eye=shifted(player,0,0,player.eye),look=player.direction();
+  const lights=this.lightCandidates(player);
+  g.age+=dt;
+  for(const s of g.stalkers.values()){
+   if(g.members.get(s.id)?.dead)continue;
+   const d=distance(s,player);
+   const direction=toward(eye,shifted(s,0,0,EYE));
+   const dot=direction.x*look.x+direction.y*look.y+direction.z*look.z;
+   const visible=dot>.20&&this.clear(eye,shifted(s,0,0,EYE));
+   const centered=visible&&dot>.80;
+   s.focus=clamp(s.focus+(centered?dt:-dt*.55),0,FOCUS_LIMIT);
+   s.walking=false;
+   if(s.hidden){
+    if(this.clock>=s.hideUntil){
+     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!o.hidden&&!g.members.get(o.id)?.dead);
+     const p=this.spot(player,occupied,lights,Math.min(36,Math.max(16,d+5)));
+     if(p){
+      Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,presence:1,
+       focus:0,target:null,retreat:false,nextMove:this.clock+1.6});
+      s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(.5-hash(s.id,11,8,this.world.seed))*.9;
+     }else s.hideUntil=this.clock+3;
+    }
+    continue;
+   }
+   // An observer stops presenting itself: it finds cover first, with a short
+   // darkness fade only when the route to cover is obstructed.
+   s.retreat=d<9||s.focus>2.0;
+   if(s.retreat&&!visible&&s.focus>.5){
+    s.hidden=true;s.hideUntil=this.clock+3.8;s.target=null;continue;
+   }
+   s.presence=clamp((FOCUS_LIMIT-s.focus)/.75,0,1);
+   if(s.focus>=FOCUS_LIMIT||(d>39&&!visible)){
+    s.hidden=true;s.hideUntil=this.clock+4.5;s.target=null;continue;
+   }
+   if(this.clock>=s.nextMove||!s.target){
+    s.nextMove=this.clock+(s.retreat?1.0:3.5+hash(s.id,4,Math.floor(this.clock/4),this.world.seed)*2);
+    if(s.retreat){
+     const awayX=(s.x-player.x)/(d||1),awayZ=(s.z-player.z)/(d||1);
+     const side=s.id%2?1:-1;
+     s.target=shifted(s,(awayX+awayZ*side*.7)*4,(awayZ-awayX*side*.7)*4);
+    }else if(d>24||!visible){
+     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!o.hidden&&!g.members.get(o.id)?.dead);
+     s.target=this.spot(player,occupied,lights,32,s);
+    }else s.target=null;
+   }
+   if(s.target&&(!centered||s.retreat)){
+    const length=distance(s,s.target);
+    if(length<.4){s.target=null;}else{
+     const speed=s.retreat?1.5:.72;
+     const step=Math.min(length,dt*speed);
+     const dx=(s.target.x-s.x)/length,dz=(s.target.z-s.z)/length;
+     const desiredYaw=Math.atan2(dx,dz);
+     const turn=Math.atan2(Math.sin(desiredYaw-s.yaw),Math.cos(desiredYaw-s.yaw));
+     // Move with actual feet, not an instant facing/teleport of the whole pack.
+     s.yaw+=clamp(turn,-dt*1.8,dt*1.8);
+     const next=shifted(s,dx*step,dz*step);
+     if(this.supported(next)&&!this.blocked(next)){
+      s.x=next.x;s.z=next.z;s.phase+=step*5.1;s.walking=true;
+     }else{s.target=null;s.nextMove=this.clock+1.2;}
+    }
+   }
+   // The torso faces travel; only the neck and lone eye quietly follow the player.
+   const gazeYaw=Math.atan2(player.x-s.x,player.z-s.z);
+   const relative=Math.atan2(Math.sin(gazeYaw-s.yaw),Math.cos(gazeYaw-s.yaw));
+   const vertical=Math.atan2(eye.y-(s.y+EYE),Math.max(1,d));
+   const ease=(value,target,rate)=>value+(target-value)*clamp(dt*rate,0,1);
+   s.headYaw=ease(s.headYaw,clamp(relative,-.53,.53),2.3);
+   s.headPitch=ease(s.headPitch,clamp(vertical,-.22,.20),1.5);
+   s.eyeYaw=ease(s.eyeYaw,clamp(relative-s.headYaw,-.32,.32),4.5);
+   s.eyePitch=ease(s.eyePitch,clamp(vertical-s.headPitch,-.16,.16),3.8);
+   if(!s.walking&&Math.abs(relative)>1.35&&s.focus<.3)
+    s.yaw+=clamp(relative,-dt*.18,dt*.18);
+  }
+  const living=[...g.stalkers.values()].filter(s=>!g.members.get(s.id)?.dead);
+  if(living.length){
+   g.point={x:living.reduce((v,s)=>v+s.x,0)/living.length,
+    y:living.reduce((v,s)=>v+s.y,0)/living.length,
+    z:living.reduce((v,s)=>v+s.z,0)/living.length};
+  }
+ }
  tick(dt,player,range){
   this.clock+=dt;
   if(this.clock<this.next)return;
@@ -264,35 +360,41 @@ export class ObserverPack {
     if(!this.active)this.next=this.clock+2.5;
    }
   }else if(this.count>0){
-   this.previous=this.views;this.sampleTime=this.clock;this.stepGroup(player,TICK);
+   this.previous=this.views;this.sampleTime=this.clock;this.stepStalkers(player,TICK);
   }
   this.publish();
  }
  publish(){
   const g=this.active;
   if(!g)return;
-  this.views=this.layout(g.point,g.yaw,g.size).map((p,i)=>{
+  const tracks=g.stalkers?[...g.stalkers.entries()]:
+   this.layout(g.point,g.yaw,g.size).map((p,i)=>[i,{...p,yaw:g.yaw}]);
+  this.views=tracks.map(([i,s])=>{
    const member=g.members.get(i);
    const old=this.previous?.find(view=>view.id===i);
    const previous=old&&{x:old.x,y:old.y,z:old.z,yaw:old.yaw};
-   return {...(member?.dead?member.at:p),id:i,yaw:member?.yaw??g.yaw,group:g,member,previous};
-  }).filter(view=>!view.member?.dead||this.clock-view.member.hitAt<10);
+   return {...(member?.dead?member.at:s),id:i,yaw:member?.yaw??s.yaw,
+    group:g,member,track:s,previous};
+  }).filter(view=>(!view.track.hidden&&!view.member?.dead)||
+    (view.member?.dead&&this.clock-view.member.hitAt<10));
  }
  pick(origin,ray,limit,padding=0){
   let result=null;
   for(const view of this.views){
-   if(view.member?.dead||distance(view,origin)>limit+2)continue;
+   if(view.member?.dead||view.track?.presence<.2||distance(view,origin)>limit+2)continue;
    const {from,to,blend}=observerPose(view,this.clock);
    const a=observerHeads[from],b=observerHeads[to];
    const x=mix(a[0],b[0],blend),z=mix(a[2],b[2],blend),y=mix(a[1],b[1],blend);
    const c=Math.cos(view.yaw),s=Math.sin(view.yaw);
-   const head=[view.x+x*c+z*s,view.y+y,view.z-x*s+z*c];
+   const neck=view.track?.headYaw??0,cn=Math.cos(neck),sn=Math.sin(neck);
+   const xx=(x*cn+(z-.14)*sn),zz=(-x*sn+(z-.14)*cn)+.14;
+   const head=[view.x+xx*c+zz*s,view.y+y+(view.track?.headPitch??0)*.09,view.z-xx*s+zz*c];
    for(const [region,center,width,height] of [['head',head,.205,.205],['body',[view.x,view.y+.92,view.z],.22,.26],['leg',[view.x,view.y+.40,view.z],.31,.36]]){
     const w=width+padding*.45;
     const hit=intersectAabb(origin,ray,[center[0]-w,center[1]-height,center[2]-w],[center[0]+w,center[1]+height,center[2]+w]);
     if(hit&&hit.distance<limit){
      limit=hit.distance;
-     result={distance:limit,region,entity:{type:'observer',x:view.x,y:view.y,z:view.z,height:HEIGHT,hurt:()=>this.damage(view.id,region)}};
+     result={distance:limit,region,entity:{type:'observer',name:OBSERVER_NAME,x:view.x,y:view.y,z:view.z,height:HEIGHT,hurt:()=>this.damage(view.id,region)}};
     }
    }
   }
@@ -310,6 +412,14 @@ export function observerPose(view,time){
  if(member&&time-member.hitAt<.40){
   const t=(time-member.hitAt)/.40;
   return {from:'idle',to:member.region,blend:Math.sin(Math.PI*t)**.72};
+ }
+ if(view.track){
+  if(view.track.walking){
+   const f=((view.track.phase%6)+6)%6,i=Math.floor(f);
+   return {from:'walk'+i,to:'walk'+((i+1)%6),blend:f-i};
+  }
+  const slow=Math.sin(time*.58+id*.84);
+  return {from:'idle',to:slow>0?'peek1':'peek0',blend:.045+Math.abs(slow)*.065};
  }
  if(g.mode==='charge'){
   const f=clamp(g.charge/1.28*5,0,4.99), i=Math.floor(f);
