@@ -8,7 +8,7 @@ export const OBSERVER_NAME='소심한 관찰자';
 const HEIGHT=2.36, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.90;
 const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
-const FACE_DISTANCE=18.5, FACE_CENTER=.56;
+const FACE_DISTANCE=16.5, FACE_CENTER=.56;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -410,11 +410,12 @@ export class ObserverPack {
    const dot=direction.x*look.x+direction.y*look.y+direction.z*look.z;
    const visible=dot>.20&&this.clear(eye,shifted(s,0,0,EYE));
    const centered=visible&&dot>.80;
-   s.focus=clamp(s.focus+(centered?dt:-dt*.55),0,FOCUS_LIMIT);
+   const scene=s.sighting,face=scene&&this.faceVisible(player,s);
+   // Do not count attention during the fog-bound approach.
+   s.focus=clamp(s.focus+((scene?(scene.phase==='watch'&&face):centered)?dt:-dt*.55),0,FOCUS_LIMIT);
    s.walking=false;
-   const scene=s.sighting;
    if(scene){
-    const inView=this.onScreen(player,s),face=this.faceVisible(player,s);
+    const inView=this.onScreen(player,s);
     if(face&&scene.firstSeen===null){
      // Start the countdown only after an actual face-to-face sightline.
      scene.firstSeen=this.clock;scene.phase='watch';
