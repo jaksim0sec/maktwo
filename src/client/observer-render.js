@@ -134,8 +134,10 @@ export class ObserverRenderer {
    const track=e.track;
    gl.uniform2f(u.Neck,track?.headYaw??0,track?.headPitch??0);
    gl.uniform2f(u.EyeAim,track?.eyeYaw??0,track?.eyePitch??0);
-   gl.uniform1f(u.Gait,track?.phase??0);gl.uniform1f(u.Stride,track?.walking?1:0);
-   gl.uniform1i(u.WalkPose,track?.walking?1:0);
+   const fleeing=track?.walking&&track.sighting?.phase==='withdraw';
+   gl.uniform1f(u.Gait,track?.phase??0);gl.uniform1f(u.Stride,track?.walking&&!fleeing?1:0);
+   // Let the authored charge mesh lean forward instead of flattening its torso to idle.
+   gl.uniform1i(u.WalkPose,track?.walking&&!fleeing?1:0);
    gl.uniform1f(u.Breath,pack.clock*.85+e.id*1.71);
    gl.uniform1f(u.Presence,e.member?.dead?1:track?.presence??1);
    gl.drawElements(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0);calls++;
