@@ -8,6 +8,7 @@ export const OBSERVER_NAME='소심한 관찰자';
 const HEIGHT=2.36, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.90;
 const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
+const FACE_DISTANCE=18.5, FACE_CENTER=.56;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -140,6 +141,14 @@ export class ObserverPack {
   return Boolean(s&&Math.abs(s.x)<.95&&Math.abs(s.y)<.84&&
    this.clear(shifted(player,0,0,player.eye),shifted(point,0,0,EYE)));
  }
+ // A real meeting is closer to the center of view and close enough to distinguish a face.
+ // Simply entering the peripheral frustum is NOT a successful encounter.
+ faceVisible(player,point){
+  const s=this.screenPoint(player,point);
+  return Boolean(s&&s.depth>3&&s.depth<FACE_DISTANCE&&
+   Math.abs(s.x)<FACE_CENTER&&Math.abs(s.y)<.70&&
+   this.clear(shifted(player,0,0,player.eye),shifted(point,0,0,EYE)));
+ }
  // A glimpse begins outside the camera, then the observer walks into the edge of view.
  glimpseSite(player,others,lights,range){
   const heading=Math.atan2(player.direction().x,player.direction().z);
@@ -147,20 +156,20 @@ export class ObserverPack {
   let choice=null,best=-Infinity;
   for(let i=0;i<32;i++){
    const n=this.serial++,side=i%2?-1:1;
-   const radius=Math.min(range-3,21+hash(n,3,7,this.world.seed)*11);
+   const radius=Math.min(range-3,12+hash(n,3,7,this.world.seed)*9);
    if(radius<13)continue;
-   const angle=heading+side*half*(.72+hash(n,5,4,this.world.seed)*.17);
+   const angle=heading+side*half*(.43+hash(n,5,4,this.world.seed)*.15);
    const seen=this.footAt(shifted(player,Math.sin(angle)*radius,Math.cos(angle)*radius));
    if(!seen||Math.abs(seen.y-player.y)>3||
       others.some(s=>distance(s,seen)<MIN_SEPARATION)||
       !this.onScreen(player,seen))continue;
    const shade=this.shadowScore(seen,lights);
    if(shade<0)continue;
-   for(const outer of [1.08,1.17,1.28]){
+   for(const outer of [1.07,1.17,1.29]){
     const away=heading+side*half*outer;
     const start=this.footAt(shifted(player,Math.sin(away)*radius,Math.cos(away)*radius));
     if(!start||Math.abs(start.y-seen.y)>.3||this.onScreen(player,start)||
-       distance(start,seen)>7.5)continue;
+       distance(start,seen)>10)continue;
     let walkable=true;
     const steps=Math.ceil(distance(start,seen)/.40);
     for(let k=1;k<=steps;k++){
@@ -171,11 +180,39 @@ export class ObserverPack {
     const face=Math.atan2(player.x-start.x,player.z-start.z);
     if(!this.walkClear(start,seen,face))continue;
     const rank=shade*5+hash(n,6,4,this.world.seed)-distance(start,seen)*.10;
-    if(rank>best){choice={start,seen};best=rank;}
+    if(rank>best){choice={start,seen,entry:'side'};best=rank;}
     break;
    }
   }
+  // An urban corridor is too narrow for side entry. A distant silhouette walks
+  // forward through mist instead, with full collision and sight checks.
+  for(let i=0;i<28;i++){
+   const n=this.serial++,side=i%2?1:-1;
+   const angle=heading+side*half*(.02+hash(n,4,7,this.world.seed)*.24);
+   const radius=Math.min(range-13,11+hash(n,3,8,this.world.seed)*6);
+   if(radius<10)continue;
+   const seen=this.footAt(shifted(player,Math.sin(angle)*radius,Math.cos(angle)*radius));
+   if(!seen||Math.abs(seen.y-player.y)>2||!this.faceVisible(player,seen)||
+     others.some(s=>distance(s,seen)<MIN_SEPARATION))continue;
+   const shade=this.shadowScore(seen,lights);
+   if(shade<0)continue;
+   const startDist=Math.min(range-2,radius+11+hash(n,5,9,this.world.seed)*5);
+   if(startDist-radius<8)continue;
+   const start=this.footAt(shifted(player,Math.sin(angle)*startDist,Math.cos(angle)*startDist));
+   if(!start||Math.abs(start.y-seen.y)>.3||distance(start,seen)<8||
+      !this.walkClear(start,seen,Math.atan2(player.x-start.x,player.z-start.z)))continue;
+   const rank=shade*5+hash(n,7,6,this.world.seed)+2;
+   if(rank>best){choice={start,seen,entry:'distant'};best=rank;}
+  }
   return choice;
+ }
+ beginGlimpse(s,site,player){
+  Object.assign(s,{x:site.start.x,y:site.start.y,z:site.start.z,hidden:false,presence:1,focus:0,
+   walking:false,retreat:false,target:site.seen,nextMove:Infinity,
+   sighting:{start:site.start,seen:site.seen,entry:site.entry,phase:'approach',
+    firstSeen:null,until:0,deadline:this.clock+14}});
+  s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
+  this.previous=null;
  }
  scheduleGlimpse(player,range){
   const g=this.active;
@@ -188,13 +225,8 @@ export class ObserverPack {
   this.nextSighting=this.clock+(site?SIGHTING_MIN_INTERVAL+hash(this.serial,3,1,this.world.seed)*17:7);
   if(!site)return;
   const s=available[Math.floor(hash(this.serial,7,9,this.world.seed)*available.length)];
-  // Only off-camera repositioning is instantaneous; both entry and retreat use footsteps.
-  Object.assign(s,{x:site.start.x,y:site.start.y,z:site.start.z,hidden:false,presence:1,focus:0,
-   walking:false,retreat:false,target:site.seen,nextMove:Infinity,
-   sighting:{start:site.start,seen:site.seen,phase:'approach',firstSeen:null,until:0,
-    deadline:this.clock+12}});
-  s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
-  this.previous=null;
+  // A distant entry starts beyond the near fog range, never at the player's feet.
+  this.beginGlimpse(s,site,player);
  }
  spawn(player,range){
   const lights=this.lightCandidates(player),stalkers=new Map(),placed=[];
@@ -208,7 +240,17 @@ export class ObserverPack {
     walking:false,hidden:false,presence:1,focus:0,headYaw:0,headPitch:0,eyeYaw:0,eyePitch:0,
     target:null,nextMove:this.clock+2+i*1.8,hideUntil:0,retreat:false});
   }
-  if(!stalkers.size)return;
+  if(!stalkers.size){
+   // Off-screen-only spawning can fail entirely in narrow city streets.
+   const site=this.glimpseSite(player,[],lights,range);
+   if(!site)return;
+   const s={id:0,phase:hash(this.serial,9,4,this.world.seed)*6,
+    yaw:0,walking:false,hidden:true,presence:1,focus:0,
+    headYaw:0,headPitch:0,eyeYaw:0,eyePitch:0,
+    target:null,nextMove:Infinity,hideUntil:0,retreat:false};
+   this.beginGlimpse(s,site,player);
+   stalkers.set(0,s);
+  }
   this.nextSighting=this.clock+13+hash(this.serial,2,4,this.world.seed)*8;
   const lead=stalkers.values().next().value;
   this.previous=null;
@@ -372,15 +414,17 @@ export class ObserverPack {
    s.walking=false;
    const scene=s.sighting;
    if(scene){
-    const inView=this.onScreen(player,s);
-    if(inView&&scene.firstSeen===null){
-     // A glimpse is a mutual look, not the back of an already fleeing creature.
+    const inView=this.onScreen(player,s),face=this.faceVisible(player,s);
+    if(face&&scene.firstSeen===null){
+     // Start the countdown only after an actual face-to-face sightline.
      scene.firstSeen=this.clock;scene.phase='watch';
-     scene.until=this.clock+1.45+hash(s.id,8,4,this.world.seed)*.65;
+     scene.until=this.clock+2.3+hash(s.id,8,4,this.world.seed)*.55;
      s.target=null;
     }
     if(scene.phase==='approach'&&distance(s,scene.seen)<.4){
-     scene.phase='watch';scene.until=this.clock+1.45+hash(s.id,8,4,this.world.seed)*.65;
+     scene.phase='watch';
+     scene.until=this.clock+2.3+hash(s.id,8,4,this.world.seed)*.55;
+     if(face&&scene.firstSeen===null)scene.firstSeen=this.clock;
      s.target=null;
     }
     if(scene.phase==='watch'&&this.clock>=scene.until){
@@ -483,7 +527,11 @@ export class ObserverPack {
   if(g&&this.count===0&&[...g.members.values()].every(m=>this.clock-m.hitAt>10)){
    this.active=null;this.views=[];return;
   }
-  if(g&&(distance(g.point,player)>range||Math.abs(g.point.y-player.y)>range||!this.loaded(g.point))){
+  const livingNear=g?.stalkers&&[...g.stalkers.values()].some(s=>
+   !g.members.get(s.id)?.dead&&distance(s,player)<=range&&
+   Math.abs(s.y-player.y)<=range&&this.loaded(s));
+  if(g&&!(livingNear??(distance(g.point,player)<=range&&
+    Math.abs(g.point.y-player.y)<=range&&this.loaded(g.point)))){
    this.sleep??=this.clock;
    this.views=[];this.previous=null;
    if(this.clock-this.sleep>=FORGET){this.active=null;this.sleep=null;this.next=this.clock+4;return;}
