@@ -1,3 +1,4 @@
+import {brick} from './material-art.js';
 // Deterministic 32x32 material patterns. Pigment comes from the block color.
 // Tile joints, mineral chips, formwork, mortar, folds and planks stay distinct.
 function noise(x,y,s){
@@ -51,13 +52,12 @@ export function sampleArchitectureTexture(index,x,y,size=32){
   else{const repair=(u>5&&u<23&&v>8&&v<25);f=repair?.99:.84;if(u===5||u===23||v===8||v===25)f*=.84;f+=.04*(patch-.5);}
  }else if(family===3){
   const dims=[[16,8],[16,8],[16,10],[16,5],[16,8]][style];
-  const j=joint(u,v,dims[0],dims[1],dims[0]/2);
-  f=.87+.14*patch+.055*(fine-.5);
-  if(j.edge)f*=style===4?.84:style===3?.76:.56;
-  else if(j.rim)f*=1.04;
+  const p=brick(u+.5,v+.5,dims[0],dims[1],index+171);
+  f=(.87+.14*patch+.055*(fine-.5))*(1-(style===4?.16:style===3?.24:.45)*p.joint)
+   +.045*p.rim-.09*p.erode;
   if(style===0){g=.94;b=.89;}
-  if(style===2)f=.94+.06*patch-(j.edge?.16:0);
-  if(style===3){f=.96+.05*patch-(j.edge?.19:0);b=.98;}
+  if(style===2)f=.94+.06*patch-.16*p.joint-.05*p.erode;
+  if(style===3){f=.96+.05*patch-.19*p.joint-.045*p.erode;b=.98;}
   if(style===4){if(Math.sin(u*.18+v*.3)>.79&&patch>.56)f*=.76;b=.94;}
  }else if(family===4){
   f=.91+.09*(patch-.5)+.03*(n-.5);

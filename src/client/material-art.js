@@ -53,12 +53,24 @@ function tile(u,v,w,h,seed,erosion=.12){
  const light=1-.33*clamp(joint)-.11*near+(.055+.018*texel)*bevel-chip;
  return {light,px,py,texel,seam,near,joint:clamp(joint)};
 }
-function brick(u,v,w,h,seed){
- const row=Math.floor(v/h),shift=(row&1)*w/2,px=mod(u+shift,w),py=mod(v,h);
- const j=Math.min(px,py,w-px,h-py),brickHash=hash(Math.floor((u+shift)/w),row,seed);
- const joint=1-sm(.4,1.35,j),rim=sm(.1,1.7,j)*(1-sm(2.5,4,j));
- const erode=sm(.58,.79,fbm(u*.33,v*.31,seed+5))*rim;
- return {light:1-.34*joint-.10*(1-sm(.4,2,j))-.15*erode+.05*rim,brickHash,joint,erode};
+export function brick(u,v,w,h,seed){
+ const row=Math.floor(v/h),shift=(row&1)*w/2;
+ // Sub-texel edge wobble and corner chips: geometry and collision stay unchanged.
+ // Keep the 32px atlas borders straight so repetition remains seam-safe.
+ const edgeX=sm(.05,1.6,mod(u,32))*(1-sm(30.4,31.95,mod(u,32)));
+ const edgeY=sm(.05,1.6,mod(v,32))*(1-sm(30.4,31.95,mod(v,32)));
+ const warpX=(noise((u+shift)*.37,v*.56,seed+71)-.5)*1.10*edgeX;
+ const warpY=(noise(u*.54,v*.35,seed+72)-.5)*.75*edgeY;
+ const px=mod(u+shift+warpX,w),py=mod(v+warpY,h);
+ const j=Math.min(px,py,w-px,h-py),brickHash=hash(Math.floor((u+shift+warpX)/w),row,seed);
+ const joint=1-sm(.34,1.42,j),rim=sm(.6,1.9,j)*(1-sm(2.5,4,j));
+ const pitting=sm(.69,.84,fbm(u*.43,v*.39,seed+5));
+ const edgeWear=(1-sm(.65,2.35,j))*(.25+.75*pitting);
+ const pores=sm(.80,.94,noise(u*.77,v*.81,seed+9));
+ const erode=edgeWear*.65+pores*.19;
+ const face=fbm(u*.22,v*.20,seed+11);
+ return {light:1-.33*joint-.085*(1-sm(.4,2.1,j))-.075*erode+.045*rim+.045*(face-.5),
+  brickHash,joint,erode,rim};
 }
 function grain(u,v,seed){
  const bend=(noise(u*.13,v*.16,seed+14)-.5)*3.6;
@@ -75,7 +87,18 @@ function ceramic(u,v,w,h,seed,old=.2){
  const t=tile(u,v,w,h,seed,old*.26),wash=deposits(u,v,seed+1,old*.48);
  const gloss=.035*sm(.1,2.1,t.px)*sm(.2,1.6,t.py);
  const chip=(1-sm(.35,1.6,t.seam))*sm(.72,.9,fbm(u*.43,v*.37,seed+61))*.22;
- return {t,wash,l:t.light+gloss-old*.28*wash-chip,chip};
+ // Irregular, per-tile mineral deposits instead of uniformly lowering each face.
+ const col=Math.floor(u/w),row=Math.floor(v/h),tx=mod(u,w)/w,ty=mod(v,h)/h;
+ const drift=(noise(u*.29,v*.23,seed+121)-.5)*.18;
+ const cx=.21+.56*hash(col,row,seed+123),cy=.19+.60*hash(col,row,seed+124);
+ const rx=.27+.12*hash(col,row,seed+125),ry=.29+.13*hash(col,row,seed+126);
+ const dist=((tx-cx+drift)/rx)**2+((ty-cy-drift*.75)/ry)**2;
+ const island=(1-sm(.37,1.56,dist))*sm(.38,.88,hash(col,row,seed+127));
+ const cloudy=sm(.44,.69,fbm(u*.19+2.7,v*.17-3.1,seed+128));
+ const edgeDirt=(1-sm(.4,2.8,Math.min(t.px,t.py,w-t.px,h-t.py)))*
+  sm(.41,.69,fbm(u*.22,v*.28,seed+129));
+ const wear=(.57+.38*old)*(.09*island+.055*cloudy)+old*.025*edgeDirt;
+ return {t,wash,l:t.light+gloss-old*.28*wash-chip-wear,chip,wear};
 }
 function stone(u,v,seed,kind){
  const x=u*.22,y=v*.22;
