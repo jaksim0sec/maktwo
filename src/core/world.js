@@ -20,6 +20,13 @@ export class World{
  c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);this.events.emit('chunk-load',c)}return c}
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
+ // Authored edits mark placed or replaced containers, not original world-generated crates.
+ isGeneratedBlock(x,y,z){
+  x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);
+  if(y<0||y>=this.height)return false;
+  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);
+  return !this.edits.get(key(cx,cz))?.has(Chunk.index(x-cx*SIZE,y,z-cz*SIZE));
+ }
  partFacing(x,y,z){
   const authored=this.blockStates.get(this.stateKey(x,y,z));
   if(authored)return authored.facing||0;
