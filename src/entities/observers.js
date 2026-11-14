@@ -33,6 +33,7 @@ export class ObserverPack {
   this.sleep=null;
   this.next=5;
   this.nextSighting=23;
+  this.renderRange=48;
   this.viewport={aspect:16/9,tan:.637}; // real viewport values are passed by the game
  }
  loaded(p) {
@@ -60,6 +61,25 @@ export class ObserverPack {
       this.blocked(shifted(p,fx,fz),width,sprinting?1.95:HEIGHT))return false;
   }
   return true;
+ }
+ // Pick a reachable continuation of the retreat, preferring a genuine corner
+ // or dark cover. Only searched after arriving at a waypoint, not each frame.
+ escapeTarget(s,player){
+  const bearing=Math.atan2(s.x-player.x,s.z-player.z);
+  const current=distance(s,player),eye=shifted(player,0,0,player.eye);
+  let best=null,score=-Infinity;
+  for(const turn of [0,.42,-.42,.85,-.85,1.25,-1.25]){
+   const angle=bearing+turn;
+   for(const length of [6,10]){
+    const p=this.footAt(shifted(s,Math.sin(angle)*length,Math.cos(angle)*length));
+    if(!p||Math.abs(p.y-s.y)>.3||distance(p,player)<current+1.5||
+       !this.walkClear(s,p,angle,true))continue;
+    const sheltered=!this.clear(eye,shifted(p,0,0,EYE));
+    const rank=(sheltered?30:0)+distance(p,player)*.12-Math.abs(turn)*2;
+    if(rank>score){best=p;score=rank;}
+   }
+  }
+  return best;
  }
  clear(a,b){
   if(!this.loaded(a)||!this.loaded(b))return false;
@@ -406,6 +426,11 @@ export class ObserverPack {
   for(const s of g.stalkers.values()){
    if(g.members.get(s.id)?.dead)continue;
    const d=distance(s,player);
+   // Stop remote sprints outside the drawable range, not within the camera.
+   if(!s.hidden&&d>this.renderRange+2){
+    s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
+    continue;
+   }
    const direction=toward(eye,shifted(s,0,0,EYE));
    const dot=direction.x*look.x+direction.y*look.y+direction.z*look.z;
    const visible=dot>.20&&this.clear(eye,shifted(s,0,0,EYE));
@@ -434,13 +459,23 @@ export class ObserverPack {
     if(scene.phase==='approach'&&this.clock>=scene.deadline){
      scene.phase='withdraw';s.target=scene.start;
     }
-    if(scene.phase==='withdraw'&&(!inView||distance(s,scene.start)<.5)){
-     s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
-     continue;
+    // Leaving the camera frustum or returning to the entrance is not
+    // actual cover. Never delete a runner while it is still in plain sight.
+    if(scene.phase==='withdraw'){
+     if(!this.clear(eye,shifted(s,0,0,EYE))){
+      s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
+      continue;
+     }
+     if((!s.target||distance(s,s.target)<.45)&&
+        this.clock>=(scene.nextEscape??0)){
+      s.target=this.escapeTarget(s,player);
+      scene.nextEscape=this.clock+(s.target?0:1.5);
+     }
     }
-    if(scene.firstSeen!==null&&this.clock-scene.firstSeen>=SIGHTING_MAX_DURATION){
-     s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
-     continue;
+    // The limit caps the stare, not the duration of a physically visible run.
+    if(scene.firstSeen!==null&&this.clock-scene.firstSeen>=SIGHTING_MAX_DURATION&&
+       scene.phase!=='withdraw'){
+     scene.phase='withdraw';s.target=scene.start;
     }
    }
    if(s.hidden){
@@ -458,11 +493,13 @@ export class ObserverPack {
    // An observer stops presenting itself: it finds cover first, with a short
    // darkness fade only when the route to cover is obstructed.
    s.retreat=d<9||s.focus>2.0||s.sighting?.phase==='withdraw';
-   if(!s.sighting&&s.retreat&&!visible&&s.focus>.5){
+   if(!s.sighting&&s.retreat&&s.focus>.5&&
+      !this.clear(eye,shifted(s,0,0,EYE))){
     s.hidden=true;s.hideUntil=this.clock+3.8;s.target=null;continue;
    }
-   s.presence=clamp((FOCUS_LIMIT-s.focus)/.75,0,1);
-   if(s.focus>=FOCUS_LIMIT||(d>39&&!visible)){
+   // Focus makes the creature flee. It must never turn into an alpha fade.
+   s.presence=1;
+   if(!s.sighting&&d>39&&!this.onScreen(player,s)){
     s.hidden=true;s.hideUntil=this.clock+4.5;s.target=null;continue;
    }
    if(!s.sighting&&(this.clock>=s.nextMove||!s.target)){
@@ -520,6 +557,7 @@ export class ObserverPack {
   }
  }
  tick(dt,player,range,viewport=this.viewport){
+  this.renderRange=range;
   this.viewport=viewport;
   this.clock+=dt;
   if(this.clock<this.next)return;
@@ -548,7 +586,7 @@ export class ObserverPack {
     if(moves.length){
      for(const [s,p] of moves){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,focus:0,
-       presence:1,retreat:false,target:null,nextMove:this.clock+1.5});
+       presence:1,retreat:false,target:null,sighting:null,nextMove:this.clock+1.5});
       s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(s.id%2?-.58:.58);
      }
      for(const s of g.stalkers.values())if(!moves.some(([o])=>o===s))s.hidden=true;
@@ -568,9 +606,9 @@ export class ObserverPack {
    this.previous=this.views;this.sampleTime=this.clock;this.stepStalkers(player,TICK);
    this.scheduleGlimpse(player,range);
   }
-  this.publish();
+  this.publish(player,range);
  }
- publish(){
+ publish(player=null,range=this.renderRange){
   const g=this.active;
   if(!g)return;
   const tracks=g.stalkers?[...g.stalkers.entries()]:
@@ -581,8 +619,9 @@ export class ObserverPack {
    const previous=old&&{x:old.x,y:old.y,z:old.z,yaw:old.yaw};
    return {...(member?.dead?member.at:s),id:i,yaw:member?.yaw??s.yaw,
     group:g,member,track:s,previous};
-  }).filter(view=>(!view.track.hidden&&!view.member?.dead)||
-    (view.member?.dead&&this.clock-view.member.hitAt<10));
+  }).filter(view=>((!view.track.hidden&&!view.member?.dead)||
+    (view.member?.dead&&this.clock-view.member.hitAt<10))&&
+    (!player||distance(view,player)<=range+2));
  }
  pick(origin,ray,limit,padding=0){
   let result=null;
