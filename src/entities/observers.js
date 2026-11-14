@@ -7,6 +7,7 @@ import {observerHeads} from './observer-poses.js';
 export const OBSERVER_NAME='소심한 관찰자';
 const HEIGHT=2.27, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.48;
 const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
+const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -30,6 +31,8 @@ export class ObserverPack {
   this.views=[];
   this.sleep=null;
   this.next=5;
+  this.nextSighting=23;
+  this.viewport={aspect:16/9,tan:.637}; // real viewport values are passed by the game
  }
  loaded(p) {
   return Boolean(this.world.getChunk(Math.floor(p.x/SIZE),Math.floor(p.z/SIZE),false));
@@ -108,6 +111,75 @@ export class ObserverPack {
   // A single ambiguous silhouette is acceptable in the open; never gather a crowd there.
   return best&&!(best.shade<1&&others.length>0)?best:null;
  }
+ screenPoint(player,point){
+  const eye=shifted(player,0,0,player.eye),look=player.direction(),len=Math.hypot(look.x,look.z)||1;
+  const rightX=-look.z/len,rightZ=look.x/len;
+  const dx=point.x-eye.x,dy=point.y+EYE-eye.y,dz=point.z-eye.z;
+  const depth=dx*look.x+dy*look.y+dz*look.z;
+  if(depth<=.1)return null;
+  const up=-dx*rightZ*look.y+dy*len+dz*rightX*look.y;
+  return {x:(dx*rightX+dz*rightZ)/(depth*this.viewport.tan*this.viewport.aspect),
+   y:up/(depth*this.viewport.tan),depth};
+ }
+ onScreen(player,point){
+  const s=this.screenPoint(player,point);
+  return Boolean(s&&Math.abs(s.x)<.95&&Math.abs(s.y)<.84&&
+   this.clear(shifted(player,0,0,player.eye),shifted(point,0,0,EYE)));
+ }
+ // A glimpse begins outside the camera, then the observer walks into the edge of view.
+ glimpseSite(player,others,lights,range){
+  const heading=Math.atan2(player.direction().x,player.direction().z);
+  const half=Math.atan(this.viewport.tan*this.viewport.aspect);
+  let choice=null,best=-Infinity;
+  for(let i=0;i<32;i++){
+   const n=this.serial++,side=i%2?-1:1;
+   const radius=Math.min(range-3,21+hash(n,3,7,this.world.seed)*11);
+   if(radius<13)continue;
+   const angle=heading+side*half*(.72+hash(n,5,4,this.world.seed)*.17);
+   const seen=this.footAt(shifted(player,Math.sin(angle)*radius,Math.cos(angle)*radius));
+   if(!seen||Math.abs(seen.y-player.y)>3||
+      others.some(s=>distance(s,seen)<MIN_SEPARATION)||
+      !this.onScreen(player,seen))continue;
+   const shade=this.shadowScore(seen,lights);
+   if(shade<0)continue;
+   for(const outer of [1.08,1.17,1.28]){
+    const away=heading+side*half*outer;
+    const start=this.footAt(shifted(player,Math.sin(away)*radius,Math.cos(away)*radius));
+    if(!start||Math.abs(start.y-seen.y)>.3||this.onScreen(player,start)||
+       distance(start,seen)>7.5)continue;
+    let walkable=true;
+    const steps=Math.ceil(distance(start,seen)/.40);
+    for(let k=1;k<=steps;k++){
+     const p=shifted(start,(seen.x-start.x)*k/steps,(seen.z-start.z)*k/steps);
+     if(!this.supported(p)||this.blocked(p)){walkable=false;break;}
+    }
+    if(!walkable)continue;
+    const rank=shade*5+hash(n,6,4,this.world.seed)-distance(start,seen)*.10;
+    if(rank>best){choice={start,seen};best=rank;}
+    break;
+   }
+  }
+  return choice;
+ }
+ scheduleGlimpse(player,range){
+  const g=this.active;
+  if(!g?.stalkers||this.clock<this.nextSighting)return;
+  if(player.fly||this.count<=0)return;
+  if([...g.stalkers.values()].some(s=>s.sighting))return;
+  const available=[...g.stalkers.values()].filter(s=>!g.members.get(s.id)?.dead&&!this.onScreen(player,s));
+  const others=[...g.stalkers.values()].filter(s=>!s.hidden&&!g.members.get(s.id)?.dead);
+  const site=available.length&&this.glimpseSite(player,others,this.lightCandidates(player),range);
+  this.nextSighting=this.clock+(site?SIGHTING_MIN_INTERVAL+hash(this.serial,3,1,this.world.seed)*17:7);
+  if(!site)return;
+  const s=available[Math.floor(hash(this.serial,7,9,this.world.seed)*available.length)];
+  // Only off-camera repositioning is instantaneous; both entry and retreat use footsteps.
+  Object.assign(s,{x:site.start.x,y:site.start.y,z:site.start.z,hidden:false,presence:1,focus:0,
+   walking:false,retreat:false,target:site.seen,nextMove:Infinity,
+   sighting:{start:site.start,seen:site.seen,phase:'approach',firstSeen:null,until:0,
+    deadline:this.clock+12}});
+  s.yaw=Math.atan2(site.seen.x-site.start.x,site.seen.z-site.start.z);
+  this.previous=null;
+ }
  spawn(player,range){
   const lights=this.lightCandidates(player),stalkers=new Map(),placed=[];
   for(let i=0;i<this.count;i++){
@@ -121,6 +193,7 @@ export class ObserverPack {
     target:null,nextMove:this.clock+2+i*1.8,hideUntil:0,retreat:false});
   }
   if(!stalkers.size)return;
+  this.nextSighting=this.clock+13+hash(this.serial,2,4,this.world.seed)*8;
   const lead=stalkers.values().next().value;
   this.previous=null;
   this.active={point:{x:lead.x,y:lead.y,z:lead.z},yaw:lead.yaw,size:this.count,
@@ -281,6 +354,29 @@ export class ObserverPack {
    const centered=visible&&dot>.80;
    s.focus=clamp(s.focus+(centered?dt:-dt*.55),0,FOCUS_LIMIT);
    s.walking=false;
+   const scene=s.sighting;
+   if(scene){
+    const inView=this.onScreen(player,s);
+    if(inView&&scene.firstSeen===null)scene.firstSeen=this.clock;
+    if(scene.phase==='approach'&&distance(s,scene.seen)<.4){
+     scene.phase='watch';scene.until=this.clock+1.4+hash(s.id,8,4,this.world.seed)*.9;
+     s.target=null;
+    }
+    if(scene.phase==='watch'&&(this.clock>=scene.until||s.focus>1.2||d<10)){
+     scene.phase='withdraw';s.target=scene.start;
+    }
+    if(scene.phase==='approach'&&this.clock>=scene.deadline){
+     scene.phase='withdraw';s.target=scene.start;
+    }
+    if(scene.phase==='withdraw'&&(!inView||distance(s,scene.start)<.5)){
+     s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
+     continue;
+    }
+    if(scene.firstSeen!==null&&this.clock-scene.firstSeen>=SIGHTING_MAX_DURATION){
+     s.hidden=true;s.hideUntil=this.clock+5;s.sighting=null;s.target=null;
+     continue;
+    }
+   }
    if(s.hidden){
     if(this.clock>=s.hideUntil){
      const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!g.members.get(o.id)?.dead);
@@ -295,15 +391,15 @@ export class ObserverPack {
    }
    // An observer stops presenting itself: it finds cover first, with a short
    // darkness fade only when the route to cover is obstructed.
-   s.retreat=d<9||s.focus>2.0;
-   if(s.retreat&&!visible&&s.focus>.5){
+   s.retreat=d<9||s.focus>2.0||s.sighting?.phase==='withdraw';
+   if(!s.sighting&&s.retreat&&!visible&&s.focus>.5){
     s.hidden=true;s.hideUntil=this.clock+3.8;s.target=null;continue;
    }
    s.presence=clamp((FOCUS_LIMIT-s.focus)/.75,0,1);
    if(s.focus>=FOCUS_LIMIT||(d>39&&!visible)){
     s.hidden=true;s.hideUntil=this.clock+4.5;s.target=null;continue;
    }
-   if(this.clock>=s.nextMove||!s.target){
+   if(!s.sighting&&(this.clock>=s.nextMove||!s.target)){
     s.nextMove=this.clock+(s.retreat?1.0:3.5+hash(s.id,4,Math.floor(this.clock/4),this.world.seed)*2);
     if(s.retreat){
      const awayX=(s.x-player.x)/(d||1),awayZ=(s.z-player.z)/(d||1);
@@ -314,10 +410,10 @@ export class ObserverPack {
      s.target=this.spot(player,occupied,lights,32,s);
     }else s.target=null;
    }
-   if(s.target&&(!centered||s.retreat)){
+   if(s.target&&(!centered||s.retreat||s.sighting)){
     const length=distance(s,s.target);
     if(length<.4){s.target=null;}else{
-     const speed=s.retreat?1.5:.72;
+     const speed=s.sighting?(s.sighting.phase==='withdraw'?1.6:1.45):s.retreat?1.5:.72;
      const step=Math.min(length,dt*speed);
      const dx=(s.target.x-s.x)/length,dz=(s.target.z-s.z)/length;
      const desiredYaw=Math.atan2(dx,dz);
@@ -354,7 +450,8 @@ export class ObserverPack {
     z:living.reduce((v,s)=>v+s.z,0)/living.length};
   }
  }
- tick(dt,player,range){
+ tick(dt,player,range,viewport=this.viewport){
+  this.viewport=viewport;
   this.clock+=dt;
   if(this.clock<this.next)return;
   this.next=this.clock+TICK;
@@ -396,6 +493,7 @@ export class ObserverPack {
    }
   }else if(this.count>0){
    this.previous=this.views;this.sampleTime=this.clock;this.stepStalkers(player,TICK);
+   this.scheduleGlimpse(player,range);
   }
   this.publish();
  }
