@@ -554,8 +554,13 @@ class Game{
  }
  showContainer(target){
   if(!this.saveGameState())return;
-  this.openContainer={...target,world:this.world,key:this.world.stateKey(target.x,target.y,target.z)};
-  this.storageView='carried';
+  const key=this.world.stateKey(target.x,target.y,target.z);
+  if(target.id===B.CRATE&&!this.survivalInventory.prepareCrate(key,this.world.seed,
+   target.x,target.y,target.z,this.world.isGeneratedBlock(target.x,target.y,target.z))){
+   this.status('상자 내용을 저장하지 못했어요');return;
+  }
+  this.openContainer={...target,world:this.world,key};
+  this.storageView='stored';
   this.inventoryPage=0;
   this.setPanel('inventory');
  }
