@@ -679,7 +679,7 @@ export class Renderer{
    data.set(scene);data.set(held,scene.length);
   }
   this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
-  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62]);
+  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62],this.lightOrigin,[LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH]);
   gl.useProgram(this.program);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);
