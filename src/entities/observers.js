@@ -85,7 +85,7 @@ export class ObserverPack {
      this.clock-cached.at<2&&distance(cached.position,player)<6&&
      Math.abs(cached.position.y-player.y)<4)return cached.lights;
   const lights=this.world.lights?.inBounds(player.x-38,player.x+38,player.z-38,player.z+38,
-   {minY:player.y-6,maxY:player.y+13,limit:48,focus:player})??[];
+   {minY:player.y-6,maxY:player.y+13,limit:48,focus:[player.x,player.y,player.z]})??[];
   this.lightCache={at:this.clock,position:{x:player.x,y:player.y,z:player.z},
    revision:this.world.lightRevision,lights};
   return lights;
