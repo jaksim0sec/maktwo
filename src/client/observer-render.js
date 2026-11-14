@@ -6,14 +6,18 @@ precision highp float;
 layout(location=0) in vec3 aStart;
 layout(location=1) in vec3 aEnd;
 layout(location=2) in vec3 aColor;
+layout(location=3) in vec3 aIdle;
 uniform mat4 uVP;
 uniform vec4 uPlace;
 uniform float uBlend,uCloud,uGait,uStride,uBreath,uPresence;
+uniform int uWalkPose;
 uniform vec2 uNeck,uEyeAim;
 uniform int uEyeFrom;
 out vec3 vColor,vPos;
 void main(){
  vec3 p=mix(aStart,aEnd,uBlend);
+ // During locomotion keep the head and torso at the neutral pose: only legs step.
+ if(uWalkPose==1)p=mix(p,aIdle,smoothstep(.82,1.57,p.y)*.96);
  // The existing walk morphs are kept; opposing foot offsets reinforce each step.
  float foot=1.-smoothstep(.12,.92,p.y);
  float beat=uGait+(p.x<0.?3.14159265:0.);
@@ -89,12 +93,14 @@ export class ObserverRenderer {
   };
   this.program=p;
   this.u=Object.fromEntries(['VP','Place','Blend','Cloud','EyeFrom','Eye','Fog','FogRange',
-   'Neck','EyeAim','Gait','Stride','Breath','Presence','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
+   'Neck','EyeAim','Gait','Stride','WalkPose','Breath','Presence','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
   this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
   upload(new Uint16Array(parts[2]),gl.ELEMENT_ARRAY_BUFFER);
   upload(new Uint8Array(parts[1]),gl.ARRAY_BUFFER);
   gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.UNSIGNED_BYTE,true,0,0);
   this.poses=Object.fromEntries(meta.names.map((name,i)=>[name,upload(Float32Array.from(new Int16Array(parts[i+3]),v=>v/4096),gl.ARRAY_BUFFER)]));
+  gl.bindBuffer(gl.ARRAY_BUFFER,this.poses.idle);
+  gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,3,gl.FLOAT,false,0,0);
   gl.bindVertexArray(null);
   this.eyeFrom=meta.eyeFrom;this.indexCount=parts[2].byteLength/2;this.ready=true;
  }
@@ -129,6 +135,7 @@ export class ObserverRenderer {
    gl.uniform2f(u.Neck,track?.headYaw??0,track?.headPitch??0);
    gl.uniform2f(u.EyeAim,track?.eyeYaw??0,track?.eyePitch??0);
    gl.uniform1f(u.Gait,track?.phase??0);gl.uniform1f(u.Stride,track?.walking?1:0);
+   gl.uniform1i(u.WalkPose,track?.walking?1:0);
    gl.uniform1f(u.Breath,pack.clock*.85+e.id*1.71);
    gl.uniform1f(u.Presence,e.member?.dead?1:track?.presence??1);
    gl.drawElements(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0);calls++;
