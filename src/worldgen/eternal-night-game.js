@@ -68,7 +68,7 @@ const inside=insidePolygon;
 export function* citySpawnCandidates(seed,cityBlueprints=true) {
  const plan=createCityPlan(seed,cityBlueprints);
  const centerX=plan.layout.centerX,centerZ=plan.layout.centerZ;
- const targetRadius=plan.layout.width*.32;
+ const targetRadius=plan.layout.width*.36;
  const candidates=plan.volumes.filter(v=>v.support===null&&v.floors?.length>=25).map(v=>{
   const mid=Math.floor(v.floors.length*(.44+hash(v.id,13,seed,seed)*.12));
   const floors=v.floors.filter(f=>f.corridors?.length&&Math.abs(f.level-mid)<=2);

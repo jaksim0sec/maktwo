@@ -47,7 +47,7 @@ void main(){
  vec3 normal=vec3(0.,1.,0.);
  if(!uDistant)normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
  vec3 emission=vec3(0.);
- float daylight=.22;
+ float daylight=.025;
  if(!uDistant&&vEmission<.5&&vFog<.99){
   vec3 samplePos=vPos+normal*.02-uLightOrigin;
   ivec3 cell=ivec3(floor(samplePos));
@@ -74,19 +74,19 @@ void main(){
  if(uCityDaylight){
   vec3 sun=normalize(vec3(.42,.86,-.29));
   float facing=max(0.,dot(normal,sun));
-  // Cool low-energy night ambient sets the scene's blue-black shadows.
-  // The brighter sky contribution still depends on occluded skylight.
-  float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+6).toFixed(1)},vPos.y);
-  float skyFill=daylight*daylight*(.55+.45*daylight);
+  // The sky is bright morning daylight, not a night-blue grading filter.
+  // Sky exposure is supplied by the existing sealed, occlusion-aware volume.
+  float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+8).toFixed(1)},vPos.y);
+  float skyFill=mix(daylight*daylight,daylight,.38);
   float hemisphere=normal.y*.5+.5;
-  vec3 fill=mix(vec3(.115,.158,.230),vec3(.142,.191,.280),hemisphere);
-  vec3 skyTint=mix(vec3(.080,.091,.102),vec3(.290,.435,.610),outdoorHeight);
+  vec3 fill=mix(vec3(.032,.043,.051),vec3(.040,.053,.063),hemisphere);
+  vec3 skyTint=vec3(.44,.62,.67)+vec3(.10,.17,.18)*outdoorHeight;
   ambient=fill+skyTint*skyFill
-   +vec3(.45,.39,.30)*facing*smoothstep(.75,1.,daylight)*outdoorHeight;
+   +vec3(.47,.39,.24)*facing*smoothstep(.68,.96,daylight)*mix(.65,1.,outdoorHeight);
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.12,.14,.16)*max(0.,uBrightness-.35);
-  if(uDistant)ambient=vec3(.270,.366,.494); // blue distance fill at equal luminance
+  if(uDistant)ambient=vec3(.23,.33,.39); // distant blue-gray silhouette, not fake sunlight
  }
  // Keep authored block colors unchanged; light range is controlled by each source.
  vec3 tinted=vColor;
@@ -145,7 +145,7 @@ void main(){
  color=mix(color,highAltitude,uClarity);
  color=mix(color,vec3(.22,.25,.30),uSkyBrightness*(1.-uClarity));
  color+=vec3(.21,.22,.23)*stars*(1.-uClarity)*(1.-uCitySky);
- vec3 citySky=mix(vec3(.62,.75,.83),vec3(.33,.52,.66),smoothstep(uHorizon-.20,uHorizon+.72,uv.y));
+ vec3 citySky=mix(vec3(.76,.87,.88),vec3(.55,.74,.87),smoothstep(uHorizon-.20,uHorizon+.72,uv.y));
  citySky*=mix(.70,1.30,uCityGradient.x);
  // Camera-ray intersection with a distant floor plane. It stays below the
  // horizon even when the camera pitches steeply, and costs no extra mesh.
@@ -156,7 +156,7 @@ void main(){
  float ground=1.-exp(-depth*mix(9.,23.,uCityGradient.y));
  float haze=smoothstep(55.,480.,reach);
   // A small #13BD9B tint keeps the haze teal without tinting every surface green.
- vec3 groundHaze=mix(vec3(.20,.23,.31),vec3(.075,.741,.608),.10);
+ vec3 groundHaze=mix(vec3(.20,.25,.28),vec3(.075,.741,.608),.14);
  vec3 groundColor=mix(vec3(.068,.117,.132),groundHaze,haze);
  citySky=mix(citySky,groundColor,ground);
  color=mix(color,citySky,uCitySky);
@@ -527,7 +527,7 @@ export class Renderer{
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=city?[.166,.235,.281]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const fog=city?[.118,.205,.232]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32));
@@ -569,7 +569,7 @@ export class Renderer{
   const vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
   gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
-  if(city)gl.uniform3f(this.u.LowerFog,.096,.138,.162);
+  if(city)gl.uniform3f(this.u.LowerFog,.060,.108,.132);
   this.updateLightVolume(world,player);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);

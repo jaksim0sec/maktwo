@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createCityPlan,citySpawnCandidates,CITY_BASE_Y} from '../src/worldgen/eternal-night-game.js';
 import {CORE_DOME_HEIGHT} from '../src/worldgen/eternal-night-library.js';
 import {DISTRICT_DOME_RATIO,DISTRICT_HEIGHT_SPREAD} from '../src/worldgen/eternal-night-precincts.js';
@@ -8,7 +9,7 @@ test('spawn candidates start in middle floors away from the core',()=>{
   const plan=createCityPlan(seed),first=citySpawnCandidates(seed).next().value;
   assert.ok(first,'spawn candidates must exist');
   const radius=Math.hypot(first.x-plan.layout.centerX,first.z-plan.layout.centerZ);
-  assert.ok(radius>plan.layout.width*.22,
+  assert.ok(radius>plan.layout.width*.26,
    `seed ${seed} spawn radius ${radius} versus city width ${plan.layout.width}`);
  }
 });
@@ -22,4 +23,11 @@ test('substantial district buildings center near 1.75 dome heights with seeded v
  assert.ok(Math.max(...heights)-Math.min(...heights)>=10,'height variety should remain noticeable');
  assert.equal(DISTRICT_HEIGHT_SPREAD,.17);
  assert.equal(CITY_BASE_Y+CORE_DOME_HEIGHT,94);
+});
+
+test('outer spawn target favors the unlit districts without changing connected fallbacks',()=>{
+ const src=readFileSync(new URL('../src/worldgen/eternal-night-game.js',import.meta.url),'utf8');
+ assert.match(src,/const targetRadius=plan\.layout\.width\*\.36;/);
+ assert.match(src,/const recent=candidates\.slice\(0,12\);/);
+ assert.match(src,/const entries=plan\.walkways\.filter\(link=>link\.kind==='core'\)/);
 });

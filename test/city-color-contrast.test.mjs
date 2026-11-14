@@ -1,57 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const src=readFileSync(new URL('../src/client/renderer.js',import.meta.url),'utf8');
 
-test('city sky and distance haze separate from the buildings',()=>{
- assert.match(src,/vec3 citySky=mix\(vec3\(\.62,\.75,\.83\),vec3\(\.33,\.52,\.66\)/);
- assert.match(src,/const fog=city\?\[\.166,\.235,\.281\]/);
- assert.match(src,/if\(city\)gl\.uniform3f\(this\.u\.LowerFog,\.096,\.138,\.162\)/);
+const src=readFileSync(new URL('../src/client/renderer.js',import.meta.url),'utf8');
+const light=(exposure,hemisphere=0.5,height=1,facing=0)=>{
+ const d=exposure,sky=(1-.38)*d*d+.38*d;
+ const bounce=[.032+.008*hemisphere,.043+.010*hemisphere,.051+.012*hemisphere];
+ const tint=[.44+.10*height,.62+.17*height,.67+.18*height];
+ const s=Math.max(0,Math.min(1,(d-.68)/(.96-.68)));
+ const sun=s*s*(3-2*s)*facing*(.65+.35*height);
+ return bounce.map((v,i)=>v+tint[i]*sky+[.47,.39,.24][i]*sun);
+};
+const luma=rgb=>.2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];
+
+test('clear morning city sky sits above a teal ground haze instead of night color',()=>{
+ assert.match(src,/vec3 citySky=mix\(vec3\(\.76,\.87,\.88\),vec3\(\.55,\.74,\.87\)/);
+ assert.match(src,/float reach=uGroundView\.y\/max\(\.001,depth\)/);
+ assert.match(src,/float haze=smoothstep\(55\.,480\.,reach\)/);
+ assert.match(src,/vec3 groundHaze=mix\(vec3\(\.20,\.25,\.28\),vec3\(\.075,\.741,\.608\),\.14\)/);
+ assert.match(src,/const fog=city\?\[\.118,\.205,\.232\]/);
+ assert.match(src,/if\(city\)gl\.uniform3f\(this\.u\.LowerFog,\.060,\.108,\.132\)/);
  assert.match(src,/gl\.uniform2f\(this\.skyGradient,this\.citySkyTone,this\.cityGroundFade\)/);
 });
-
-test('outdoor skylight and directional sunlight remain sky-occlusion gated',()=>{
- assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
- assert.match(src,/vec3\(\.45,\.39,\.30\)\*facing\*smoothstep\(\.75,1\.,daylight\)\*outdoorHeight/);
- assert.match(src,/if\(uDistant\)ambient=vec3\(\.270,\.366,\.494\)/);
+test('bright openings remain bright without washing out enclosed buildings',()=>{
+ assert.match(src,/float daylight=\.025;/);
+ assert.match(src,/float skyFill=mix\(daylight\*daylight,daylight,\.38\)/);
+ assert.match(src,/vec3 fill=mix\(vec3\(\.032,\.043,\.051\),vec3\(\.040,\.053,\.063\),hemisphere\)/);
+ assert.match(src,/vec3 skyTint=vec3\(\.44,\.62,\.67\)\+vec3\(\.10,\.17,\.18\)\*outdoorHeight;/);
+ assert.match(src,/vec3\(\.47,\.39,\.24\)\*facing\*smoothstep\(\.68,\.96,daylight\)\*mix\(\.65,1\.,outdoorHeight\)/);
+ const sealed=light(.025),window=light(.40),open=light(1,.5,1,.8);
+ assert.ok(luma(sealed)<.08,'sealed interior stays genuinely dark');
+ assert.ok(luma(window)>luma(sealed)*4,'sunlit gap brightens near surfaces');
+ assert.ok(luma(open)>luma(window)*2,'open street is substantially brighter than a gap');
+ assert.ok(window[2]>window[0]*1.3,'daylight bounce remains cool in shade');
+});
+test('sky occlusion, light colors, and distant geometry stay intact',()=>{
  assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
  assert.match(src,/texelFetch\(uLightVolume,cell,0\)/);
- assert.match(src,/gl\.uniform1f\(this\.u\.brightness,\.35\+\.43\*skyLight\)/);
-});
-
-test('street shade brightens noticeably, while sheltered interior ambient remains restrained',()=>{
- const oldSun=.154+.30+.38,newSun=.170+.345+.45;
- const oldShade=.154+.30,newShade=.170+.345;
- const oldRoom=.140+.069*Math.pow(.22,3);
- const newRoom=.150+.080*Math.pow(.22,2)*(.55+.45*.22);
- assert.ok(newSun>oldSun&&newShade>oldShade);
- assert.ok(newRoom<oldRoom*1.16);
- assert.ok(.315>.25*1.2,'distant red fill lifts without changing block pigments');
-});
-
-test('cool sky reflections increase only on outdoor-exposed cells',()=>{
- assert.match(src,/vec3 skyTint=mix\(vec3\(\.080,\.091,\.102\),vec3\(\.290,\.435,\.610\),outdoorHeight\)/);
- assert.match(src,/float outdoorHeight=smoothstep/);
- assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
- assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
- assert.match(src,/daylight=mix\(daylight,light\.a,weight\)/);
- assert.match(src,/texelFetch\(uLightVolume,cell,0\)/);
- const fill=d=>d*d*(.55+.45*d);
- const low=[.080,.091,.102].map(c=>c*fill(.22));
- const high=[.295,.385,.485].map(c=>c*fill(.80));
- assert.ok(low[2]-low[0]<.001,'underground blue contribution remains negligible');
- assert.ok(high[2]-high[0]>.1,'exposed sky retains cool contrast');
-});
-
-test('night ambient regains blue separation without raising sealed-room brightness',()=>{
- assert.match(src,/vec3 fill=mix\(vec3\(\.115,\.158,\.230\),vec3\(\.142,\.191,\.280\),hemisphere\)/);
- assert.match(src,/float skyFill=daylight\*daylight\*\(\.55\+\.45\*daylight\)/);
- assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);
  assert.match(src,/daylight=mix\(daylight,light\.a,weight\)/);
  assert.match(src,/emission\*=mix\(\.68,\.88,outdoorHeight\)/);
- const old=[.160,.167,.176],blue=[.1285,.1745,.255];
- const lum=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
- assert.ok(blue[2]>blue[0]*1.7,'night surfaces must look blue instead of grey');
- assert.ok(lum(blue)/lum(old)<1.08,'cool shadow should not brighten a sealed room');
- assert.ok(lum(blue)/lum(old)>.93,'color correction must preserve readable surfaces');
+ assert.match(src,/if\(uDistant\)ambient=vec3\(\.23,\.33,\.39\)/);
+ assert.match(src,/gl\.uniform1f\(this\.u\.brightness,\.35\+\.43\*skyLight\)/);
+ assert.match(src,/if\(nearChunk&&\(!uFarPass\|\|!outsideNearY\)\)discard/);
 });
