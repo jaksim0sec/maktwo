@@ -1,5 +1,6 @@
 import {BLOCK as B,BLOCKS,HOTBAR,HOTBAR_SIZE,itemId} from './blocks.js';
 import {RECIPES,recipeGrid,matchesPattern} from './crafting.js';
+import {hash} from '../util/math.js';
 export {RECIPES} from './crafting.js';
 
 // A separate player-owned ledger. World/chunk snapshots remain byte-for-byte
@@ -8,13 +9,26 @@ export const STARTER_SUPPLIES=Object.freeze({
  [B.DIRT]:8,[B.PLANKS]:12,[B.TORCH]:6,[B.DOOR]:1,
 });
 export const MAX_STACK=999;
+// Deterministic loot, computed from immutable world seed and crate coordinates.
+export function crateLoot(seed,x,y,z){
+ x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);
+ const roll=salt=>hash(x,y,z,(seed|0)^salt);
+ const items=new Map(),weapon=roll(0x6d21);
+ if(weapon<.23)items.set(B.STEEL_BAR,1);
+ else if(weapon<.62)items.set(B.WOOD_CLUB,1);
+ if(roll(0x6d22)<.78)items.set(B.TORCH,1+Math.floor(roll(0x6d23)*4));
+ if(roll(0x6d24)<.56)items.set(B.PLANKS,2+Math.floor(roll(0x6d25)*5));
+ if(roll(0x6d26)<.32)items.set(B.COBBLE,2+Math.floor(roll(0x6d27)*5));
+ if(!items.size)items.set(B.PLANKS,2+Math.floor(roll(0x6d28)*4));
+ return items;
+}
 export function harvestDrop(id){
  if(id===B.AIR||id===B.BEDROCK||id===B.WATER||id===B.PORTAL)return null;
  return id===B.GRASS?B.DIRT:id===B.STONE?B.COBBLE:id===B.DOOR_TOP?B.DOOR:itemId(id);
 }
 export class SurvivalInventory{
  constructor(storage=null,world='Overworld'){
-  this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
+  this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.initializedContainers=new Set();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
  }
  get key(){return `maktwo:survival:${this.world}`}
  count(id){return this.items.get(itemId(Number(id)))||0}
@@ -61,6 +75,17 @@ export class SurvivalInventory{
   this.quickSlots.fill(null);
   return this.save();
  }
+ // A chest is stocked only once; emptying it never causes a refill.
+ prepareCrate(key,seed,x,y,z,naturallyGenerated){
+  if(this.initializedContainers.has(key))return true;
+  const existing=this.containers.get(key);
+  this.initializedContainers.add(key);
+  if(naturallyGenerated&&!existing?.size)this.containers.set(key,crateLoot(seed,x,y,z));
+  if(this.save())return true;
+  this.initializedContainers.delete(key);
+  if(existing)this.containers.set(key,existing);else this.containers.delete(key);
+  return false;
+ }
  transfer(key,id,deposit){
   const previous=this.containers.get(key),stored=new Map(previous);
   const from=deposit?this.items:stored,to=deposit?stored:this.items;
@@ -86,7 +111,7 @@ export class SurvivalInventory{
   this.quickSlots=slots;if(!known)this.seen.delete(id);
   return false;
  }
- save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots,checkpoint:this.checkpoint,containers:[...this.containers].map(([key,items])=>[key,[...items]])}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
+ save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots,checkpoint:this.checkpoint,containers:[...this.containers].map(([key,items])=>[key,[...items]]),initializedContainers:[...this.initializedContainers]}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
  load(){let data=null;try{const raw=this.storage?.getItem(this.key);if(raw!==null&&raw!==undefined)data=JSON.parse(raw)}catch{}
   if((data?.version===1||data?.version===2)&&Array.isArray(data.items)){
    for(const [id,n] of data.items){
@@ -112,6 +137,10 @@ export class SurvivalInventory{
    }
    if(stored.size)this.containers.set(entry[0],stored);
   }
+  for(const key of Array.isArray(data?.initializedContainers)?data.initializedContainers:[])
+   if(typeof key==='string')this.initializedContainers.add(key);
+  // Existing saved contents always win over newly generated loot.
+  for(const key of this.containers.keys())this.initializedContainers.add(key);
   const assigned=new Set();
   this.quickSlots=this.quickSlots.map(id=>{
    const canonical=itemId(id);
