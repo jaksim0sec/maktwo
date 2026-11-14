@@ -80,8 +80,15 @@ export class ObserverPack {
   return (roof?2:0)-(lamp?3:0);
  }
  lightCandidates(player){
-  return this.world.lights?.inBounds(player.x-38,player.x+38,player.z-38,player.z+38,
+  const cached=this.lightCache;
+  if(cached&&cached.revision===this.world.lightRevision&&
+     this.clock-cached.at<2&&distance(cached.position,player)<6&&
+     Math.abs(cached.position.y-player.y)<4)return cached.lights;
+  const lights=this.world.lights?.inBounds(player.x-38,player.x+38,player.z-38,player.z+38,
    {minY:player.y-6,maxY:player.y+13,limit:48,focus:player})??[];
+  this.lightCache={at:this.clock,position:{x:player.x,y:player.y,z:player.z},
+   revision:this.world.lightRevision,lights};
+  return lights;
  }
  spot(player,others=[],lights=[],range=32,near=null){
   const eye=shifted(player,0,0,player.eye),look=player.direction();
@@ -152,8 +159,10 @@ export class ObserverPack {
  kill(index,member=this.active.members.get(index)??{}){
   if(member.dead)return;
   const g=this.active;
-  member.hp=0;member.dead=true;member.hitAt=this.clock;member.yaw=g.yaw;
-  member.at=g.stalkers?.get(index)??this.layout(g.point,g.yaw,g.size)[index];
+  member.hp=0;member.dead=true;member.hitAt=this.clock;
+  const track=g.stalkers?.get(index);
+  member.yaw=track?.yaw??g.yaw;
+  member.at=track?{x:track.x,y:track.y,z:track.z}:this.layout(g.point,g.yaw,g.size)[index];
   g.members.set(index,member);this.count--;
  }
  canMove(from,to,yaw=this.active.yaw,previousYaw=yaw){
@@ -273,7 +282,7 @@ export class ObserverPack {
    s.walking=false;
    if(s.hidden){
     if(this.clock>=s.hideUntil){
-     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!o.hidden&&!g.members.get(o.id)?.dead);
+     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!g.members.get(o.id)?.dead);
      const p=this.spot(player,occupied,lights,Math.min(36,Math.max(16,d+5)));
      if(p){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,presence:1,
@@ -300,7 +309,7 @@ export class ObserverPack {
      const side=s.id%2?1:-1;
      s.target=shifted(s,(awayX+awayZ*side*.7)*4,(awayZ-awayX*side*.7)*4);
     }else if(d>24||!visible){
-     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!o.hidden&&!g.members.get(o.id)?.dead);
+     const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!g.members.get(o.id)?.dead);
      s.target=this.spot(player,occupied,lights,32,s);
     }else s.target=null;
    }
@@ -314,8 +323,13 @@ export class ObserverPack {
      const turn=Math.atan2(Math.sin(desiredYaw-s.yaw),Math.cos(desiredYaw-s.yaw));
      // Move with actual feet, not an instant facing/teleport of the whole pack.
      s.yaw+=clamp(turn,-dt*1.8,dt*1.8);
-     const next=shifted(s,dx*step,dz*step);
-     if(this.supported(next)&&!this.blocked(next)){
+     // A few cheap alternate footholds allow the observer to edge along walls.
+     const side=s.id%2?1:-1;
+     const next=[0,side*.55,-side*.55,side*1.1,-side*1.1].map(angle=>{
+      const x=dx*Math.cos(angle)-dz*Math.sin(angle),z=dz*Math.cos(angle)+dx*Math.sin(angle);
+      return shifted(s,x*step,z*step);
+     }).find(p=>this.supported(p)&&!this.blocked(p));
+     if(next){
       s.x=next.x;s.z=next.z;s.phase+=step*5.1;s.walking=true;
      }else{s.target=null;s.nextMove=this.clock+1.2;}
     }
@@ -350,7 +364,27 @@ export class ObserverPack {
   if(g&&(distance(g.point,player)>range||Math.abs(g.point.y-player.y)>range||!this.loaded(g.point))){
    this.sleep??=this.clock;
    this.views=[];this.previous=null;
-   if(this.clock-this.sleep>=FORGET){this.active=null;this.sleep=null;this.next=this.clock+4;}
+   if(this.clock-this.sleep>=FORGET){this.active=null;this.sleep=null;this.next=this.clock+4;return;}
+   // When genuinely out of range, relocate only while invisible; keep wounded identities.
+   if(g.stalkers&&this.clock-this.sleep>6&&this.clock>=(g.nextRelocate??0)&&!player.fly){
+    g.nextRelocate=this.clock+3;
+    const lights=this.lightCandidates(player),taken=[],moves=[];
+    for(const s of g.stalkers.values()){
+     if(g.members.get(s.id)?.dead)continue;
+     const p=this.spot(player,taken,lights,Math.min(range*.83,36));
+     if(p){taken.push(p);moves.push([s,p]);}
+    }
+    if(moves.length){
+     for(const [s,p] of moves){
+      Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,focus:0,
+       presence:1,retreat:false,target:null,nextMove:this.clock+1.5});
+      s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
+     }
+     for(const s of g.stalkers.values())if(!moves.some(([o])=>o===s))s.hidden=true;
+     g.point={x:moves[0][1].x,y:moves[0][1].y,z:moves[0][1].z};
+     this.sleep=null;this.next=this.clock+TICK;
+    }
+   }
    return;
   }
   this.sleep=null;
