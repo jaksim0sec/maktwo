@@ -10,7 +10,7 @@ import {distantCityMesh,distanceSectorVisible} from './city-distance.js';
 import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,makeDaylightSnapshot,buildLightVolume} from '../core/lightVolume.js';
-import {cameraEyeY,dampStepOffset} from './camera.js';
+import {cameraEyeY,dampStepOffset,VERTICAL_FOV,FOV_TAN} from './camera.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
 import {TRAIN,trainDoorMotion} from '../worldgen/station-train.js';
@@ -152,7 +152,7 @@ void main(){
  // Camera-ray intersection with a distant floor plane. It stays below the
  // horizon even when the camera pitches steeply, and costs no extra mesh.
  float pitch=uGroundView.x;
- float rayY=sin(pitch)+(uv.y*2.-1.)*.767327*cos(pitch);
+ float rayY=sin(pitch)+(uv.y*2.-1.)*${FOV_TAN.toFixed(9)}*cos(pitch);
  float depth=max(0.,-rayY);
  float reach=uGroundView.y/max(.001,depth);
  float ground=smoothstep(.025,.16,depth)*(1.-exp(-depth*mix(9.,23.,uCityGradient.y)));
@@ -529,29 +529,10 @@ export class Renderer{
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
   const fog=city?[.137,.195,.184]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  // Render sky separately from voxel fog so the horizon is not a flat navy fill.
-  gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
-  const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32));
-  gl.uniform1f(this.skyHorizon,horizon);
-  gl.uniform2f(this.skyGround,player.pitch,Math.max(1,toMeters(cameraEyeY(player)-CITY_BASE_Y)));
-  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,city?1:0);gl.uniform2f(this.skyGradient,this.citySkyTone,this.cityGroundFade);
-  gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
-  if(city){
-   const towers=new Float32Array(48),aspect=width/Math.max(1,height),horizontalScale=2*Math.tan(75*Math.PI/360)*aspect;
-   for(let group=0;group<4;group++)for(let n=0;n<3;n++){
-    const i=group*3+n,angle=group*Math.PI/2+[-.31,.02,.35][n];
-    const delta=Math.atan2(Math.sin(player.yaw-angle),Math.cos(player.yaw-angle));
-    const size=[.023,.030,.020][n],x=Math.abs(delta)<1.18?.5+Math.tan(delta)/horizontalScale-size/2:-2;
-    towers.set([x,horizon-.075+(n-1)*.006,size,.21+(i%3)*.025],i*4);
-   }
-   gl.useProgram(this.skylineProgram);gl.uniform4fv(this.skylineTowers,towers);
-   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-   gl.drawArrays(gl.TRIANGLES,0,72);gl.disable(gl.BLEND);
-  }
-  gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniform3f(this.u.entityOffset,0,0,0);
+  const aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);
   const swing=combat?.pose(),baseYaw=player.yaw+walkSway;
   const eye=[player.x,cameraEyeY(player),player.z];
-  let yaw=baseYaw,pitch=player.pitch;
+  let yaw=player.yaw,pitch=player.pitch;
   if(swing){
    const {forward,right,up}=weaponBasis(baseYaw,pitch);
    const shift=eye.map((_,i)=>forward[i]*(swing.extension*.21-swing.pull*.11-swing.recoil*.085)+right[i]*swing.arc*.055-up[i]*swing.weight*.036);
@@ -566,8 +547,28 @@ export class Renderer{
    yaw-=swing.arc*swing.weight*.23;
    pitch+=swing.pull*.061-swing.extension*.10+swing.recoil*.032;
   }
+  // Render sky separately from voxel fog so the horizon is not a flat navy fill.
+  gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
+  const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(pitch)/(2*FOV_TAN)));
+  gl.uniform1f(this.skyHorizon,horizon);
+  gl.uniform2f(this.skyGround,pitch,Math.max(1,toMeters(eye[1]-CITY_BASE_Y)));
+  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,city?1:0);gl.uniform2f(this.skyGradient,this.citySkyTone,this.cityGroundFade);
+  gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
+  if(city){
+   const towers=new Float32Array(48),horizontalScale=2*FOV_TAN*aspect;
+   for(let group=0;group<4;group++)for(let n=0;n<3;n++){
+    const i=group*3+n,angle=group*Math.PI/2+[-.31,.02,.35][n];
+    const delta=Math.atan2(Math.sin(yaw-angle),Math.cos(yaw-angle));
+    const size=[.023,.030,.020][n],x=Math.abs(delta)<1.18?.5+Math.tan(delta)/horizontalScale-size/2:-2;
+    towers.set([x,horizon-.075+(n-1)*.006,size,.21+(i%3)*.025],i*4);
+   }
+   gl.useProgram(this.skylineProgram);gl.uniform4fv(this.skylineTowers,towers);
+   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+   gl.drawArrays(gl.TRIANGLES,0,72);gl.disable(gl.BLEND);
+  }
+  gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniform3f(this.u.entityOffset,0,0,0);
   const [camX,camY,camZ]=eye.map(toMeters);
-  const vp=matMultiply(perspective(75*Math.PI/180,width/Math.max(1,height),farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
+  const vp=matMultiply(perspective(VERTICAL_FOV,aspect,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
   gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
   if(city)gl.uniform3f(this.u.LowerFog,.091,.142,.132);
@@ -598,7 +599,7 @@ export class Renderer{
      for(let i=0;i<mesh.sectors.length;i++){
       const sector=mesh.sectors[i];
       if(!sector.count)continue;
-      if(!distanceSectorVisible(i,player.yaw,width/Math.max(1,height))){flush();continue}
+      if(!distanceSectorVisible(i,yaw,aspect,pitch)){flush();continue}
       if(rangeStart<0)rangeStart=sector.start;
       rangeCount+=sector.count;
      }

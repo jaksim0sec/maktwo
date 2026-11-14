@@ -1,3 +1,4 @@
+import {FOV_TAN} from '../src/client/camera.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -64,8 +65,8 @@ test('atlas sampling exactly preserves each card aspect including wide buttons',
  }
 });
 test('portrait inventory controls, pagination and item cards fit in the camera field',()=>{
- const aspect=300/700,limitX=PANEL_DISTANCE*Math.tan(75*Math.PI/360)*aspect;
- const limitY=PANEL_DISTANCE*Math.tan(75*Math.PI/360);
+ const aspect=300/700,limitX=PANEL_DISTANCE*FOV_TAN*aspect;
+ const limitY=PANEL_DISTANCE*FOV_TAN;
  const scale=Math.min(PANEL_SCALE,limitX*.90/.45);
  const cards=cardGeometry('all',Array.from({length:6},(_,i)=>({name:String(i)})),true,{index:0,total:3});
  const close=cards.find(c=>c.id==='close');

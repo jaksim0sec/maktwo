@@ -1,3 +1,4 @@
+import {FOV_TAN} from './camera.js';
 import {SIZE} from '../core/chunk.js';
 import {BLOCK as B,block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
@@ -9,11 +10,13 @@ const NEAR=44, FAR=256, MAX_BUILDINGS=96;
 export const DISTANCE_SECTORS=8;
 const TAU=2*Math.PI;
 // Broad visibility window retains wide building silhouettes near sector edges.
-export function distanceSectorVisible(index,yaw,aspect=16/9){
+export function distanceSectorVisible(index,yaw,aspect=16/9,pitch=0){
  const forward=Math.atan2(-Math.sin(yaw),-Math.cos(yaw));
  const center=(index+.5)*TAU/DISTANCE_SECTORS;
  const delta=Math.atan2(Math.sin(center-forward),Math.cos(center-forward));
- const halfFov=Math.atan(Math.tan(75*Math.PI/360)*Math.max(.5,aspect));
+ const depth=Math.cos(pitch)-Math.abs(Math.sin(pitch))*FOV_TAN;
+ if(depth<=0)return true;
+ const halfFov=Math.atan2(FOV_TAN*aspect,depth);
  return Math.abs(delta)<=Math.min(Math.PI,halfFov+.30+Math.PI/DISTANCE_SECTORS);
 }
 const nearSquared=NEAR**2;

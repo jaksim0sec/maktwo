@@ -1,3 +1,4 @@
+import {FOV_TAN} from '../src/client/camera.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
@@ -47,7 +48,7 @@ test('mobile hologram cards remain inside the portrait view cone',()=>{
  const cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`Item ${i}`})),true);
  const anchor=createAnchor({x:1,y:25,z:1,eye:2.125,yaw:0,pitch:0},true);
  assert.equal(anchor.center[0],1);
- const horizontalHalfWidth=2.65*Math.tan(75*Math.PI/360)*.45;
+ const horizontalHalfWidth=2.65*FOV_TAN*.45;
  assert.ok(cards.every(card=>Math.abs(card.x)+card.w*.5<horizontalHalfWidth));
 });
 test('physical 0.8m voxels preserve integer chunk storage and world save coordinates',()=>{

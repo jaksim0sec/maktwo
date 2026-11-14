@@ -1,3 +1,6 @@
+export const VERTICAL_FOV = 65*Math.PI/180;
+export const FOV_TAN = Math.tan(VERTICAL_FOV/2);
+
 // Presentation-only camera behavior. Physics coordinates remain authoritative.
 export function applyCameraLook(player,dx,dy,sensitivity=.0023){
  const limit=180;const bound=v=>Number.isFinite(v)?Math.max(-limit,Math.min(limit,v)):0;

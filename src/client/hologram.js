@@ -1,3 +1,4 @@
+import {FOV_TAN} from './camera.js';
 import {BLOCK_SIZE} from '../core/scale.js';
 import {drawItemIcon} from './item-icons.js';
 import {recipeGrid} from '../core/crafting.js';
@@ -139,7 +140,7 @@ export function spatialHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
 function pointerRay(player,nx,ny,aspect){
  const sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),cp=Math.cos(player.pitch),sp=Math.sin(player.pitch);
  const forward=[-sy*cp,sp,-cy*cp],right=[cy,0,-sy],up=[sy*sp,cp,cy*sp];
- const tan=Math.tan(75*Math.PI/360),horizontal=nx*tan*aspect,vertical=-ny*tan;
+ const tan=FOV_TAN,horizontal=nx*tan*aspect,vertical=-ny*tan;
  const dir=add(add(forward,right,horizontal),up,vertical),mag=Math.hypot(...dir);
  return dir.map(v=>v/mag);
 }
@@ -152,7 +153,7 @@ export class Hologram{
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
- open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.scale=this.compact?Math.min(PANEL_SCALE,PANEL_DISTANCE*Math.tan(75*Math.PI/360)*(canvas.clientWidth/Math.max(1,canvas.clientHeight))*.90/.45):PANEL_SCALE;this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
+ open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.scale=this.compact?Math.min(PANEL_SCALE,PANEL_DISTANCE*FOV_TAN*(canvas.clientWidth/Math.max(1,canvas.clientHeight))*.90/.45):PANEL_SCALE;this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}
