@@ -1,6 +1,6 @@
 import {Combat,weapons} from '../core/combat.js';
 import {WorldManager} from '../core/world.js';
-import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
+import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY,FOV_TAN} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
@@ -723,7 +723,8 @@ class Game{
    this.travel(names[(names.indexOf(this.world.name)+1)%names.length]);this.portalCooldown=2;
   }
   this.world.tick();
-  this.entities.tick(dt,p,p.creative?null:this.inventory,Math.min(this.renderer.maxDistance??88,(this.renderRadius??3)*16));
+  this.entities.tick(dt,p,p.creative?null:this.inventory,Math.min(this.renderer.maxDistance??88,(this.renderRadius??3)*16),
+   {aspect:this.canvas.clientWidth/Math.max(1,this.canvas.clientHeight),tan:FOV_TAN});
   this.effects.tick(dt);
   if(this.entities.collected){this.entities.collected=false;this.renderHotbar();this.refreshInventoryUI()}
   if(p.dead)this.beginCinematic('death');
