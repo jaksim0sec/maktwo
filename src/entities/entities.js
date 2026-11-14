@@ -1,3 +1,4 @@
+import {ObserverPack} from './observers.js';
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
@@ -8,6 +9,8 @@ let NEXT=1;
 export class Entity{constructor(type,x,y,z){this.id=NEXT++;this.type=type;this.x=x;this.y=y;this.z=z;this.vx=0;this.vy=0;this.vz=0;this.width=.6;this.height=1.8;this.hp=20;this.maxHp=20;this.grounded=false;this.water=false;this.fly=false;this.age=0;this.dead=false;this.heading=0;this.flash=0}tick(w,dt){this.age+=dt;this.flash=Math.max(0,this.flash-dt);moveBody(w,this,dt)}hurt(amount,from){this.hp-=amount;this.flash=.2;if(from){let dx=this.x-from.x,dz=this.z-from.z,l=Math.hypot(dx,dz)||1;this.vx+=dx/l*4;this.vz+=dz/l*4;this.vy+=3}if(this.hp<=0)this.dead=true}}
 export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this.width=toVoxels(.54);this.height=1.53;this.standingHeight=1.53;this.crouchedHeight=.94;this.standingEye=1.39;this.crouchedEye=.81;this.crouching=false;this.eye=1.39;this.yaw=0;this.pitch=0;this.selected=0;this.hp=20;this.stamina=100;this.staminaRecovery=0;this.exhausted=false;this.fly=false;this.sprint=false;this.creative=false;this.cooldown=0;this.jumps=0;this.visualStepOffset=0}
  hurt(amount,from){if(!this.creative)super.hurt(amount,from)}
+ push(x,z){if(!this.creative&&!this.fly&&!this.dead){this.pushX=x;this.pushZ=z;this.pushedFromY=this.y;}}
+ clearPush(){this.pushX=0;this.pushZ=0;delete this.pushedFromY;}
  onStep(rise){this.visualStepOffset=Math.max(-1,Math.min(0,this.visualStepOffset-rise))}
  update(w,dt,input){
   // Sneaking reduces actual physical height. Don't stand up inside low ceilings.
@@ -25,7 +28,16 @@ export class Player extends Entity{constructor(x,y,z){super('player',x,y,z);this
   else if(this.staminaRecovery===0)this.stamina=Math.min(100,this.stamina+14*dt);
   const speed=toVoxels(this.fly?8:this.crouching?2.7:this.sprint?7:2.5),len=Math.max(1,Math.hypot(forward,side));const sin=Math.sin(this.yaw),cos=Math.cos(this.yaw);this.vx=(-sin*forward+cos*side)/len*speed;this.vz=(-cos*forward-sin*side)/len*speed;const horizontal=Math.hypot(this.vx,this.vz);const cap=toVoxels(7);if(horizontal>cap){this.vx*=cap/horizontal;this.vz*=cap/horizontal}
  if(this.fly){this.vy=(Number(Boolean(input.jump))-Number(Boolean(input.crouch)))*speed}else if(input.jump&&(this.grounded||this.water)){this.vy=toVoxels(this.water?5:8.3);this.grounded=false}
+ const pushX=this.pushX||0,pushZ=this.pushZ||0;
+ this.vx+=pushX;this.vz+=pushZ;
  this.cooldown=Math.max(0,this.cooldown-dt);super.tick(w,dt);
+ const drag=Math.exp(-dt*(this.grounded?4:1.9));
+ this.pushX=this.vx===0||Math.abs(pushX)<.05?0:pushX*drag;
+ this.pushZ=this.vz===0||Math.abs(pushZ)<.05?0:pushZ*drag;
+ if(this.pushedFromY!==undefined){
+  if(this.grounded||this.water||this.fly)delete this.pushedFromY;
+  else if(this.pushedFromY-this.y>18){this.hurt(this.hp);delete this.pushedFromY;}
+ }
  const landing=toMeters(this.landingSpeed);
  if(landing>11.5&&!inWater(w,this))this.hurt(Math.ceil((landing-11.5)*1.25));
  if(this.water&&!this.fly){this.vx*=.55;this.vz*=.55}}
@@ -155,11 +167,13 @@ export class EntityManager{
    this.entities.push(new SubwayTrain(STATION_PREVIEW_SITE));
   if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
    this.entities.push(...createCityPlan(world.seed,world.version).stations.map(site=>new SubwayTrain(site)));
+  this.observers=world.mode===CITY_MODE?new ObserverPack(world):null;
   world.trainColliders=this.entities.filter(e=>e.type==='train');
  }
  spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
- tick(dt,player,inventory=null){
+ tick(dt,player,inventory=null,renderRange=48){
+  this.observers?.tick(dt,player,renderRange);
   for(const train of this.world.trainColliders){
    const step=train.advance(dt,this.world,player);
    if(step)carryTrainPassenger(train,player,step);
@@ -197,6 +211,8 @@ export class EntityManager{
    const hit=intersectAabb(origin,direction,[e.x-r,e.y-vertical,e.z-r],[e.x+r,e.y+e.height+vertical,e.z+r]);
    if(hit&&hit.distance>=0&&hit.distance<best){best=hit.distance;choice=e}
   }
+  const observer=this.observers?.pick(origin,direction,best,assist);
+  if(observer)return details?observer:observer.entity;
   return details&&choice?{entity:choice,distance:best}:choice;
  }
  attack(player,max=3.3){let chosen=null,best=max;const d=player.direction();for(const e of this.entities){if(e.type==='drop'||e.type==='train')continue;const cx=e.x-player.x,cy=e.y+e.height*.5-(player.y+player.eye),cz=e.z-player.z,along=cx*d.x+cy*d.y+cz*d.z;if(along<0||along>best)continue;const perp=Math.hypot(cx-d.x*along,cy-d.y*along,cz-d.z*along);if(perp<e.width+.3){best=along;chosen=e}}if(chosen){chosen.hurt(5,player);return chosen}return null}

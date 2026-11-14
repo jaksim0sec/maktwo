@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.59-occluded-morning-city';
+const CACHE_NAME='maktwo-shell-v1.15.60-observers';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
@@ -11,6 +11,7 @@ const APP_FILES=[
  './src/core/panel-joints.js','./src/core/fence-joints.js','./src/core/effects.js','./src/core/events.js','./src/core/lighting.js',
  './src/core/lightVolume.js','./src/core/mining.js','./src/core/inventory.js','./src/core/crafting.js','./src/core/physics.js',
  './src/core/scale.js','./src/core/train-collision.js','./src/core/part-library.js','./src/core/station-parts.js','./src/core/station-materials.js','./src/core/tree-assets.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
+ './assets/observer.mesh','./src/client/observer-render.js','./src/entities/observers.js','./src/entities/observer-poses.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
  './src/worldgen/generators.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/trees.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
  './src/worldgen/eternal-night-game.js','./src/worldgen/eternal-night-core-floor.js','./src/worldgen/eternal-night-districts.js',
