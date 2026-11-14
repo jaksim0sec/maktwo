@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ObserverPack,OBSERVER_NAME} from '../src/entities/observers.js';
+import {ObserverPack,OBSERVER_NAME,observerPose} from '../src/entities/observers.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 
 const world={
@@ -99,4 +99,49 @@ test('portrait viewport selects a genuinely visible peripheral position',()=>{
   if(active&&pack.onScreen(player,active)){seen=true;break;}
  }
  assert.ok(seen,'mobile portrait framing must still allow an encounter');
+});
+
+test('observer movement checks the entire route and the forward charge lean',()=>{
+ const w={...world,get(x,y,z,create){
+  assert.equal(create,false);
+  return y<10||(Math.floor(x)===0&&Math.floor(z)===0&&y<14)?B.STONE:B.AIR;
+ }};
+ const pack=new ObserverPack(w,{count:1});
+ const start={x:-2,y:10,z:.5},end={x:2,y:10,z:.5};
+ assert.equal(pack.blocked(start),false);
+ assert.equal(pack.blocked(end),false);
+ assert.equal(pack.walkClear(start,end,Math.PI/2),false,'thin wall between valid endpoints must block walk');
+ assert.equal(pack.walkClear(start,end,Math.PI/2,true),false,'running must not tunnel through the wall');
+ assert.equal(pack.walkClear({x:-.6,y:10,z:.5},{x:-.55,y:10,z:.5},Math.PI/2,true),false,
+  'forward-leaning charge mesh must not protrude through wall');
+});
+test('first sighting holds eye contact before the retreat begins',()=>{
+ const pack=make(),viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
+ let observed=null;
+ for(let i=0;i<260;i++){
+  pack.tick(.18,player,48,viewport);
+  const s=[...pack.active.stalkers.values()].find(s=>s.sighting?.firstSeen!=null);
+  if(s){observed=s;break;}
+ }
+ assert.ok(observed,'there must be an actual sighting');
+ assert.equal(observed.sighting.phase,'watch','first visibility must start a watch, not a retreat');
+ const gaze=Math.atan2(player.x-observed.x,player.z-observed.z);
+ assert.ok(Math.cos(gaze-observed.yaw)>.8,'the observer must look toward the player');
+ const startTime=observed.sighting.firstSeen;
+ for(let i=0;i<3;i++)pack.tick(.18,player,48,viewport);
+ assert.equal(observed.sighting.phase,'watch','the observer must not run away instantly');
+ assert.ok(pack.clock-startTime<1,'watch should be held before the flee');
+});
+test('retreat reuses the charge pose and the fast movement still respects walls',()=>{
+ const pack=make(),viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
+ let running=null;
+ for(let i=0;i<300;i++){
+  pack.tick(.18,player,48,viewport);
+  const s=[...pack.active.stalkers.values()].find(s=>s.sighting?.phase==='withdraw'&&s.walking);
+  if(s){running=s;break;}
+ }
+ assert.ok(running,'one observer must visibly sprint during withdrawal');
+ const pose=observerPose({track:running,id:running.id,group:pack.active},pack.clock);
+ assert.ok(pose.from.startsWith('charge')&&pose.to.startsWith('charge'),
+  'withdrawal should use the charge animation instead of walk');
 });
