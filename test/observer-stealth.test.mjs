@@ -70,7 +70,7 @@ test('lighting candidates use array focus and are cached between short AI ticks'
 });
 
 
-test('a shy observer walks from off-screen into view and withdraws within five seconds',()=>{
+test('a shy observer reaches recognisable face range then withdraws within five seconds',()=>{
  const pack=make(),viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
  let started=false,seen=false,finished=false,firstTrack=null,seenAt=null;
  for(let i=0;i<230;i++){
@@ -78,9 +78,11 @@ test('a shy observer walks from off-screen into view and withdraws within five s
   const active=[...pack.active.stalkers.values()].find(s=>s.sighting);
   if(active&&!started){
    started=true;firstTrack=active;
-   assert.equal(pack.onScreen(player,active),false,'entry must not pop into view');
+   assert.ok(!pack.onScreen(player,active)||
+    active.sighting.entry==='distant'&&Math.hypot(active.x-player.x,active.z-player.z)>20,
+    'distant fog entry is allowed, but not popping in near the camera');
   }
-  if(active===firstTrack&&pack.onScreen(player,active)){
+  if(active===firstTrack&&pack.faceVisible(player,active)){
    seen=true;seenAt??=pack.clock;
   }
   if(seen&&!firstTrack.sighting){finished=true;break;}
