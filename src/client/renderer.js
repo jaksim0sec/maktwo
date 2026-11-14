@@ -79,10 +79,10 @@ void main(){
   float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+8).toFixed(1)},vPos.y);
   float skyFill=daylight*(.54+.46*daylight);
   float hemisphere=normal.y*.5+.5;
-  vec3 fill=mix(vec3(.100,.106,.105),vec3(.126,.134,.131),hemisphere);
+  vec3 fill=mix(vec3(.085,.089,.086),vec3(.122,.128,.121),hemisphere);
   vec3 skyTint=mix(vec3(.42,.48,.46),vec3(.49,.59,.55),outdoorHeight);
   ambient=fill+skyTint*skyFill
-   +vec3(.49,.43,.33)*facing*smoothstep(.68,.96,daylight)*mix(.65,1.,outdoorHeight);
+   +vec3(.59,.53,.40)*facing*smoothstep(.68,.96,daylight)*mix(.65,1.,outdoorHeight);
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.14,.15,.14)*max(0.,uBrightness-.35);
@@ -147,7 +147,7 @@ void main(){
  color=mix(color,highAltitude,uClarity);
  color=mix(color,vec3(.22,.25,.30),uSkyBrightness*(1.-uClarity));
  color+=vec3(.21,.22,.23)*stars*(1.-uClarity)*(1.-uCitySky);
- vec3 citySky=mix(vec3(.79,.88,.85),vec3(.58,.77,.76),smoothstep(uHorizon-.20,uHorizon+.72,uv.y));
+ vec3 citySky=mix(vec3(.71,.87,.99),vec3(.29,.60,.96),smoothstep(uHorizon-.10,uHorizon+.64,uv.y));
  citySky*=mix(.70,1.30,uCityGradient.x);
  // Camera-ray intersection with a distant floor plane. It stays below the
  // horizon even when the camera pitches steeply, and costs no extra mesh.
@@ -155,7 +155,7 @@ void main(){
  float rayY=sin(pitch)+(uv.y*2.-1.)*.767327*cos(pitch);
  float depth=max(0.,-rayY);
  float reach=uGroundView.y/max(.001,depth);
- float ground=1.-exp(-depth*mix(9.,23.,uCityGradient.y));
+ float ground=smoothstep(.025,.16,depth)*(1.-exp(-depth*mix(9.,23.,uCityGradient.y)));
  float haze=smoothstep(55.,480.,reach);
  vec3 groundHaze=vec3(.22,.33,.31);
  vec3 groundColor=mix(vec3(.082,.125,.119),groundHaze,haze);
@@ -528,7 +528,7 @@ export class Renderer{
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=city?[.155,.234,.218]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const fog=city?[.137,.195,.184]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   // Render sky separately from voxel fog so the horizon is not a flat navy fill.
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(player.pitch)*.32));

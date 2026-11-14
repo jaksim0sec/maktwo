@@ -45,7 +45,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
    const [index,cost]=heap.pop();if(cost>dist[index]+1e-4||cost>=radius)continue;
    const x=index%width,y=Math.floor(index/width)%height,z=Math.floor(index/plane);
    const k=index*4;
-   const fraction=cost/radius,fade=(1-fraction*fraction)**2, power=128*energy*fade;
+   const fraction=cost/radius,fade=src.falloff?(1-fraction)**src.falloff:(1-fraction*fraction)**2, power=128*energy*fade;
    for(let channel=0;channel<3;channel++)output[k+channel]=Math.max(output[k+channel],Math.min(255,Math.round(tint[channel]*power)));
    for(const step of STEPS){
     const xx=x+step.dx,yy=y+step.dy,zz=z+step.dz,dd=cost+step.cost;

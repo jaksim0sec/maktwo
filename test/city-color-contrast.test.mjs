@@ -12,14 +12,14 @@ const light=(d,hemisphere=.5,height=1,facing=0)=>{
  const tint=lerp(...pair('skyTint'),height);
  const t=Math.max(0,Math.min(1,(d-.68)/.28));
  const sun=t*t*(3-2*t)*facing*(.65+.35*height);
- return bounce.map((v,i)=>v+tint[i]*sky+[.49,.43,.33][i]*sun);
+ return bounce.map((v,i)=>v+tint[i]*sky+[.59,.53,.40][i]*sun);
 };
 const luma=rgb=>.2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];
 
 test('clear morning city sky sits above a teal ground haze instead of night color',()=>{
  const [horizon,sky]=pair('citySky');
  const haze=triplet(src.match(/vec3 groundHaze=vec3\(([^)]+)\)/)[1]);
- assert.ok(luma(horizon)>.76&&luma(sky)>.65);
+ assert.ok(luma(horizon)>.76&&luma(sky)>.54&&sky[2]>sky[1]*1.35);
  assert.ok(haze[1]>haze[2]&&haze[2]>haze[0]&&luma(haze)<.4);
  assert.match(src,/float reach=uGroundView\.y\/max\(\.001,depth\)/);
  assert.match(src,/float haze=smoothstep\(55\.,480\.,reach\)/);

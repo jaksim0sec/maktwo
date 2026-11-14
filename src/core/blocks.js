@@ -52,7 +52,7 @@ export const HOTBAR=[BLOCK.DIRT,BLOCK.PLANKS,BLOCK.TORCH,BLOCK.DOOR,null,null,nu
 export const HOTBAR_SIZE=7;
 
 // Warm practical lighting: three reusable fixtures; color and falloff are renderer-agnostic.
-BLOCKS[BLOCK.TORCH].light={color:'#ff8750',radius:9,intensity:.73,offsetY:.75};
+BLOCKS[BLOCK.TORCH].light={color:'#ffab65',radius:6,intensity:.62,offsetY:.75,falloff:3.4};
 // ID 16 is retained for old world edits and wall mounts.
 BLOCKS[BLOCK.LANTERN].light=BLOCKS[BLOCK.TORCH].light;
 BLOCKS[BLOCK.CAMPFIRE].light={color:'#ff814a',radius:10,intensity:.79,offsetY:.45};

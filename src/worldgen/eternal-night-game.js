@@ -13,7 +13,7 @@ import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
 import {stampElevatedStationColumn} from './eternal-night-station-build.js';
 import {roadsideTreeCell} from './trees.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
-import {floorEnvironment,lightProbability,survivingFixture} from './eternal-night-decay.js';
+import {floorEnvironment,lightProbability,survivingFixture,collapsePlan,stampCollapse} from './eternal-night-decay.js';
 
 export const CITY_MODE='eternal-city-lab';
 export const CITY_BASE_Y=8;
@@ -48,6 +48,7 @@ export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
     floorEnvironment(v,layout.centerX,layout.centerZ,seed);
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
     return {kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
+      collapse:cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION?collapsePlan(v,seed):null,
       stairs:v.stairs[0]?.treads??[],landing:v.stairs[0]?.landing,access:v.stairs[0]?.upperLanding};
   });
   return cached=plan;
@@ -347,6 +348,12 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
       const outward=[[1,0],[-1,0],[0,1],[0,-1]].find(([dx,dz])=>containsRect(atrium,x+dx,z+dz));
       if(outward&&empty(floor)&&!reservedPassage(floor))put(floor,cityPart('balcony',2),outwardTurn(...outward));
     }
+  }
+  // Clearance belongs to the shared structural plan, before bridges and stations stamp.
+  if(detail.collapse&&step<0&&!onLanding&&!atAccess&&!shaftSide){
+    const c=detail.collapse;
+    const overlapsAccess=reservedPassage(c.base-1)||reservedPassage(c.base)||reservedPassage(c.base+1);
+    if(!overlapsAccess)stampCollapse(c,x,z,seed,put,empty,reservedPassage,B);
   }
 }
 
