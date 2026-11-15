@@ -143,6 +143,25 @@ export function spatialHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
  }
  return result;
 }
+// Ray-test the workspace plane, including empty gaps between the individual cards.
+// This is a world-space hit, not a screen-coordinate rectangle that loses alignment
+// when the panel follows a turning player.
+export function spatialWorkspaceHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
+ if(!anchor||!cards?.length)return false;
+ const eye=[camera.x,camera.y+camera.eye+(camera.visualStepOffset||0),camera.z];
+ const denominator=dot(ray,anchor.forward);
+ if(denominator<=1e-5)return false;
+ const distance=dot(sub(anchor.center,eye),anchor.forward)/denominator;
+ if(distance<=.05||distance>6)return false;
+ const hit=sub(add(eye,ray,distance),anchor.center);
+ const x=dot(hit,anchor.right)/scale,y=dot(hit,anchor.up)/scale;
+ const left=Math.min(...cards.map(card=>card.x-card.w*.5));
+ const right=Math.max(...cards.map(card=>card.x+card.w*.5));
+ const bottom=Math.min(...cards.map(card=>card.y-card.h*.5));
+ const top=Math.max(...cards.map(card=>card.y+card.h*.5));
+ const margin=.026;
+ return x>=left-margin&&x<=right+margin&&y>=bottom-margin&&y<=top+margin;
+}
 function pointerRay(player,nx,ny,aspect){
  const sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),cp=Math.cos(player.pitch),sp=Math.sin(player.pitch);
  const forward=[-sy*cp,sp,-cy*cp],right=[cy,0,-sy],up=[sy*sp,cp,cy*sp];
@@ -227,6 +246,12 @@ export class Hologram{
    for(const [x,y,u,v] of quad)vertices.push(...point(c,a.right,a.up,x,y,0,a.forward),u,v,i);
   });
   gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));this.count=vertices.length/6;
+ }
+ containsAt(player,clientX,clientY,rect){
+  if(!this.opened)return false;
+  const nx=((clientX-rect.left)/Math.max(1,rect.width))*2-1;
+  const ny=((clientY-rect.top)/Math.max(1,rect.height))*2-1;
+  return spatialWorkspaceHit(this.anchor,this.cards,player,pointerRay(player,nx,ny,rect.width/Math.max(1,rect.height)),this.scale??PANEL_SCALE);
  }
  point(clientX,clientY,rect){this.keyboardMode=false;this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
  aim(player){if(!this.opened)return null;
