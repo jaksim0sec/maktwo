@@ -21,7 +21,7 @@ function bagContent({items,compact,page,craftFilter,palette}){
   result.push(...evenlySpaced(filters.slice(0,3),.58,-.45,.45,.15));
   if(filters.length>3)result.push(...evenlySpaced(filters.slice(3),.40,-.45,.45,.15));
   const start=filters.length>3?.19:.39;
-  items.slice(0,craft?6:9).forEach((item,i)=>result.push(make('item:'+i,item.name,
+  items.slice(0,6).forEach((item,i)=>result.push(make('item:'+i,item.name,
    (i%3-1)*.29,start-Math.floor(i/3)*.24,.266,.215,'item',{...item,blockId:item.id,variant:'grid'})));
  }else{
   const filters=craft?[['filter:all','전체 레시피'],['filter:available','제작 가능']]:
