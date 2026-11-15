@@ -1,6 +1,8 @@
 import {Combat,weapons} from '../core/combat.js';
 import {WorldManager} from '../core/world.js';
-import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY,FOV_TAN} from './camera.js';import {Hologram} from './hologram.js';
+import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';
+import {TerrainWorker} from './terrain-worker.js';
+import {applyCameraLook,cameraEyeY,FOV_TAN} from './camera.js';import {Hologram} from './hologram.js';
 import {inventoryPageSize} from './hologram-layout.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
 import {SurvivalInventory,CreativeInventory,MAX_STACK,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
@@ -38,12 +40,16 @@ class Game{
   for(const preset of worldPresets)manager.add(preset.name,preset.seed,preset.mode);
   const requested=new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY);
   manager.active=manager.worlds.get(requested)||manager.worlds.get('EternalNightCityLab')||manager.active;
+  const terrainWorker=new TerrainWorker();
   try{
-   await prepareWorld(manager.active);
-   return new Game(manager,worldPresets);
+   await Promise.all([prepareWorld(manager.active),terrainWorker.prepare(manager.active)]);
+   return new Game(manager,worldPresets,terrainWorker);
+  }catch(error){
+   terrainWorker.reset();
+   throw error;
   }finally{showWorldLoading(false)}
  }
- constructor(manager,worldPresets){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=manager;this.worldPresets=worldPresets;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoDragging=null;this.movePending=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(manager,worldPresets,terrainWorker){this.canvas=$('screen');this.terrainWorker=terrainWorker;this.renderer=new Renderer(this.canvas,terrainWorker);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=manager;this.worldPresets=worldPresets;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoDragging=null;this.movePending=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -623,7 +629,8 @@ class Game{
   this.acc=0;
   showWorldLoading(true);
   try{
-   await prepareWorld(destination);
+   this.terrainWorker.reset();
+   await Promise.all([prepareWorld(destination),this.terrainWorker.prepare(destination)]);
    this.enterWorld(name);
    return true;
   }catch(error){
@@ -993,7 +1000,7 @@ class Game{
    this.combat.tick(dt,this.world,this.entities,p,cameraEyeY(p),this.effects);
   }
  }
- frame(time){if(this.travelPending){this.last=time;this.scheduleFrame();return}const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){if(this.hologram.syncViewport())this.updateHologram(true);this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);if(this.travelPending){this.scheduleFrame();return}this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
+ frame(time){if(this.travelPending){this.last=time;this.scheduleFrame();return}const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){if(this.hologram.syncViewport())this.updateHologram(true);this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);if(this.travelPending){this.scheduleFrame();return}this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);this.terrainWorker.stream(this.world,this.player.x,this.player.z,this.renderRadius||3,this.frameCount%3===0);this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
  hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 원거리 ${(this.renderer.distanceMesh?.count??0)+(this.renderer.farMesh?.count??0)} verts / ${this.renderer.lastDistanceDrawCalls??0} draw · 전체 ${this.renderer.lastDrawCalls??0} draw · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';this.renderStatusRing('health',p.hp,p.maxHp);this.renderStatusRing('stamina',p.stamina,100);document.body.classList.toggle('submerged',this.world.get(p.x,p.y+p.eye,p.z,false)===B.WATER);$('flight').textContent=p.fly?'비행 중':'걷는 중'}
 }
