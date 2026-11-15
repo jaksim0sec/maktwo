@@ -40,7 +40,7 @@ function setup(scene){
 }
 function audit(scene,seconds=200){
  const {player,pack,start}=setup(scene);
- let scheduled=0;
+ let scheduled=0; const thresholds=[24,40,60,80],eligible=new Map(thresholds.map(px=>[px,{frames:0,current:0,longest:0}]));
  const begin=pack.beginGlimpse.bind(pack);
  pack.beginGlimpse=(...args)=>{scheduled++;return begin(...args)};
  let seen=0,readable=0,face=0,unique=new Set(),first=null,maxRun=0,run=0,
@@ -50,6 +50,7 @@ function audit(scene,seconds=200){
   if(scene.endsWith('scan'))player.yaw+=DT*(Math.PI*2/42);
   pack.tick(DT,player,48,VIEWPORT);
   let screen=false,vis=false,big=false,inFace=false;
+  const bigByThreshold=new Set();
   for(const view of pack.views){
    const proj=pack.screenPoint(player,view);
    if(!proj)continue;
@@ -58,6 +59,7 @@ function audit(scene,seconds=200){
    screen=true;unique.add(view.id);
    const px=2.36*HEIGHT/(2*VIEWPORT.tan*proj.depth);
    const ok=px>=24;
+   for(const bound of thresholds)if(px>=bound)bigByThreshold.add(bound);
    const faceNow=pack.faceVisible(player,view);
    if(px>maxPixels){maxPixels=px;maxDepth=proj.depth}
    minDepth=Math.min(minDepth,proj.depth);
@@ -69,6 +71,7 @@ function audit(scene,seconds=200){
   if(vis){seen++;if(first===null)first=+(f*DT).toFixed(2);run++;maxRun=Math.max(maxRun,run)}else run=0;
   if(big)readable++;
   if(inFace)face++;
+  for(const bound of thresholds){const state=eligible.get(bound);if(bigByThreshold.has(bound)){state.frames++;state.current++;state.longest=Math.max(state.longest,state.current)}else state.current=0;}
   if(pack.active)closeCount++;
   if(pack.views.length)visibleFrames++;
  }
@@ -76,7 +79,7 @@ function audit(scene,seconds=200){
    onScreenSeconds:+(seen*DT).toFixed(2),readable24pxSeconds:+(readable*DT).toFixed(2),
    faceSeconds:+(face*DT).toFixed(2),longestContinuousOnScreenSeconds:+(maxRun*DT).toFixed(2),
    firstOnScreenSecond:first,maxProjectedHeightPx:+maxPixels.toFixed(1),minDepth: Number.isFinite(minDepth)?+minDepth.toFixed(1):null,
-   uniqueIds:[...unique],actors:[...tally]};
+   uniqueIds:[...unique],actors:[...tally],pixelThresholds:Object.fromEntries([...eligible].map(([px,m])=>[px,{seconds:+(m.frames*DT).toFixed(2),longestContinuous:+(m.longest*DT).toFixed(2)}]))};
  console.log('OBSERVER_PERCEPTION '+JSON.stringify(report));
  return report;
 }
