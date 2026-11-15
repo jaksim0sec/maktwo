@@ -67,7 +67,7 @@ export const HOLOGRAM_PLUGINS=Object.freeze({
  storage:storageContent
 });
 export function workspaceCards({palette='all',items=[],compact=false,page=null,craftFilter='all',
- quickSlots=[],storage=null,selectedId=null}={}){
+ quickSlots=[],storage=null,selectedId=null,moveMode=false}={}){
  const isStorage=Boolean(storage)||palette.startsWith('storage:'),mode=isStorage?'storage':palette==='craft'?'craft':'inventory';
  const cards=[];
  if(isStorage)cards.push(make('holo:title',storage?.label||'보관함',compact?-.18:-.65,.81,compact?.55:.86,.21,'label'));
@@ -78,7 +78,7 @@ export function workspaceCards({palette='all',items=[],compact=false,page=null,c
  cards.push(make('close','✕',compact?.39:1.05,.81,compact?.15:.22,compact?.15:.22,'close'));
  cards.push(...HOLOGRAM_PLUGINS[mode]({items,compact,page,craftFilter,palette,storage:storage||{}}));
  if(!isStorage){
-  cards.push(make('info:summary',selectedId==null?'아이템을 선택하세요':'선택한 아이템',
+  cards.push(make('info:summary',moveMode?'이동할 위치를 선택하세요':selectedId==null?'아이템을 선택하세요':'선택한 아이템',
    compact?0:.72,compact?-.485:.14,compact?.86:.81,compact?.14:.52,'detail',{blockId:selectedId}));
   if(!compact){
    cards.push(make('info:shortcut','빠른 슬롯에 배치',.72,-.30,.81,.20,'action'));
