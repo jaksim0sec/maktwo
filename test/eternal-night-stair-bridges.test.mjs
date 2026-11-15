@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {World} from '../src/core/world.js';
 import {BLOCK as B} from '../src/core/blocks.js';
-import {CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,TURN_STYLE} from '../src/core/chunk.js';
+import {CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,TURN_STYLE,EXTERIOR_STYLE} from '../src/core/chunk.js';
 import {createCityPlan} from '../src/worldgen/eternal-night-game.js';
 import {partById,partGeometry} from '../src/core/part-library.js';
-import {partPrisms,prismAabb} from '../src/core/part-prisms.js';
+import {partPrisms,prismAabb,bridgeGuardProfile} from '../src/core/part-prisms.js';
 import {stairOuterRail,encodeCityStair,decodeCityStair,walkwayJunction} from '../src/worldgen/eternal-night-stairs.js';
 
 test('a generated stair tread encodes height in the existing style byte and leaves creative stairs alone',()=>{
@@ -70,6 +70,33 @@ test('continuous bridge guard uses joined horizontal bars with one post per inte
  assert.ok(joined.length<solo.length,'ordinary show-room passage is not stamped repeatedly');
  assert.equal(posted.length,joined.length+1);
  assert.ok(joined.every(p=>p.vertices.every(v=>v.x>=-.00001&&v.x<=1.00001)));
+});
+
+test('diagonal guard rails share their cell corner and the column reaches the deck',()=>{
+ const id=B.PART_PASSAGE_5,column=B.PART_COLUMN_1;
+ const guard=bridgeGuardProfile(id,1,(dx,dy,dz)=>dx===0&&dz===0&&dy===1
+  ?{id:column,style:EXTERIOR_STYLE|TURN_STYLE|1}:{id:B.AIR,style:0});
+ const rail=partPrisms(id,0,30,0,{facing:1,cityBridge:true,bridgeGuard:guard});
+ const next=partPrisms(id,1,30,1,{facing:1,cityBridge:true});
+ const topRail=pieces=>pieces.find(p=>p.material===106&&p.vertices.every(v=>v.lo>30.7));
+ for(const pieces of [rail,next]){
+  assert.ok(topRail(pieces)?.vertices.some(v=>Math.hypot(v.x-1,v.z-1)<.08));
+ }
+ assert.ok(rail.some(p=>p.vertices.every(v=>v.lo===30&&v.hi===31)),
+  'the same column cross-section starts at deck height');
+});
+
+test('graded bridge rails meet at the voxel seam and sit on partial stairs',()=>{
+ const id=B.PART_PASSAGE_5,stair=B.PART_STAIRCASE_1,style=CITY_STAIR_STYLE|TURN_STYLE|EXTERIOR_STYLE;
+ const low=bridgeGuardProfile(id,0,(dx,dy,dz)=>dx===1&&dy===1
+  ?{id,style}:dy===-1?{id:stair,style:CITY_STAIR_STYLE|TURN_STYLE|8}:{id:B.AIR,style:0});
+ const high=bridgeGuardProfile(id,0,(dx,dy,dz)=>dx===-1&&dy===-1
+  ?{id,style}:{id:B.AIR,style:0});
+ const atSeam=(pieces,y)=>pieces.flatMap(piece=>piece.vertices).some(v=>v.x===1&&Math.abs(v.lo-y)<1e-6);
+ const first=partPrisms(id,0,30,0,{cityBridge:true,bridgeGuard:low});
+ const second=partPrisms(id,1,31,0,{cityBridge:true,bridgeGuard:high});
+ assert.ok(atSeam(first,31.28)&&atSeam(second,31.28));
+ assert.ok(first.some(piece=>piece.vertices.every(v=>v.lo===29.5)));
 });
 
 test('roof addition paths have guardrails outside their open portal and stair landing',()=>{

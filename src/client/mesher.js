@@ -10,7 +10,7 @@ import {panelJoints,panelNeighbor,panelKind} from '../core/panel-joints.js';
 import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
-import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections} from '../core/part-prisms.js';
+import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from '../core/part-prisms.js';
 import {treeGeometryForBlock} from './tree-mesh.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
@@ -29,16 +29,17 @@ const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path'
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
-function partTemplate(id,facing,connected,simple,stairRise,cityStair=false,treadHeight=1,rail=false,cityBridge=false,bridgePost=false,splitTread=null,joints=null){
+function partTemplate(id,facing,connected,simple,stairRise,cityStair,treadHeight,rail,bridgeGuard,bridgePost,splitTread,joints){
  const baseKey=id|(facing<<8)|(connected?.left?1<<11:0)|(connected?.right?1<<12:0)
   |(simple?1<<13:0)|((stairRise===undefined?0:Math.round(stairRise*4)+1)<<14)
   |(cityStair?1<<18:0)|(cityStair?(Math.round(treadHeight*4)-1)<<19:0)|(rail?1<<22:0)
-  |(cityBridge?1<<23:0)|(bridgePost?1<<24:0)|((splitTread?splitTread.index+1:0)<<25);
+  |(bridgeGuard?1<<23:0)|(bridgePost?1<<24:0)|((splitTread?splitTread.index+1:0)<<25);
  const key=(joints?`${baseKey}:${joints.left.direction}:${joints.right.direction}:${+joints.left.joined}${+joints.right.joined}${+joints.bottom}${+joints.top}`:baseKey)+
-  (connected?.top?':T':'')+(connected?.bottom?':B':'');
+  (connected?.top?':T':'')+(connected?.bottom?':B':'')+
+  (bridgeGuard?`:${bridgeGuard.rises}:${bridgeGuard.foot}:${bridgeGuard.column}`:'');
  if(partTemplates.has(key))return partTemplates.get(key);
  const opaque=[],transparent=[];
- for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge,bridgePost,splitTread,panelJoints:joints})||[]){
+ for(const piece of partPrisms(id,0,0,0,{facing,connected,simple,stairRise,cityStair,treadHeight,rail,cityBridge:Boolean(bridgeGuard),bridgeGuard,bridgePost,splitTread,panelJoints:joints})||[]){
   const color=piece.emissive?[.97,.90,.78]:COLORS[piece.material],target=piece.alpha?transparent:opaque;
   for(const face of prismFaces(piece,true)){
    const n=prismNormal(face);if(!n)continue;
@@ -208,12 +209,13 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
    const cityGenerated=Boolean(style&CITY_STAIR_STYLE),family=partById(id)?.family;
    const cityStair=cityGenerated&&family==='staircase',cityBridge=cityGenerated&&family==='passage';
    const treadHeight=cityStair?(((style&CITY_STAIR_LEVEL_MASK)>>3)+1)/4:1;
-   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),cityBridge,cityBridge&&Boolean(style&8),split,joints);
+   const guard=cityBridge?bridgeGuardProfile(id,orientation,neighbor):null;
+   const [solid,glass]=partTemplate(id,orientation,connected,simple,stairRise,cityStair,treadHeight,cityStair&&Boolean(style&EXTERIOR_STYLE),guard,cityBridge&&Boolean(style&8),split,joints);
    emitPart(opaque,solid,wx,y,wz);emitPart(transparent,glass,wx,y,wz);
    continue;
   }
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,joints?{...state,panelJoints:joints}:state,transparent);continue}
-  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent);continue}
+  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent,Boolean(style&EXTERIOR_STYLE));continue}
   const start=opaque.length;
   if(id===B.FENCE){
    const metal=variant===6||variant===7;
@@ -427,8 +429,18 @@ function fluorescentMesh(dest,id){
 
 // The door's full two-block model is emitted once from the lower cell.
 // Rendering it separately avoids breaking greedy face merging or chunk storage.
-export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest){
+export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,framed=false){
  const b=doorBounds(x,z,state?.facing||0,Boolean(state?.open));
+ if(framed){
+  const closed=doorBounds(x,z,state?.facing||0),frame=rgb('#59534a');
+  if(closed.w>closed.d){
+   for(const dx of [0,.91])cube(dest,x+dx,y,closed.z-.02,.09,2,closed.d+.04,frame);
+   cube(dest,x,y+1.98,closed.z-.02,1,.04,closed.d+.04,frame);
+  }else{
+   for(const dz of [0,.91])cube(dest,closed.x-.02,y,z+dz,closed.w+.04,2,.09,frame);
+   cube(dest,closed.x-.02,y+1.98,z,closed.w+.04,.04,1,frame);
+  }
+ }
  const style=Math.max(0,Math.min(5,state?.variant||0)),acrossX=b.w>b.d;
  const colors=['#af9372','#957e66','#737b80','#a3b3b9','#6f655c','#80868b'];
  const color=rgb(colors[style]);

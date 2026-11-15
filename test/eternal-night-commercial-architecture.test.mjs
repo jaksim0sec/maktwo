@@ -75,6 +75,12 @@ test('seed 9999 rasterizes solid service walls and a true two-cell door while re
  const [dx,dz]=mid(store.door);
  assert.equal(at(dx,modules.y,dz),B.DOOR);
  assert.equal(at(dx,modules.y+1,dz),B.DOOR_TOP);
+ assert.ok(block(at(dx,modules.y+2,dz)).opaque,'solid header above the door');
+ const acrossX=Math.abs(store.door.b[0]-store.door.a[0])>0;
+ for(const side of [-1,1]){
+  assert.ok(block(at(dx+(acrossX?side:0),modules.y+1,dz+(acrossX?0:side))).opaque,
+   'door opening terminates in a wall at both jambs');
+ }
  const market=plan.volumes.filter(v=>v.support===null&&v.program==='market'&&v.floors.length>1&&v.floors.length<35);
  assert.ok(market.length>0);
  assert.ok(market.every(v=>v.floors.length<=14),'local shop-house height');

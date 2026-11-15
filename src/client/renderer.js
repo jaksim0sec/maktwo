@@ -75,18 +75,19 @@ void main(){
  if(uCityDaylight){
   vec3 sun=normalize(vec3(.42,.86,-.29));
   float facing=max(0.,dot(normal,sun));
-  // Sealed skylight controls the cool bounce. The shadow floor is nearly neutral.
+  // Occlusion controls blue skylight independently from the warmer direct sun.
   float outdoorHeight=smoothstep(${(CITY_BASE_Y-2).toFixed(1)},${(CITY_BASE_Y+8).toFixed(1)},vPos.y);
   float skyFill=daylight*(.54+.46*daylight);
   float hemisphere=normal.y*.5+.5;
-  vec3 fill=mix(vec3(.085,.089,.086),vec3(.122,.128,.121),hemisphere);
-  vec3 skyTint=mix(vec3(.42,.48,.46),vec3(.49,.59,.55),outdoorHeight);
-  ambient=fill+skyTint*skyFill
-   +vec3(.59,.53,.40)*facing*smoothstep(.68,.96,daylight)*mix(.65,1.,outdoorHeight);
+  vec3 fill=mix(vec3(.082,.088,.099),vec3(.119,.126,.139),hemisphere);
+  vec3 skyTint=mix(vec3(.38,.47,.58),vec3(.44,.56,.69),outdoorHeight);
+  float direct=facing*smoothstep(.68,.96,daylight);
+  vec3 skyBounce=mix(skyTint,vec3(.53,.57,.57),direct*.62);
+  ambient=fill+skyBounce*skyFill+vec3(.59,.53,.40)*direct*mix(.65,1.,outdoorHeight);
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.14,.15,.14)*max(0.,uBrightness-.35);
-  if(uDistant)ambient=vec3(.37,.41,.39); // Fog provides the distant color shift.
+  if(uDistant)ambient=vec3(.312,.365,.414);
  }
  // Keep authored block colors unchanged; light range is controlled by each source.
  vec3 tinted=vColor;
@@ -157,8 +158,8 @@ void main(){
  float reach=uGroundView.y/max(.001,depth);
  float ground=smoothstep(.025,.16,depth)*(1.-exp(-depth*mix(9.,23.,uCityGradient.y)));
  float haze=smoothstep(55.,480.,reach);
- vec3 groundHaze=vec3(.22,.33,.31);
- vec3 groundColor=mix(vec3(.082,.125,.119),groundHaze,haze);
+ vec3 groundHaze=vec3(.20,.31,.34);
+ vec3 groundColor=mix(vec3(.075,.111,.137),groundHaze,haze);
  citySky=mix(citySky,groundColor,ground);
  color=mix(color,citySky,uCitySky);
  frag=vec4(color,1.);
@@ -528,7 +529,7 @@ export class Renderer{
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
   const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=city?[.137,.195,.184]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const fog=city?[.139,.212,.253]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);
   const swing=combat?.pose(),baseYaw=player.yaw+walkSway;
   const eye=[player.x,cameraEyeY(player),player.z];
@@ -571,7 +572,7 @@ export class Renderer{
   const vp=matMultiply(perspective(VERTICAL_FOV,aspect,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
   gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
-  if(city)gl.uniform3f(this.u.LowerFog,.091,.142,.132);
+  if(city)gl.uniform3f(this.u.LowerFog,.094,.148,.177);
   this.updateLightVolume(world,player);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);

@@ -113,8 +113,12 @@ function inspectShape(f,x,z) {
   const room=f.rooms.find(r=>containsRect(r,x,z));
   let door,doorKind;
   for(const room of f.rooms){
-    door=room.openings?room.openings.find(opening=>lineDistance(x,z,opening.a,opening.b)<.70):
-      lineDistance(x,z,room.door.a,room.door.b)<.70?room.door:undefined;
+    const covers=({a,b})=>{
+      if(lineDistance(x,z,a,b)>=.70)return false;
+      if(room.kind==='shop')return true;
+      return a[0]===b[0]?Math.floor(x)===Math.floor(a[0]):Math.floor(z)===Math.floor(a[1]);
+    };
+    door=room.openings?room.openings.find(covers):covers(room.door)?room.door:undefined;
     if(door){doorKind=room.kind;break;}
   }
   const partition=!door&&f.partitions.find(({a,b})=>lineDistance(x,z,a,b)<.56);
@@ -184,9 +188,11 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     const kit=kits[f.level],floor=Math.round(f.y),ceiling=Math.round(f.top)-1;
     if(!shape) {
       // Recessed upper floors expose the roof of the previous mass as a terrace.
-      if(lastShape&&lastShape.edge>=0&&columnHash>.54&&!reservedPassage(floor)) {
+      if(lastShape&&lastShape.edge>=0&&!empty(floor-1)&&!reservedPassage(floor)) {
         const previous=v.floors[floorIndex-1].outline;
-        put(floor,cityPart('balcony',2),lineTurn(previous[lastShape.edge],previous[(lastShape.edge+1)%previous.length]),true);
+        const a=previous[lastShape.edge],b=previous[(lastShape.edge+1)%previous.length];
+        put(floor,cityPart('passage',4),outwardTurn(b[1]-a[1],a[0]-b[0]),true,
+          CITY_STAIR_STYLE|(columnHash>.64?8:0));
       }
       lastShape=shape;
       continue;
@@ -230,15 +236,14 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
       if(exit){
         // Preserve the physical 2-block exit, but give it an actual wall/lintel
         // above instead of an isolated floating 'entrance' voxel.
-        for(let y=floor+3;y<ceiling-1;y++)put(y,kit.body);
-        put(ceiling-1,cityPart('entrance',kit.entrance),turn,true);
+        for(let y=floor+3;y<ceiling;y++)put(y,kit.body);
       }else if(railEdge){
         if(!reservedPassage(floor)){
           const outward=outwardTurn(b[1]-a[1],a[0]-b[0]);
           const gallery=corridor?.kind==='open-corridor';
-          put(floor,cityPart(gallery?'passage':'balcony',gallery?4:2),outward,true,
-            gallery?CITY_STAIR_STYLE|(bay%3===0?8:0):0);
-          if(gallery&&bay===0)for(let y=floor+1;y<ceiling;y++)put(y,cityPart('column',0),turn,true);
+          const pier=gallery&&bay===0&&ceiling>floor+1;
+          put(floor,cityPart('passage',4),outward,true,CITY_STAIR_STYLE|(bay%3===0?8:0));
+          if(pier)for(let y=floor+1;y<ceiling;y++)put(y,cityPart('column',0),outward,true);
         }
       }else{
         for(let y=floor;y<ceiling;y++){
@@ -274,8 +279,11 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
         const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
         const atDoor=midX===xi&&midZ===zi;
         if(atDoor&&doorKind!=='shop') {
-          put(floor,B.DOOR,turn>>1);
+          put(floor,B.DOOR,turn>>1,true);
           put(floor+1,B.DOOR_TOP);
+        }else if(doorKind!=='shop'&&!reservedPassage(floor)){
+          put(floor,wallFinish(floor));
+          put(floor+1,wallFinish(floor+1));
         }
       } else if(corridor) {
         // Older, low-headroom corridors keep their legacy ceiling light;
@@ -346,7 +354,8 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     const atrium=f.holes.find(h=>h.kind==='atrium');
     if(atrium&&!hole&&edge<0) {
       const outward=[[1,0],[-1,0],[0,1],[0,-1]].find(([dx,dz])=>containsRect(atrium,x+dx,z+dz));
-      if(outward&&empty(floor)&&!reservedPassage(floor))put(floor,cityPart('balcony',2),outwardTurn(...outward));
+      if(outward&&empty(floor)&&!reservedPassage(floor))put(floor,cityPart('passage',4),outwardTurn(...outward),true,
+        CITY_STAIR_STYLE|(columnHash>.64?8:0));
     }
   }
   // Clearance belongs to the shared structural plan, before bridges and stations stamp.
@@ -439,7 +448,7 @@ function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
     const roofY=level+(style==='hung'?4:3);
     if(empty(roofY)&&(style!=='hung'||edge||bay===0))put(roofY,style==='enclosed'?B.CEILING_TILE:B.CONCRETE_BEAM);
   }
-  const guardY=part.kind==='deck'?level:Math.ceil(surface);
+  const guardY=part.kind==='deck'?level:encodeCityStair(surface,0).base+1;
   if(edge&&!storefront&&empty(guardY)) {
     if(style==='enclosed'){
       const face=enclosedPassageBay(bay);
@@ -450,7 +459,7 @@ function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
       // A continuous guardrail replaces three posts per independent module.
       put(guardY,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(mod(Math.floor(along),3)===0?8:0));
       if(bay===0&&(style==='arcade'||style==='hung')){
-        for(let y=level+1;y<level+(style==='hung'?4:3);y++)if(empty(y))put(y,cityPart('column',3),turn,true);
+        for(let y=guardY+1;y<level+(style==='hung'?4:3);y++)if(empty(y))put(y,cityPart('column',3),turn,true);
       }
     }
   }

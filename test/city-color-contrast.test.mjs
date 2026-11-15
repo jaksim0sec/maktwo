@@ -11,8 +11,10 @@ const light=(d,hemisphere=.5,height=1,facing=0)=>{
  const bounce=lerp(...pair('fill'),hemisphere);
  const tint=lerp(...pair('skyTint'),height);
  const t=Math.max(0,Math.min(1,(d-.68)/.28));
- const sun=t*t*(3-2*t)*facing*(.65+.35*height);
- return bounce.map((v,i)=>v+tint[i]*sky+[.59,.53,.40][i]*sun);
+ const direct=t*t*(3-2*t)*facing;
+ const tintInSun=triplet(src.match(/vec3 skyBounce=mix\(skyTint,vec3\(([^)]+)\)/)[1]);
+ const skyBounce=lerp(tint,tintInSun,direct*.62);
+ return bounce.map((v,i)=>v+skyBounce[i]*sky+[.59,.53,.40][i]*direct*(.65+.35*height));
 };
 const luma=rgb=>.2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];
 
@@ -20,7 +22,7 @@ test('clear morning city sky sits above a teal ground haze instead of night colo
  const [horizon,sky]=pair('citySky');
  const haze=triplet(src.match(/vec3 groundHaze=vec3\(([^)]+)\)/)[1]);
  assert.ok(luma(horizon)>.76&&luma(sky)>.54&&sky[2]>sky[1]*1.35);
- assert.ok(haze[1]>haze[2]&&haze[2]>haze[0]&&luma(haze)<.4);
+ assert.ok(haze[2]>haze[1]&&haze[1]>haze[0]&&luma(haze)<.4);
  assert.match(src,/float reach=uGroundView\.y\/max\(\.001,depth\)/);
  assert.match(src,/float haze=smoothstep\(55\.,480\.,reach\)/);
  assert.match(src,/gl\.uniform2f\(this\.skyGradient,this\.citySkyTone,this\.cityGroundFade\)/);
@@ -30,10 +32,11 @@ test('bright openings remain bright without washing out enclosed buildings',()=>
  assert.match(src,/if\(vEmission<\.5\)c\+=\.014/);
  const sealed=light(.025),window=light(.40),open=light(1,.5,1,.8);
  assert.ok(luma(sealed)>.10&&luma(sealed)<.15,'sealed interior retains dark detail');
- assert.ok(Math.max(...sealed)-Math.min(...sealed)<.02,'deep shade remains nearly neutral');
+ assert.ok(Math.max(...sealed)-Math.min(...sealed)<.025,'deep shade remains close to neutral');
  assert.ok(luma(window)>luma(sealed)*2,'window raises the light level');
  assert.ok(luma(open)>luma(window)*2,'open street is substantially brighter');
- assert.ok(window[1]>window[2]&&window[2]>window[0],'exposed bounce is teal');
+ assert.ok(window[2]>window[1]&&window[1]>window[0],'indirect light is blue');
+ assert.ok(open[0]>=open[2]*.94,'strong direct light is close to neutral');
 });
 test('sky occlusion, light colors, and distant geometry stay intact',()=>{
  assert.match(src,/if\(uCityDaylight&&light\.a>0\.\)/);

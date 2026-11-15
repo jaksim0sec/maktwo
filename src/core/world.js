@@ -5,7 +5,7 @@ import {ARBORETUM_MODE,ARBORETUM_SPAWN} from '../worldgen/trees.js';
 import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,CITY_STATION_REDESIGN_VERSION,CITY_BOTANICAL_VERSION,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
-import {stairConnections,stairRailRise,signConnections} from './part-prisms.js';import {LightIndex} from './lighting.js';
+import {stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from './part-prisms.js';import {LightIndex} from './lighting.js';
 import {isDoor,doorIntersectsBody} from './door.js';
 import {fenceJoints} from './fence-joints.js';
 import {panelJoints,panelNeighbor,panelKind} from './panel-joints.js';
@@ -43,11 +43,17 @@ export class World{
    variant:variant&TURN_STYLE?0:variant,
    ...(cityStair?{cityStair:true,treadHeight:split?.high??(((variant&CITY_STAIR_LEVEL_MASK)>>3)+1)/4,rail:Boolean(variant&64),splitTread:split}:{}),
    ...this.blockStates.get(this.stateKey(x,y,z))};
-  if(cityStair&&partById(this.get(x,y,z,false))?.family==='passage'){
+  const id=this.get(x,y,z,false);
+  if(cityStair&&partById(id)?.family==='passage'){
    state.cityBridge=true;state.cityStair=false;state.bridgePost=Boolean(variant&8);
    delete state.treadHeight;delete state.rail;
+   state.bridgeGuard=bridgeGuardProfile(id,state.facing,(dx,dy,dz)=>{
+    const nx=Math.floor(x)+dx,ny=y0+dy,nz=Math.floor(z)+dz;
+    const cx=Math.floor(nx/SIZE),cz=Math.floor(nz/SIZE),chunk=this.getChunk(cx,cz,false);
+    const index=Chunk.index(nx-cx*SIZE,ny,nz-cz*SIZE);
+    return {id:chunk?.data[index]||B.AIR,style:chunk?.styles?.[index]||0};
+   });
   }
-  const id=this.get(x,y,z,false);
   if(id===B.FENCE)state.fenceJoints=fenceJoints((dx,dy,dz)=>this.get(Math.floor(x)+dx,y0+dy,Math.floor(z)+dz,false));
   if(panelKind(id))state.panelJoints=panelJoints(id,state,(dx,dy,dz)=>{
    const nx=Math.floor(x)+dx,ny=y0+dy,nz=Math.floor(z)+dz;

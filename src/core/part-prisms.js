@@ -2,6 +2,7 @@
 // physical overlap use the same clipped prisms, including 45-degree rotations.
 import {partById,partGeometry} from './part-library.js';
 import {panelPoint} from './panel-joints.js';
+import {CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,EXTERIOR_STYLE} from './chunk.js';
 const EPS=1e-8;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -69,6 +70,22 @@ export function stairRailRise(facing,neighborAt,currentHeight){
   }
  }
 }
+export function bridgeGuardProfile(id,facing,neighborAt){
+ const angle=facing*Math.PI/4,dx=Math.round(Math.cos(angle)),dz=Math.round(Math.sin(angle));
+ const rises=[-1,1].map(side=>{
+  for(const dy of [0,-1,1]){
+   const next=neighborAt(dx*side,dy,dz*side);
+   if(next.id===id&&(next.style&CITY_STAIR_STYLE)&&(next.style&7)===facing)return dy;
+  }
+  return 0;
+ });
+ const below=neighborAt(0,-1,0),above=neighborAt(0,1,0);
+ const foot=(below.style&CITY_STAIR_STYLE)&&partById(below.id)?.family==='staircase'
+  ?((below.style&CITY_STAIR_LEVEL_MASK)>>3)*.25-.75:0;
+ const column=(above.style&EXTERIOR_STYLE)&&(above.style&7)===facing&&partById(above.id)?.family==='column'
+  ?above.id:0;
+ return {rises,foot,column};
+}
 export function partPrisms(id,x,y,z,state={}){
  if(!partById(id))return null;
  const angle=(((state.facing||0)%8)+8)%8*Math.PI/4;
@@ -114,17 +131,22 @@ export function partPrisms(id,x,y,z,state={}){
    }
   }
  }else if(state.cityBridge&&partById(id)?.family==='passage'){
-  // Continuous side guard: horizontal members join across adjacent bridge
-  // cells and one thin post is emitted only at planned spacing.
-  geometry=[
-   {x:0,y:0,z:.78,w:1,h:.15,d:.2,material:107,solid:true},
-   {x:0,y:.78,z:.86,w:1,h:.065,d:.08,material:106,solid:true},
-   {x:0,y:.43,z:.87,w:1,h:.036,d:.06,material:106,solid:true},
-   {x:0,y:.85,z:.856,w:1,h:.015,d:.067,material:109,solid:false},
-   {x:0,y:.16,z:.862,w:1,h:.021,d:.042,material:106,solid:false,tone:.76}
-  ];
-  if(!state.simple&&state.bridgePost)
-   geometry.push({x:.46,y:.11,z:.83,w:.07,h:.75,d:.11,material:106,solid:true});
+  // The diagonal follows the corner-to-corner line. On grades, both
+  // adjacent rails meet halfway between their post heights at the seam.
+  const {rises=[0,0],foot=0,column=0}=state.bridgeGuard??{};
+  const span=state.facing&1?Math.SQRT2:1;
+  geometry=[{x:.5-span/2,y:foot,z:.40,w:span,h:.15-foot,d:.20,material:107,solid:true}];
+  for(const [level,height,depth,material,solid] of [[.78,.065,.08,106,true],[.43,.036,.06,106,true],
+    [.84,.018,.067,109,false],[.14,.021,.042,106,false]]){
+   const bar={x:.5-span/2,y:level,z:.5-depth/2,w:span,h:height,d:depth,material,solid,tone:level===.14?.76:1};
+   if(!rises[0]&&!rises[1])geometry.push(bar);
+   else geometry.push({...bar,y:level+rises[0]*.5,w:span*.5,slopeX:-rises[0]*.5},
+    {...bar,x:.5,w:span*.5,slopeX:rises[1]*.5});
+  }
+  if(column)geometry.push(...partGeometry(column).map(piece=>({...piece,y:piece.y===0?foot:piece.y,
+   h:piece.y===0?piece.h-foot:piece.h})));
+  else if(state.bridgePost)
+   geometry.push({x:.461,y:.12,z:.447,w:.078,h:.74,d:.106,material:106,solid:true});
  }else if(state.simple){
   const family=partById(id).family;
   if(family==='bookshelf')geometry=[
@@ -171,7 +193,8 @@ export function partPrisms(id,x,y,z,state={}){
   const points=footprint(piece,angle,state.panelJoints);
   if(points.length<3)continue;
   const verts=points.map(([a,b,sourceZ])=>{
-   const rise=(piece.slopeY||0)*(sourceZ-piece.z)/piece.d;
+   const sourceX=piece.slopeX ? .5+(a-.5)*Math.cos(angle)+(b-.5)*Math.sin(angle) : piece.x;
+   const rise=(piece.slopeY||0)*(sourceZ-piece.z)/piece.d+(piece.slopeX||0)*(sourceX-piece.x)/piece.w;
    return {x:x+a,z:z+b,lo:y+piece.y+rise,hi:y+piece.y+piece.h+rise};
   });
   pieces.push({vertices:verts,material:piece.material,alpha:piece.alpha,solid:piece.solid,emissive:piece.emissive,
