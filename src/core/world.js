@@ -264,6 +264,10 @@ export class World{
   const shift=Math.floor((y-144)/CANYON_SHIFT)*CANYON_SHIFT;
   if(!shift)return 0;
   this.yOrigin+=shift;
+  if(this.trainColliders?.length){
+   for(const train of this.trainColliders)train.y-=shift;
+   this.trainChunkRevision=(this.trainChunkRevision??0)+1;
+  }
   const offset=shift*SIZE*SIZE;
   const moveIndices=(columns,moveValue=value=>value)=>{
    for(const [k,entries] of columns)columns.set(k,new Map([...entries].map(([i,v])=>[i-offset,moveValue(v)])));

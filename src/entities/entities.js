@@ -1,6 +1,7 @@
 import {ObserverPack} from './observers.js';
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels,toMeters} from '../core/scale.js';
+import {canyonCore} from '../worldgen/canyon-v2-core.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {createStationTrain,TRAIN,trainControls} from '../worldgen/station-train.js';
@@ -168,6 +169,13 @@ export class EntityManager{
    this.entities.push(new SubwayTrain(STATION_PREVIEW_SITE));
   if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
    this.entities.push(...createCityPlan(world.seed,world.version).stations.map(site=>new SubwayTrain(site)));
+  if(world.mode===CANYON_MODE){
+   for(const site of canyonCore(world.seed).stations){
+    const train=new SubwayTrain(site);
+    train.y-=world.yOrigin;
+    this.entities.push(train);
+   }
+  }
   this.observers=world.mode===CITY_MODE?new ObserverPack(world):null;
   world.trainColliders=this.entities.filter(e=>e.type==='train');
  }

@@ -7,6 +7,7 @@ import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {canyonCore} from '../worldgen/canyon-v2-core.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
 import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {screenRay} from './picking.js';
@@ -412,7 +413,7 @@ class Game{
    const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
   }));
   menu.value=this.world.name;
-  if($('city-teleports'))$('city-teleports').hidden=this.world.mode!==CITY_MODE;
+  if($('city-teleports'))$('city-teleports').hidden=this.world.mode!==CITY_MODE&&this.world.mode!==CANYON_MODE;
  }
  deleteSelectedGame(){
   const name=$('world')?.value,slot=loadWorldSlots(localStorage).find(w=>w.name===name);
@@ -422,12 +423,18 @@ class Game{
   if(!deleteWorldSlot(localStorage,name))return;this.manager.worlds.delete(name);this.worldPresets=this.worldPresets.filter(w=>w.name!==name);this.refreshWorldChoices();this.status('월드 삭제 완료');
  }
  teleportCity(target){
-  if(this.world.mode!==CITY_MODE)return;const plan=createCityPlan(this.world.seed,this.world.version>=7?this.world.version:false);
+  const canyon=this.world.mode===CANYON_MODE;
+  if(this.world.mode!==CITY_MODE&&!canyon)return;
+  const plan=canyon?canyonCore(this.world.seed):createCityPlan(this.world.seed,this.world.version>=7?this.world.version:false);
   const site=target==='dome'?null:plan.stations[Number(target.split('-')[1])];
   if(target!=='dome'&&!site){this.status('이 월드에는 역이 없습니다');return}
   const pos=site?{x:Math.round(site.x)+.5,y:site.y,z:Math.round(site.z)+(site.axis==='x'?4.5:.5)}:{x:Math.round(plan.library.x+plan.library.towerRadius+9)+.5,y:plan.library.galleries[1],z:Math.round(plan.library.z)+.5};
   if(site?.axis==='z')pos.x=Math.round(site.x)+4.5;
-  Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0});this.world.stream(pos.x,pos.z,2,4);this.setPanel(null);this.status('이동 완료');
+  if(canyon){
+   this.shiftCanyonView(pos.y-this.world.yOrigin);
+   pos.y-=this.world.yOrigin;
+  }
+  Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,canyonFallStart:undefined});this.world.stream(pos.x,pos.z,2,4);this.setPanel(null);this.status('이동 완료');
  }
  createGame(){
   try{
@@ -727,7 +734,7 @@ class Game{
   if(!shift)return;
   this.player.y-=shift;
   if(this.player.pushedFromY!==undefined)this.player.pushedFromY-=shift;
-  for(const entity of this.entities.entities)entity.y-=shift;
+  for(const entity of this.entities.entities)if(entity.type!=='train')entity.y-=shift;
   for(const particle of this.effects.particles)particle.y-=shift;
   if(this.openContainer)this.openContainer.y-=shift;
   this.renderer.resetWorld(this.world);

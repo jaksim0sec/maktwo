@@ -3,8 +3,11 @@ import test from 'node:test';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {collides} from '../src/core/physics.js';
 import {World} from '../src/core/world.js';
-import {Player} from '../src/entities/entities.js';
+import {Player,EntityManager} from '../src/entities/entities.js';
 import {CANYON_MODE,canyonBay,canyonShelter} from '../src/worldgen/canyon-v2-plan.js';
+
+import {canyonCore,coreApproaches} from '../src/worldgen/canyon-v2-core.js';
+import {libraryRoofHeight} from '../src/worldgen/eternal-night-library.js';
 
 const seed=9999;
 test('V2 starts on a clear aisle facing a paired bed',()=>{
@@ -46,4 +49,30 @@ test('voxel edits on absolute levels survive saving outside the active window',(
  assert.equal(loaded.yOrigin,world.yOrigin);
  assert(loaded.recenterCanyon(y-loaded.yOrigin)<0);
  assert.equal(loaded.get(x,y-loaded.yOrigin,z),B.SHOP_BRICK);
+});
+
+test('V2 retains the original octagonal slab, dome and driveable station positions',()=>{
+ const world=new World({mode:CANYON_MODE,seed});
+ const core=canyonCore(seed);
+ const {halfWidth,floorY,diagonalLimit}=core.layout;
+ assert.equal(world.get(halfWidth-1,floorY-1,0),B.CONCRETE);
+ assert.equal(world.get(halfWidth-1,floorY-1,Math.ceil(diagonalLimit-halfWidth)+5),B.AIR);
+ const radius=core.library.radius-4,x=Math.floor(radius/Math.SQRT2)+.5,z=x;
+ const roof=Math.floor(libraryRoofHeight(core.library,Math.hypot(x,z)));
+ assert.notEqual(world.get(x,roof,z),B.AIR);
+
+ const entities=new EntityManager(world);
+ assert.equal(entities.entities.length,4);
+ const station=core.stations.find(site=>site.axis==='z'&&site.z>0);
+ const train=entities.entities.find(e=>e.stationId===station.id);
+ const localY=train.y;
+ world.recenterCanyon(station.y);
+ assert.equal(train.y+world.yOrigin,localY);
+ assert.equal(world.get(station.x+4,station.y-world.yOrigin-1,station.z),B.STATION_PLATFORM_ORANGE);
+ const entry=coreApproaches(core).find(path=>path.ax>0&&path.az>180&&path.ay===station.y);
+ const player=new Player(entry.bx+.5,entry.by-world.yOrigin,entry.bz+.5);
+ player.yaw=Math.atan2(entry.dx,entry.dz);
+ for(let frame=0;player.x>entry.ax+.57&&frame<entry.length*22+100;frame++)
+  player.update(world,1/60,{forward:true});
+ assert(player.x<=entry.ax+.57&&Math.abs(player.y+world.yOrigin-station.y)<.6);
 });

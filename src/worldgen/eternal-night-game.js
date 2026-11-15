@@ -471,7 +471,7 @@ function stampStationAccess(link,x,z,put){
   if(nearest<.50&&Math.floor(along)%7===3)put(y+3,B.FLUORESCENT,axisTurn(bx-ax,bz-az));
 }
 
-function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
+export function stampWalkway(link,part,x,z,put,empty,centerX,centerZ,seed) {
   if(part.kind==='annex-bay'){stampAnnex(part,x,z,put,empty);return;}
   const surface=part.y??segmentY(part,x,z);
   const level=Math.round(surface),style=link.architecture??'open';

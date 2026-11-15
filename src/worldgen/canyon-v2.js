@@ -5,6 +5,7 @@ import {containsRect,insidePolygon} from './eternal-night-buildings.js';
 import {cityPart} from './eternal-night-kits.js';
 import {encodeCityStair} from './eternal-night-stairs.js';
 import {stampBuilding} from './eternal-night-game.js';
+import {canyonCore,coreApproaches,stampCanyonCoreColumn} from './canyon-v2-core.js';
 import {canyonBays,canyonShelter} from './canyon-v2-plan.js';
 
 const mod=(n,k)=>((n%k)+k)%k;
@@ -15,32 +16,21 @@ const rail=cityPart('passage',4),stair=cityPart('staircase',2);
 
 export function routeSurface(p,x,z){
  const along=(x-p.ax-.5)*p.dx+(z-p.az-.5)*p.dz;
- const land=p.half;
+ const land=p.landing??p.half;
  if(p.by===p.ay)return p.ay;
  const progress=Math.max(0,Math.min(1,(along-land)/(p.length-2*land)));
  return p.ay+(p.by-p.ay)*progress;
 }
 
-function stampTerrace(t,x,z,seed,put,lowerRoof){
- const set=(y,id)=>{if(y>=lowerRoof)put(y,id);};
- const {x0,x1,z0,z1}=t.bounds,xi=Math.floor(x),zi=Math.floor(z);
- const inward=t.side===1?x-x0:x1-x,depth=x1-x0;
+function stampTerrace(t,x,z,seed,put){
+ const {x0,x1,z0,z1}=t.bounds;
+ const inward=t.side===1?x-x0:x1-x;
  const across=Math.min(z-z0,z1-z);
- const seam=mod(zi,12),beam=seam<2||mod(xi,13)<2||inward<1;
- // Ribbed slabs taper near unsupported ends. Wide rectangular piers and brackets
- // are visible underneath, with no terrain mass filling the canyon.
- const thickness=Math.max(2,t.thickness-(inward<7?3:0)-(across<3?2:0));
+ const thickness=Math.max(2,t.thickness-(inward<7?4:0)-(across<3?2:0));
  const patch=hash(Math.floor(x/4),t.level,Math.floor(z/4),seed);
  for(let h=1;h<=thickness;h++){
-  if(h>2&&!beam)continue;
-  set(t.y-h,h===1?(patch>.92?B.WET_TILE:B.FLOOR_TILE):h===2?B.CRACKED_CONCRETE:B.CONCRETE_BEAM);
- }
- if(across>3&&across<z1-z0-5&&seam<3){
-  const rib=18+Math.floor(hash(t.level,t.bay,Math.floor(z/12),seed)*17);
-  const bracket=inward>8&&inward<depth-2?Math.min(15,Math.floor(inward*.24)):0;
-  for(let h=thickness+1;h<=thickness+bracket;h++)set(t.y-h,B.CONCRETE_BEAM);
-  if((inward>=depth*.32&&inward<depth*.32+4)||(inward>depth-8&&inward<depth-3))
-   for(let h=thickness+1;h<=thickness+rib;h++)set(t.y-h,h%12===0?B.CONCRETE_BEAM:B.CRACKED_CONCRETE);
+  if(h>3&&mod(Math.floor(z),11)>2&&inward>=1)continue;
+  put(t.y-h,h===1?(patch>.92?B.WET_TILE:B.FLOOR_TILE):h===2?B.CRACKED_CONCRETE:B.CONCRETE_BEAM);
  }
 }
 
@@ -103,6 +93,11 @@ function stampBuildingDetails(v,x,z,put,empty){
  }
  if(!has(v,x,z)||!insidePolygon(v.roof.outline,x,z)||v.roof.holes.some(h=>has(h,x,z)))return;
  const y=Math.round(v.y1);
+ if(v.deckAbove!==undefined){
+  // Bear the upper slab on the built roof. Leave the stair opening untouched.
+  for(let h=y;h<v.deckAbove-1;h++)if(empty(h))put(h,h===y?B.CRACKED_CONCRETE:B.CONCRETE_BEAM);
+  return;
+ }
  if(v.kind==='industrial'){
   const xx=Math.floor((v.x0+v.x1)/2)+5,zz=Math.floor((v.z0+v.z1)/2)-5;
   if(Math.abs(x-xx)<1.5&&Math.abs(z-zz)<1.5){
@@ -118,6 +113,9 @@ export function stampCanyonChunk(chunk,seed,origin=0){
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
  const bounds={x0:ox,x1:ox+SIZE,z0:oz,z1:oz+SIZE};
  const terraces=[],buildings=[],routes=[];
+ const core=origin<627&&origin+chunk.height>0?canyonCore(seed):null;
+ if(core&&origin<40&&origin+chunk.height>6)
+  routes.push(...coreApproaches(core).filter(p=>intersects(p.bounds,bounds)));
  for(const plan of canyonBays(seed,origin,chunk.height,bounds.z0,bounds.z1)){
   terraces.push(...plan.terraces.filter(t=>intersects(t.bounds,bounds)));
   buildings.push(...plan.buildings.filter(v=>intersects({...v,x0:v.x0-2,x1:v.x1+2},bounds)));
@@ -140,12 +138,10 @@ export function stampCanyonChunk(chunk,seed,origin=0){
   };
   const decks=terraces.filter(t=>has(t.bounds,x,z));
   const paths=routes.filter(p=>has(p.bounds,x,z));
-  for(const t of decks){
-   let lowerRoof=-Infinity;
-   for(const v of buildings)
-    if(v.y1<t.y&&v.y1>t.y-48&&has(v,x,z)&&insidePolygon(v.roof.outline,x,z))
-     lowerRoof=Math.max(lowerRoof,v.y1);
-   stampTerrace(t,x,z,seed,put,lowerRoof);
+  for(const t of decks)stampTerrace(t,x,z,seed,put);
+  if(core){
+   const stairSlots=paths.filter(p=>p.kind==='stairs').map(p=>routeSurface(p,x,z));
+   stampCanyonCoreColumn(core,x,z,put,empty,origin,origin+chunk.height,stairSlots);
   }
   for(const v of buildings)if(has(v,x,z)&&v.y1>origin&&v.y0<origin+chunk.height)
    stampBuilding(v,v.detail,x,z,seed,put,empty,undefined,origin+chunk.height);

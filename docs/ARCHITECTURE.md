@@ -114,8 +114,11 @@ The system uses 6-block storeys and 12 half-block steps to rise between landings
 The selectable `EternalNightCanyonV2` world samples its geometry by absolute
 city level and longitudinal bay. Building volumes reuse the original floor,
 facade and stair kits. Walkways and their distant silhouettes share the same
-terrace heights and endpoints. No voxel is required to represent empty space
-outside the active window.
+terrace heights and endpoints. Tall wings occupy the overlap between terraces
+and carry their upper slabs. The original octagonal floor, station layout,
+trains, library dome and tower anchor the world at their original coordinates.
+Street stairs connect the upper terraces to existing station doors. No voxel
+is required to represent empty space outside the active window.
 
 The canyon keeps the existing chunk layout and shifts its vertical origin as
 the player crosses levels. Voxel edits, block states and fixture mounts are
