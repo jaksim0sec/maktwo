@@ -46,12 +46,12 @@ export function atlasRect(card,index){
 export function inspectionGeometry(view,compact=false){
  const cards=[],x=compact?0:.72,w=compact?.86:.81;
  const add=(id,name,xx,y,ww,h,role='control',extra={})=>cards.push({id,name,x:xx,y,w:ww,h,role,depth:-.058,...extra});
- add('inspect:back','‹ 뒤로',compact?-.27:.52,compact?-.42:.56,compact?.30:.37,compact?.14:.18);
- add('inspect:summary',view.name,x,compact?-.53:.14,w,compact?.19:.53,'summary',view);
+ add('inspect:back','‹ 뒤로',compact?-.27:.52,compact?-.35:.56,compact?.30:.37,compact?.11:.18);
+ add('inspect:summary',view.name,x,compact?-.50:.14,w,compact?.14:.53,'summary',view);
  if(view.step==='slots'){
   const step=compact?.20:.205,start=compact?-.30:.43;
   view.slots.forEach((slot,i)=>add('inspect:slot:'+i,String(i+1),start+(i%4)*step,
-   compact?-.69-Math.floor(i/4)*.09:-.27-Math.floor(i/4)*.25,step-.014,compact?.085:.22,'slot',slot));
+   compact?-.68-Math.floor(i/4)*.10:-.27-Math.floor(i/4)*.25,step-.014,compact?.085:.22,'slot',slot));
  }else if(view.step==='quantity'){
   const n=4,step=w/n;
   [['minus','−'],['amount',String(view.amount)],['plus','+'],['all','전부']].forEach(([key,label],i)=>
@@ -172,7 +172,11 @@ export class Hologram{
    this.basePalette=palette;
    this.baseCards=cardGeometry(palette,items,this.compact,page,craftFilter,options);
   }
-  this.cards=inspection?[...(this.baseCards||[]).filter(card=>!card.id.startsWith('info:')&&card.id!=='hand'),...inspectionGeometry(inspection,this.compact)]:this.baseCards;
+  this.cards=inspection?[...(this.baseCards||[]).filter(card=>
+    !card.id.startsWith('info:')&&card.id!=='hand'&&!card.id.startsWith('page:')&&
+    !(this.compact&&inspection.step!=='details'&&card.role==='quick')&&
+    !(this.compact&&this.basePalette?.startsWith('storage:')&&card.role==='item'&&card.y<-.14)),
+    ...inspectionGeometry(inspection,this.compact)]:this.baseCards;
   if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(inspection?'inspect:back':palette.startsWith('storage:')?palette:palette==='craft'?'view:craft':'view:inventory');
   this.dirty=true;this.buildGeometry();
  }
@@ -238,6 +242,11 @@ export class Hologram{
    const focused=this.keyboardMode&&this.focusId===card.id;
    const ready=card.role==='item'&&mode==='craft'&&card.craftable;
    ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+   if(card.role==='label'){
+    ctx.font=font(22,true);ctx.textAlign='center';ctx.fillStyle='#d0e5e1';
+    ctx.fillText(fitLabel(card.name,w-8,22),cx,cy+7);
+    ctx.restore();return;
+   }
    if(card.role==='quick'){
     rounded(ctx,x+2,y+2,w-4,h-4,7,'#162b33cb',
      card.blockId!=null&&card.blockId===this.activeItemId?'#efd3a4':'#689ba17a');
