@@ -48,7 +48,7 @@ void main(){
   // Settle the entire shape close to the floor instead of leaving a tall
   // tilted silhouette. This remaps height into a horizontal resting pose.
   float grounded=smoothstep(.48,1.,uCollapse);
-  float restingY=.065+.055*abs(p.x)+.045*max(0.,p.y);
+  float restingY=.23+.08*abs(p.x)+.05*max(0.,p.y);
   p.y=mix(p.y,restingY,grounded);
   p.z-=.12*settle;
  }
