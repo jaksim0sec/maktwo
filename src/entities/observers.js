@@ -464,6 +464,8 @@ export class ObserverPack {
   g.age+=dt;
   for(const s of g.stalkers.values()){
    if(g.members.get(s.id)?.dead)continue;
+   // Never retain a stale run pose across hidden/repositioned frames.
+   s.walking=false;s.fleeing=false;
    const d=distance(s,player);
    // Stop remote sprints outside the drawable range, not within the camera.
    if(!s.hidden&&d>this.renderRange+2){
@@ -478,7 +480,6 @@ export class ObserverPack {
    // Peripheral gaze matters; center-only focus made exposed observers oblivious.
    const noticed=scene?scene.phase==='watch'&&face:visible&&this.onScreen(player,s);
    s.focus=clamp(s.focus+(noticed?dt*(centered?1.5:1.15):-dt*.55),0,FOCUS_LIMIT);
-   s.walking=false;
    if(scene){
     const inView=this.onScreen(player,s);
     if(face&&scene.firstSeen===null){
@@ -543,7 +544,7 @@ export class ObserverPack {
    if(!s.sighting&&d>39&&!this.onScreen(player,s)){
     s.hidden=true;s.hideUntil=this.clock+4.5;s.target=null;continue;
    }
-   if(!s.sighting&&(this.clock>=s.nextMove||!s.target)){
+   if(!s.sighting&&!startled&&(this.clock>=s.nextMove||!s.target)){
     s.nextMove=this.clock+(s.retreat?1.0:3.5+hash(s.id,4,Math.floor(this.clock/4),this.world.seed)*2);
     if(s.retreat){
      const escape=this.escapeTarget(s,player);
