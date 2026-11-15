@@ -1,4 +1,4 @@
-import {observerPose} from '../entities/observers.js';
+import {observerPose,observerCollapseProgress} from '../entities/observers.js';
 import {BLOCK_SIZE} from '../core/scale.js';
 
 const VERT=`#version 300 es
@@ -9,7 +9,7 @@ layout(location=2) in vec3 aColor;
 layout(location=3) in vec3 aIdle;
 uniform mat4 uVP;
 uniform vec4 uPlace;
-uniform float uBlend,uCloud,uGait,uStride,uBreath,uPresence;
+uniform float uBlend,uCloud,uGait,uStride,uBreath,uPresence,uCollapse,uCollapseSide;
 uniform int uWalkPose;
 uniform vec2 uNeck,uEyeAim;
 uniform int uEyeFrom;
@@ -33,6 +33,19 @@ void main(){
  p.z+=sin(uBreath)*.005*smoothstep(.75,1.25,p.y)*(1.-smoothstep(1.75,2.1,p.y));
  // The eye has its own, quicker micro-saccades inside the head's motion.
  if(gl_VertexID>=uEyeFrom){p.x+=uEyeAim.x*.038;p.y+=uEyeAim.y*.025;}
+ // Author's fall morph shapes the limbs; a separate grounded collapse
+ // lowers the entire silhouette instead of only yawing the character.
+ if(uCollapse>0.){
+  float settle=smoothstep(0.,1.,uCollapse);
+  float buckle=smoothstep(0.,.44,settle);
+  p.z+=.13*buckle*smoothstep(.4,1.9,p.y);
+  float angle=1.42*uCollapseSide*settle;
+  float ca=cos(angle),sa=sin(angle);
+  vec2 local=p.xy-vec2(0.,.18);
+  p.x=local.x*ca+local.y*sa;
+  p.y=max(.055,.18+local.y*ca-local.x*sa);
+  p.z-=.12*settle;
+ }
  float c=cos(uPlace.w),s=sin(uPlace.w);
  vPos=(vec3(p.x*c+p.z*s,p.y,-p.x*s+p.z*c)+uPlace.xyz)*${BLOCK_SIZE.toFixed(2)};
  vColor=gl_VertexID>=uEyeFrom?mix(aColor,vec3(.54,.51,.39),uCloud):aColor;
@@ -93,7 +106,7 @@ export class ObserverRenderer {
   };
   this.program=p;
   this.u=Object.fromEntries(['VP','Place','Blend','Cloud','EyeFrom','Eye','Fog','FogRange',
-   'Neck','EyeAim','Gait','Stride','WalkPose','Breath','Presence','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
+   'Neck','EyeAim','Gait','Stride','WalkPose','Breath','Presence','Collapse','CollapseSide','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
   this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
   upload(new Uint16Array(parts[2]),gl.ELEMENT_ARRAY_BUFFER);
   upload(new Uint8Array(parts[1]),gl.ARRAY_BUFFER);
@@ -132,13 +145,15 @@ export class ObserverRenderer {
    gl.uniform1f(u.Blend,blend);
    gl.uniform1f(u.Cloud,e.member?.dead?Math.min(1,(pack.clock-e.member.hitAt)/1.3):0);
    const track=e.track;
-   gl.uniform2f(u.Neck,track?.headYaw??0,track?.headPitch??0);
-   gl.uniform2f(u.EyeAim,track?.eyeYaw??0,track?.eyePitch??0);
-   const fleeing=track?.walking&&track.sighting?.phase==='withdraw';
-   gl.uniform1f(u.Gait,track?.phase??0);gl.uniform1f(u.Stride,track?.walking&&!fleeing?1:0);
+   gl.uniform2f(u.Neck,e.member?.dead?0:track?.headYaw??0,e.member?.dead?0:track?.headPitch??0);
+   gl.uniform2f(u.EyeAim,e.member?.dead?0:track?.eyeYaw??0,e.member?.dead?0:track?.eyePitch??0);
+   const fleeing=track?.walking&&(track.sighting?.phase==='withdraw'||track.fleeing);
+   gl.uniform1f(u.Gait,track?.phase??0);gl.uniform1f(u.Stride,track?.walking&&!fleeing&&!e.member?.dead?1:0);
    // Let the authored charge mesh lean forward instead of flattening its torso to idle.
-   gl.uniform1i(u.WalkPose,track?.walking&&!fleeing?1:0);
-   gl.uniform1f(u.Breath,pack.clock*.85+e.id*1.71);
+   gl.uniform1i(u.WalkPose,track?.walking&&!fleeing&&!e.member?.dead?1:0);
+   gl.uniform1f(u.Breath,e.member?.dead?0:pack.clock*.85+e.id*1.71);
+   gl.uniform1f(u.Collapse,e.member?.dead?observerCollapseProgress(pack.clock,e.member.hitAt):0);
+   gl.uniform1f(u.CollapseSide,e.member?.fallSide??1);
    gl.uniform1f(u.Presence,e.member?.dead?1:track?.presence??1);
    gl.drawElements(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0);calls++;
   }
