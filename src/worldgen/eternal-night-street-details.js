@@ -1,5 +1,5 @@
 import {BLOCK as B} from '../core/blocks.js';
-import {CITY_STAIR_STYLE,ROAD_MIRROR_STYLE} from '../core/chunk.js';
+import {CITY_STAIR_STYLE} from '../core/chunk.js';
 import {hash} from '../util/math.js';
 import {insidePolygon,containsRect} from './eternal-night-buildings.js';
 import {CORE_ZONE,zoneAt} from './eternal-night-core-floor.js';
@@ -106,16 +106,17 @@ export function designStreetDetails(plan,seed,ground){
     if(fits&&ports===2){add('stairs',stamps);break tryStairs;}
    }
   }
-  if(roll>.82&&v.floors.length<6){
-   const {dx,dz}=facade,side=roll>.91?1:-1;
-   mirrorSite:for(const offset of [side,-side])for(const depth of [1.6,2.6,3.5]){
-    const x=Math.floor(facade.x+dx*depth+dz*offset*2.8),z=Math.floor(facade.z+dz*depth-dx*offset*2.8);
-    if(!occupied(f,x,z)&&clear(v,x,z,ground,ground+4)){
-     add('mirror',[[x,z,[[ground,B.CITY_DAMP_GROWTH,undefined,false,ROAD_MIRROR_STYLE|(outward(dx,dz)>>1)]]]]);
-     break mirrorSite;
-    }
-   }
-  }
+  // Road mirror placement is paused. Keep its mesh path for existing saved chunks.
+  // if(roll>.82&&v.floors.length<6){
+  //  const {dx,dz}=facade,side=roll>.91?1:-1;
+  //  mirrorSite:for(const offset of [side,-side])for(const depth of [1.6,2.6,3.5]){
+  //   const x=Math.floor(facade.x+dx*depth+dz*offset*2.8),z=Math.floor(facade.z+dz*depth-dx*offset*2.8);
+  //   if(!occupied(f,x,z)&&clear(v,x,z,ground,ground+4)){
+  //    add('mirror',[[x,z,[[ground,B.CITY_DAMP_GROWTH,undefined,false,ROAD_MIRROR_STYLE|(outward(dx,dz)>>1)]]]]);
+  //    break mirrorSite;
+  //   }
+  //  }
+  // }
  }
  return {columns,examples};
 }
