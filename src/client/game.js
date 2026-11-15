@@ -899,6 +899,7 @@ class Game{
  shiftCanyonView(y,shift=this.world.recenterCanyon(y)){
   if(!shift)return;
   this.player.y-=shift;
+  this.entities.observers?.rebaseVertical(shift);
   if(this.player.pushedFromY!==undefined)this.player.pushedFromY-=shift;
   for(const entity of this.entities.entities)if(entity.type!=='train'&&entity.type!=='drop')entity.y-=shift;
   for(const particle of this.effects.particles)particle.y-=shift;

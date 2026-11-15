@@ -36,6 +36,30 @@ export class ObserverPack {
   this.renderRange=48;
   this.viewport={aspect:16/9,tan:.637}; // real viewport values are passed by the game
  }
+ // Canyon V2 shifts the voxel window by whole floors without moving its actors
+ // in absolute world space. Rebase local coordinates, keeping shared targets
+ // (sighting start/seen) from being shifted twice.
+ rebaseVertical(shift){
+  if(!shift)return;
+  const moved=new Set();
+  const rebase=point=>{
+   if(!point||moved.has(point)||!Number.isFinite(point.y))return;
+   point.y-=shift;moved.add(point);
+  };
+  const g=this.active;
+  if(g){
+   rebase(g.point);rebase(g.at);
+   for(const s of g.stalkers?.values()??[]){
+    rebase(s);rebase(s.target);
+    rebase(s.sighting?.start);rebase(s.sighting?.seen);
+   }
+   for(const member of g.members.values())rebase(member.at);
+  }
+  for(const views of [this.views,this.previous])for(const view of views??[]){
+   rebase(view);rebase(view.previous);
+  }
+  this.lightCache=null;
+ }
  loaded(p) {
   return Boolean(this.world.getChunk(Math.floor(p.x/SIZE),Math.floor(p.z/SIZE),false));
  }

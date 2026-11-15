@@ -188,7 +188,7 @@ export class EntityManager{
     this.entities.push(train);
    }
   }
-  this.observers=world.mode===CITY_MODE?new ObserverPack(world):null;
+  this.observers=world.mode===CITY_MODE||world.mode===CANYON_MODE?new ObserverPack(world):null;
   world.trainColliders=this.entities.filter(e=>e.type==='train');
  }
  spawnDrop(itemId,x,y,z,count=1,motion){
