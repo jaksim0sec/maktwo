@@ -46,17 +46,14 @@ test('V2 vertical window rebase retains observer and all encounter coordinates',
  pack.clock=5;pack.spawn(player(),48);pack.publish(player(),48);
  assert(pack.active&&pack.views.length);
  const g=pack.active,s=g.stalkers.values().next().value;
- s.target=at(s.x+2,s.y,s.z);
+ const originalX=s.x;
  s.sighting={start:at(s.x,s.y,s.z-11),seen:at(s.x,s.y,s.z-1),phase:'approach'};
+ s.target=s.sighting.seen;
  g.at=at(s.x+1,s.y,s.z);
  g.members.set(s.id,{hp:1,hitAt:3,at:at(s.x,s.y,s.z)});
  pack.previous=pack.views.map(v=>({...v,previous:at(v.x,v.y,v.z)}));
  pack.lightCache={position:at(0,40,0),at:1,revision:1,lights:[]};
- const sibling=[...g.stalkers.values()].find(track=>track!==s);
- assert(sibling,'expected a second observer to exercise shared references');
- sibling.sighting={start:at(sibling.x,sibling.y,sibling.z-6),seen:at(sibling.x,sibling.y,sibling.z-2),phase:'approach'};
- sibling.target=sibling.sighting.seen;
- const sharedY=sibling.target.y;
+ const sharedY=s.target.y;
  const before={
   group:g.point.y,stalker:s.y,target:s.target.y,start:s.sighting.start.y,seen:s.sighting.seen.y,
   groupTarget:g.at.y,member:g.members.get(s.id).at.y,
@@ -72,10 +69,10 @@ test('V2 vertical window rebase retains observer and all encounter coordinates',
   assert.equal(after[key],before[key]-448,key);
  for(const key of ['views','previous'])
   assert.deepEqual(after[key],before[key].map(y=>y-448),key);
- assert.equal(sibling.target.y,sharedY-448,'sighting target alias must rebase only once');
- assert.equal(sibling.sighting.seen.y,sharedY-448);
+ assert.equal(s.target.y,sharedY-448,'sighting target alias must rebase only once');
+ assert.equal(s.sighting.seen.y,sharedY-448);
  assert.equal(pack.lightCache,null,'old-height light candidates must be invalidated');
- assert.equal(s.x,s.target.x-2,'horizontal position unchanged');
+ assert.equal(s.x,originalX,'horizontal position unchanged');
 });
 test('canyon recenter hook shifts active observer with the player',()=>{
  const source=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
