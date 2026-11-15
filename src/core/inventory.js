@@ -9,6 +9,14 @@ export const STARTER_SUPPLIES=Object.freeze({
  [B.DIRT]:8,[B.PLANKS]:12,[B.TORCH]:6,[B.DOOR]:1,
 });
 export const MAX_STACK=999;
+// Visual ordering is separate from counts and does not create synthetic stacks.
+export function orderInventoryIds(ids,order=[]){const ranks=new Map(order.map((id,i)=>[id,i]));return [...ids].sort((a,b)=>(ranks.get(a)??1e9)-(ranks.get(b)??1e9)||a-b)}
+function reorderedIds(inventory,from,to){if(from===to)return inventory.itemOrder;
+ if(!inventory.has(from)||!inventory.has(to))return null;
+ const next=orderInventoryIds(inventory.items instanceof Map?inventory.items.keys():inventory.items,inventory.itemOrder);
+ const at=next.indexOf(from),target=next.indexOf(to);if(at<0||target<0)return null;
+ next.splice(at,1);next.splice(next.indexOf(to),0,from);return next;
+}
 // Deterministic loot, computed from immutable world seed and crate coordinates.
 export function crateLoot(seed,x,y,z){
  x=Math.floor(x);y=Math.floor(y);z=Math.floor(z);
@@ -41,8 +49,10 @@ function moveShortcut(inventory,id,index){
 }
 export class SurvivalInventory{
  constructor(storage=null,world='Overworld'){
-  this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.initializedContainers=new Set();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
+  this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.initializedContainers=new Set();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.itemOrder=[];this.load();
  }
+ orderedIds(ids){return orderInventoryIds(ids,this.itemOrder)}
+ reorder(from,to){const next=reorderedIds(this,from,to);if(!next)return false;const previous=this.itemOrder;this.itemOrder=next;if(this.save())return true;this.itemOrder=previous;return false}
  get key(){return `maktwo:survival:${this.world}`}
  count(id){return this.items.get(itemId(Number(id)))||0}
  discovered(id){return this.seen.has(itemId(Number(id)))}
@@ -141,7 +151,7 @@ export class SurvivalInventory{
   this.quickSlots=slots;if(!known)this.seen.delete(id);
   return false;
  }
- save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots,checkpoint:this.checkpoint,containers:[...this.containers].map(([key,items])=>[key,[...items]]),initializedContainers:[...this.initializedContainers]}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
+ save(){try{this.storage?.setItem(this.key,JSON.stringify({version:2,items:[...this.items],seen:[...this.seen],quickSlots:this.quickSlots,itemOrder:this.itemOrder,checkpoint:this.checkpoint,containers:[...this.containers].map(([key,items])=>[key,[...items]]),initializedContainers:[...this.initializedContainers]}));return true}catch(error){console.warn('[MakTwo] Inventory not saved',error);return false}}
  load(){let data=null;try{const raw=this.storage?.getItem(this.key);if(raw!==null&&raw!==undefined)data=JSON.parse(raw)}catch{}
   if((data?.version===1||data?.version===2)&&Array.isArray(data.items)){
    for(const [id,n] of data.items){
@@ -152,6 +162,7 @@ export class SurvivalInventory{
    }
    if(data.version===2){for(const id of data.seen||[])if(Number.isInteger(id)&&id>0&&id<BLOCKS.length)this.seen.add(itemId(id));if(Array.isArray(data.quickSlots)&&data.quickSlots.length===HOTBAR_SIZE)this.quickSlots=data.quickSlots.map(id=>id===null?null:(Number.isInteger(id)&&id>0&&id<BLOCKS.length&&this.count(id)>0?itemId(id):null));}
   }else for(const [id,n] of Object.entries(STARTER_SUPPLIES))this.items.set(Number(id),n);
+  if(Array.isArray(data?.itemOrder))this.itemOrder=[...new Set(data.itemOrder.filter(id=>Number.isInteger(id)&&id>0&&id<BLOCKS.length))];
   const checkpoint=data?.checkpoint;
   if(checkpoint&&[checkpoint.x,checkpoint.y,checkpoint.z].every(Number.isSafeInteger))this.checkpoint=checkpoint;
   for(const entry of Array.isArray(data?.containers)?data.containers:[]){
@@ -186,8 +197,10 @@ export class SurvivalInventory{
 export class CreativeInventory {
  constructor(items){
   this.items=new Set(items);
-  this.quickSlots=[B.CONCRETE,B.PLANKS,B.TORCH,B.SHOP_SIGN,B.GLASS,null,null];
+  this.quickSlots=[B.CONCRETE,B.PLANKS,B.TORCH,B.SHOP_SIGN,B.GLASS,null,null];this.itemOrder=[];
  }
+ orderedIds(ids){return orderInventoryIds(ids,this.itemOrder)}
+ reorder(from,to){const next=reorderedIds(this,from,to);if(!next)return false;this.itemOrder=next;return true}
  count(id){return this.items.has(id)?Infinity:0}
  has(id){return this.items.has(id)}
  knownRecipes(){return RECIPES}
