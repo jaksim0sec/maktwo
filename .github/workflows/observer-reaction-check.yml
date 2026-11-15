@@ -12,3 +12,41 @@ jobs:
         with: {node-version: '22'}
       - name: Run observer regression suite
         run: node --test test/observer-reactivity.test.mjs test/observer-pack.test.mjs test/observer-stealth.test.mjs test/canyon-v2-observer.test.mjs
+      - name: Install Chromium test utilities
+        run: npm install --no-save playwright-core pngjs
+      - name: Start isolated browser test server
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/client/game.js')
+          s=p.read_text()
+          assert 'try{new Game()}catch(err)' in s
+          p.write_text(s.replace('try{new Game()}catch(err)', 'try{window.__auditGame=new Game()}catch(err)'))
+          PY
+          (python3 -m http.server 8080 >/tmp/maktwo-server.log 2>&1 &)
+      - name: WebGL observer fall and persistence visual test
+        run: |
+          export CHROME_BIN=$(command -v google-chrome || command -v chromium || true)
+          node test/observer-reaction-browser-audit.mjs
+      - name: Upload observer visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observer-hit-and-fall-screenshots
+          path: /tmp/observer-*.png
+          if-no-files-found: ignore
+      - name: Full regression suite
+        run: npm test
+
+
+  main-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Existing main test baseline
+        run: npm test
