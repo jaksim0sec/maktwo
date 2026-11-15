@@ -44,6 +44,12 @@ void main(){
   vec2 local=p.xy-vec2(0.,.07);
   p.x=local.x*ca+local.y*sa;
   p.y=max(.04,.07+local.y*ca-local.x*sa);
+  // The authored fall2 pose still sits almost upright at the neck.
+  // Settle the entire shape close to the floor instead of leaving a tall
+  // tilted silhouette. This remaps height into a horizontal resting pose.
+  float grounded=smoothstep(.48,1.,uCollapse);
+  float restingY=.065+.055*abs(p.x)+.045*max(0.,p.y);
+  p.y=mix(p.y,restingY,grounded);
   p.z-=.12*settle;
  }
  float c=cos(uPlace.w),s=sin(uPlace.w);
