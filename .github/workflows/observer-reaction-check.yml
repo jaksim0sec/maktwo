@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - name: Run observer regression suite
-        run: node --test test/observer-reactivity.test.mjs test/observer-pack.test.mjs test/observer-stealth.test.mjs test/canyon-v2-observer.test.mjs
+        run: node --test test/observer-reactivity.test.mjs test/observer-pack.test.mjs test/observer-stealth.test.mjs test/canyon-v2-observer.test.mjs test/observer-v2-reaction-realworld.test.mjs
       - name: Install Chromium test utilities
         run: npm install --no-save playwright-core pngjs
       - name: Start isolated browser test server
