@@ -2,10 +2,10 @@
 // A tree is ONE placed anchor, not a stack of cube leaves.
 export const TREE_ASSET_START=238;
 export const TREE_SPECIES=Object.freeze([
- Object.freeze({key:'SAKURA',name:'Cherry blossom tree',label:'벚꽃나무',height:6.1,spread:3.0,bark:'#67515b',crown:['#d78aab','#e6aec1','#bb678c','#e1a0b4','#edc5cb'],litter:['#b981a1','#d8a9b8','#b8668f','#e0bcc4']}),
- Object.freeze({key:'GINKGO',name:'Ginkgo tree',label:'은행나무',height:7.2,spread:2.45,bark:'#676052',crown:['#c4a44f','#d7ba66','#a68a41','#d4b459','#e1c778'],litter:['#b69b4f','#ceb661','#a88d43','#d9be71']}),
- Object.freeze({key:'MAPLE',name:'Japanese maple tree',label:'단풍나무',height:6.4,spread:2.85,bark:'#634e49',crown:['#b95445','#c6724a','#974844','#d18a56','#a44b51'],litter:['#a95143','#be744d','#954543','#cd8959']}),
- Object.freeze({key:'GREEN',name:'Leafy broadleaf tree',label:'일반나무',height:7.0,spread:3.0,bark:'#635849',crown:['#4c8b64','#79a16d','#396d57','#92aa76','#5b906d'],litter:['#58835b','#92944e','#5d8350','#a19665']})
+ Object.freeze({key:'SAKURA',name:'Cherry blossom tree',label:'벚꽃나무',height:6.1,spread:3.0,bark:'#615552',crown:['#a68c85','#b8a198','#8b7564','#ac9289','#c2aca0'],litter:['#977c77','#a9948c','#896f65','#b6a396']}),
+ Object.freeze({key:'GINKGO',name:'Ginkgo tree',label:'은행나무',height:7.2,spread:2.45,bark:'#676052',crown:['#99824f','#ac9659','#786b42','#a58d5b','#b6a071'],litter:['#927c4c','#a99658','#8d7545','#b09a62']}),
+ Object.freeze({key:'MAPLE',name:'Japanese maple tree',label:'단풍나무',height:6.4,spread:2.85,bark:'#634e49',crown:['#805852','#9a674c','#71534b','#9d7555','#895d50'],litter:['#825a4b','#976347','#795148','#9d7355']}),
+ Object.freeze({key:'GREEN',name:'Leafy broadleaf tree',label:'일반나무',height:7.0,spread:3.0,bark:'#635849',crown:['#566c4e','#778364','#405943','#82906b','#637955'],litter:['#58835b','#92944e','#5d8350','#a19665']})
 ]);
 export const TREE_BLOCKS=Object.freeze(TREE_SPECIES.map((t,kind)=>Object.freeze({
  id:TREE_ASSET_START+kind,key:'TREE_'+t.key,kind,name:t.name,label:t.label,color:t.bark,render:'tree'

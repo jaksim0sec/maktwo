@@ -16,13 +16,13 @@ export const WORLD_PRESETS=Object.freeze([
 ]);
 const placeables=new Set([
  B.WOOD_CLUB,B.STEEL_BAR,...LIGHTBAR,B.FLUORESCENT,B.ROUND_FLUORESCENT,B.BROKEN_FLUORESCENT,B.SHOP_SIGN,B.WORKBENCH,B.CHAIR,B.CRATE,B.BED,B.MATTRESS,B.FLOWER_POT,
- B.FLOWER,B.GLOW_MUSHROOM,B.REEDS,B.FIREFLY_GRASS,
+ B.FLOWER,B.GLOW_MUSHROOM,B.REEDS,B.FIREFLY_GRASS,B.CITY_DAMP_GROWTH,
 ]);
 const visible=BLOCKS.filter(({id})=>!RETIRED_BLOCK_IDS.has(id)&&id!==B.AIR&&id!==B.BEDROCK&&id!==B.DOOR_TOP&&id!==B.PORTAL&&itemId(id)===id).map(({id})=>id);
 export const isPlaceableItem=id=>placeables.has(id);
 export const CREATIVE_ITEMS=Object.freeze(visible);
 export const PALETTES=Object.freeze({
- blocks:{label:'건축재',items:visible.filter(id=>(id<PART_ID_START||B.STATION_TRACK_BALLAST<=id&&id<B.PART_STATION_TRAINWALL_1)&&!isPlaceableItem(id))},
+ blocks:{label:'건축재',items:visible.filter(id=>(id<PART_ID_START||B.STATION_TRACK_BALLAST<=id&&id<B.PART_STATION_TRAINWALL_1||id===B.CITY_PAINT_WHITE||id===B.CITY_PAINT_GRAY)&&!isPlaceableItem(id))},
  parts:{label:'건축 부품',items:visible.filter(id=>id>=PART_ID_START&&id<B.TREE_SAKURA&&(id<B.STATION_TRACK_BALLAST||id>=B.PART_STATION_TRAINWALL_1))},
  trees:{label:'수목·낙엽',items:[...TREE_BLOCKS,...FALLEN_LEAF_BLOCKS].map(p=>p.id)},
  items:{label:'배치품',items:visible.filter(isPlaceableItem)},

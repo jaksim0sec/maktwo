@@ -12,135 +12,129 @@ function triangle(out,a,b,c,color,shade,double=false){
  const write=(p,q,r)=>{out.push(...p,...color,shade,...q,...color,shade,...r,...color,shade)};
  write(a,b,c);if(double)write(a,c,b);
 }
-function stem(out,from,to,r0,r1,color,seedShade=1){
- const dx=to[0]-from[0],dy=to[1]-from[1],dz=to[2]-from[2],len=Math.hypot(dx,dy,dz)||1;
- const d=[dx/len,dy/len,dz/len],other=Math.abs(d[1])>.84?[0,0,1]:[0,1,0];
- const ux=d[1]*other[2]-d[2]*other[1],uy=d[2]*other[0]-d[0]*other[2],uz=d[0]*other[1]-d[1]*other[0];
- const ul=Math.hypot(ux,uy,uz)||1,u=[ux/ul,uy/ul,uz/ul],v=[d[1]*u[2]-d[2]*u[1],d[2]*u[0]-d[0]*u[2],d[0]*u[1]-d[1]*u[0]];
- const point=(center,r,i)=>{const a=PI*2*i/7,c=Math.cos(a),s=Math.sin(a);
-  return [center[0]+r*(u[0]*c+v[0]*s),center[1]+r*(u[1]*c+v[1]*s),center[2]+r*(u[2]*c+v[2]*s)]};
- for(let i=0;i<7;i++){
-  const a=point(from,r0,i),b=point(to,r1,i),c=point(to,r1,i+1),d0=point(from,r0,i+1);
-  const sh=24.82+.015*i+(seedShade-1)*.07; // original vertical bark atlas, not grass.
-  triangle(out,a,b,c,color,sh,true);triangle(out,a,c,d0,color,sh,true);
+const mixPoint=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const unit=v=>{const length=Math.hypot(...v)||1;return v.map(n=>n/length);};
+const subtract=(a,b)=>a.map((v,i)=>v-b[i]);
+
+function branchTube(out,path,radii,color,sides=6,phase=0){
+ const axis=unit(subtract(path.at(-1),path[0]));
+ const guide=Math.abs(axis[1])>.72?[0,0,1]:[0,1,0];
+ // Each bend has a shared tapered ring, so the bark continues through forks.
+ const rings=path.map((point,i)=>{
+  const tangent=unit(subtract(path[Math.min(path.length-1,i+1)],path[Math.max(0,i-1)]));
+  const u=unit(cross(guide,tangent)),v=cross(tangent,u);
+  return Array.from({length:sides},(_,j)=>{
+   const angle=j*2*PI/sides+phase;
+   const radius=radii[i]*(1+.12*Math.sin(j*2.1+phase)+.10*(i===0)*Math.cos(j*3.7));
+   return point.map((p,k)=>p+radius*(u[k]*Math.cos(angle)+v[k]*Math.sin(angle)));
+  });
+ });
+ for(let i=1;i<rings.length;i++)for(let j=0;j<sides;j++){
+  const k=(j+1)%sides,shade=24.73+.15*(1+Math.sin(j*2*PI/sides+phase))*.5;
+  triangle(out,rings[i-1][j],rings[i-1][k],rings[i][k],color,shade);
+  triangle(out,rings[i-1][j],rings[i][k],rings[i][j],color,shade);
  }
 }
-// Unlit-looking foliage was caused by NEGATIVE vertex shade values, which the
-// shared shader interprets as emissive. Every botanical triangle now uses a
-// positive, non-emissive shade in [0,1], including fallen leaves.
-function petal(out,kind,center,scale,angle,color,shade){
- const c=Math.cos(angle),sn=Math.sin(angle),lift=.16*Math.sin(angle*1.8);
- // Local leaf plane tilts in 3D to reveal alternating surfaces, without disks.
- const at=(dx,dy)=>[center[0]+dx*c-dy*sn*.35,center[1]+dy*.82+dx*lift,
-  center[2]+dx*sn+dy*c*.35];
- const base=at(0,0);
- const pair=(a,b)=>triangle(out,base,at(...a),at(...b),color,shade,true);
- if(kind===0){
-  // Individual five-point blossoms, with visible spaces between petals.
-  for(let j=0;j<5;j++){
-   const a=j*2*PI/5+angle*.12;
-   pair([Math.cos(a-.31)*scale*.48,Math.sin(a-.31)*scale*.48],
-        [Math.cos(a)*scale,Math.sin(a)*scale]);
-  }
- }else if(kind===1){
-  // Two-lobed ginkgo fan with a notch and radiating fan veins.
-  const rim=[[-.35,.18],[-.95,.76],[-.38,1],[0,.68],[.38,1],[.95,.76],[.35,.18]];
-  for(let j=0;j<rim.length-1;j++)
-   pair(rim[j].map(v=>v*scale),rim[j+1].map(v=>v*scale));
- }else if(kind===2){
-  // Five unequal, pointed maple lobes rather than a spherical red surface.
-  for(let j=0;j<5;j++){
-   const a=j*2*PI/5+angle*.1,reach=(j%2? .78:1.08)*scale;
-   pair([Math.cos(a-.32)*reach*.46,Math.sin(a-.32)*reach*.46],
-        [Math.cos(a)*reach,Math.sin(a)*reach]);
-  }
- }else{
-  // Long folded leaves with a narrow attachment and raised central ridge.
-  const tip=at(scale*1.25,scale*.25),mid=at(scale*.47,scale*.22);
-  const left=at(scale*.49,scale*.59),right=at(scale*.49,-scale*.49);
-  triangle(out,base,left,mid,color,shade,true);
-  triangle(out,mid,right,tip,color,shade*.92,true);
- }
+
+function foldedLeaf(out,base,angle,length,width,lift,color,shade){
+ const dx=Math.cos(angle),dz=Math.sin(angle),[x,y,z]=base;
+ const tip=[x+dx*length,y+lift,z+dz*length];
+ const joint=[x+dx*length*.48,y+lift*.45,z+dz*length*.48];
+ const ridge=[joint[0],joint[1]+width*.37,joint[2]];
+ const left=[joint[0]-dz*width,joint[1],joint[2]+dx*width];
+ const right=[joint[0]+dz*width,joint[1]-width*.19,joint[2]-dx*width];
+ triangle(out,base,left,ridge,color,shade,true);
+ triangle(out,left,tip,ridge,color,shade,true);
+ triangle(out,ridge,tip,right,color,shade*.85,true);
+ triangle(out,base,ridge,right,color,shade*.85,true);
 }
-function foliageBlob(out,kind,center,radii,palette,random){
- // Open sprays of separate pointed leaves. No closed oval / ball / spherical shell.
- // Branches remain visible through intentional gaps in the crown.
- const count=kind===0?7:kind===1?7:kind===2?7:11;
+
+function foliageSpray(out,from,to,angle,kind,palette,bark,rand){
+ // Leaves hang from staggered points on a real twig. There are holes between sprays.
+ const bend=mixPoint(from,to,.58);bend[1]+=.13;
+ branchTube(out,[from,bend,to],[.024,.013,.004],bark,3,angle);
+ const count=kind===1?7:6;
  for(let i=0;i<count;i++){
-  const spiral=i*2.399963229728653;
-  const r=.23+.74*Math.sqrt(random());
-  const theta=spiral+(random()-.5)*.58;
-  const spread=.36+.64*random();
-  const end=[center[0]+Math.cos(theta)*r*radii[0],
-   center[1]+(random()-.5)*1.44*radii[1],
-   center[2]+Math.sin(theta)*r*radii[2]];
-  const join=[center[0]+(end[0]-center[0])*.57,
-   center[1]+(end[1]-center[1])*.71,center[2]+(end[2]-center[2])*.57];
-  const twig=rgb('#61554d');
-  // Slender visible twig, no cylindrical foliage volume.
-  const width=.013;
-  const left=[join[0]-width,join[1],join[2]],right=[join[0]+width,join[1],join[2]];
-  triangle(out,left,end,right,twig,.64,true);
-  const leafColor=palette[(i+Math.floor(random()*palette.length))%palette.length];
-  petal(out,kind,end,(kind===0?.19:kind===1?.23:kind===2?.22:.26)*spread,
-   theta+(random()-.5)*1.1,leafColor,.68+.22*random());
-  if(i%5===0){
-   const a=theta+1.3,side=[
-    join[0]+Math.cos(a)*radii[0]*.21,
-    join[1]+radii[1]*.13,
-    join[2]+Math.sin(a)*radii[2]*.21];
-   petal(out,kind,side,.14+.065*random(),a,palette[(i+2)%palette.length],.62+.20*random());
-  }
+  const t=(i+.65)/count;
+  const base=t<.58?mixPoint(from,bend,t/.58):mixPoint(bend,to,(t-.58)/.42);
+  const length=(.41+rand()*.18)*(.85+.20*Math.sin(t*PI));
+  const width=length*[.40,.36,.32,.25][kind];
+  const side=i%2?1:-1;
+  foldedLeaf(out,base,angle+side*(.56+.68*rand()),length,width,(rand()-.65)*.37,
+   palette[Math.floor(rand()*palette.length)],.64+.25*rand());
  }
 }
+
 export function treeMesh(kind,variant=0){
  if(kind<0||kind>=TREE_SPECIES.length)throw RangeError('Invalid tree species');
  variant=variant&3;const key=kind*4+variant;
  if(TREE_TEMPLATES.has(key))return TREE_TEMPLATES.get(key);
  const spec=TREE_SPECIES[kind],rand=mulberry(0x19087+kind*7841+variant*331),palette=spec.crown.map(rgb);
- const out=[],bark=rgb(spec.bark),height=spec.height,spread=spec.spread;
- const trunk=[[.5,0,.5]];
- for(let i=1;i<=5;i++){
-  const t=i/5,wander=.09*Math.sin(t*5+variant*.83);
-  trunk.push([.5+wander+(rand()-.5)*t*.06,height*(.13+i*.13),.5+.07*Math.sin(t*6+kind)+(rand()-.5)*t*.05]);
+ const out=[],bark=rgb(spec.bark),h=spec.height,spread=spec.spread;
+ const turn=rand()*2*PI,wind=kind===1?.41:.66;
+ const trunk=[[.5,.01,.5],[.46,.46,.53],[.54+Math.cos(turn)*wind*.58,h*.30,.52+Math.sin(turn)*wind*.58],
+  [.5+Math.cos(turn)*wind,h*.49,.5+Math.sin(turn)*wind],
+  [.48+Math.cos(turn+.66)*wind,h*.66,.53+Math.sin(turn+.66)*wind],
+  [.65+Math.cos(turn+1)*wind,h*[.91,.94,.93,.95][kind],.5+Math.sin(turn+1)*wind]];
+ branchTube(out,trunk,[.36,.245,.196,.145,.098,.022],bark,8,turn);
+ for(let i=0;i<4;i++){
+  const a=turn+i*2*PI/4+rand()*.59,r=.63+rand()*.41;
+  const root=[.5+Math.cos(a)*r,.033,.5+Math.sin(a)*r];
+  branchTube(out,[[.5,.23,.5],mixPoint([.5,.14,.5],root,.54),root],[.16,.103,.025],bark,5,a);
  }
- for(let i=0;i<5;i++)stem(out,trunk[i],trunk[i+1],
-  (.31-i*.042)*(kind===0?1.17:1),Math.max(.074,.28-i*.044),bark);
- // Uneven surface roots radiate from the trunk into broken paving.
- for(let i=0;i<5;i++){
-  const a=(i/5)*PI*2+rand()*.4,r=.7+rand()*.30;
-  stem(out,[.5, .29,.5],[.5+Math.cos(a)*r,.04,.5+Math.sin(a)*r],.13,.045,bark);
- }
- const clusters=[],branches=kind===1?10:kind===2?11:9;
- for(let i=0;i<branches;i++){
-  const a=2*PI*(i/branches)+.36*rand()+kind*.20;
-  const t=.46+.24*rand(),base=trunk[Math.min(5,Math.max(2,Math.round(t*5)))];
-  const reach=spread*(kind===1?.53+.23*rand():.61+.31*rand());
-  const tipHeight=kind===1?height*(.76+.18*rand()):
-   kind===0?height*(.63+.14*rand()):kind===2?height*(.66+.18*rand()):height*(.71+.16*rand());
-  const mid=[.5+Math.cos(a)*reach*.50,base[1]+(tipHeight-base[1])*.67,.5+Math.sin(a)*reach*.50];
-  const tip=[.5+Math.cos(a)*reach,tipHeight,.5+Math.sin(a)*reach];
-  stem(out,base,mid,.15,.087,bark);stem(out,mid,tip,.088,.025,bark);
-  clusters.push([tip[0],tip[1]+(kind===1?.32:-.02),tip[2],.87+.25*rand()]);
-  if(i%2===0){
-   const aa=a+(i%4===0?.53:-.42);
-   const side=[mid[0]+Math.cos(aa)*.8,mid[1]+.37,mid[2]+Math.sin(aa)*.8];
-   stem(out,mid,side,.054,.019,bark);
-   clusters.push([...side,.75+.18*rand()]);
+ const limbs=kind===1?7:6;
+ for(let i=0;i<limbs;i++){
+  const t=i/(limbs-1),a=turn+i*2.399963+(rand()-.5)*.57;
+  const start=i===limbs-1?trunk[4]:mixPoint(trunk[i<2?2:3],trunk[i<2?3:4],.17+.60*rand());
+  const broad=kind===1?.56:1;
+  const reach=spread*broad*(.58+.23*rand())*(1-.33*t);
+  const endY=i===limbs-1?h*.96:h*(.62+.26*t+.048*rand());
+  const joint=[start[0]+Math.cos(a-.14)*reach*.52,start[1]+(endY-start[1])*.55,start[2]+Math.sin(a-.14)*reach*.52];
+  const tip=[start[0]+Math.cos(a)*reach,endY,start[2]+Math.sin(a)*reach];
+  branchTube(out,[start,mixPoint(start,joint,.48),joint,tip],[.112-.049*t,.094-.042*t,.064-.031*t,.018],bark,6,a);
+  for(let j=0;j<3;j++){
+   const root=j===2?mixPoint(joint,tip,.77):mixPoint(start,joint,.69+j*.24);
+   const angle=a+(j===2?.12:j?-.67:.88)+(rand()-.5)*.48;
+   const length=.40+rand()*.48;
+   const knee=[root[0]+Math.cos(angle)*length,root[1]+.17+rand()*.31,root[2]+Math.sin(angle)*length];
+   branchTube(out,[root,mixPoint(root,knee,.53),knee],[.044,.031,.015],bark,4,angle);
+   if((i*3+j+variant)%11===4)continue; // A few dry tips survive between live clusters.
+   for(let k=0;k<2;k++){
+    const aim=angle+(k?-.68:.50)+(rand()-.5)*.24;
+    const reach=.54+rand()*.49;
+    const end=[knee[0]+Math.cos(aim)*reach,knee[1]+(kind===1?.21:.06)-rand()*.28,knee[2]+Math.sin(aim)*reach];
+    foliageSpray(out,knee,end,aim,kind,palette,bark,rand);
+   }
   }
- }
- // Crown is intentionally asymmetrical; no uniform leaf cubes or perfect spheres.
- clusters.push([.5,height*.87,.5,1.30]);
- clusters.push([.5+spread*.31,height*.89,.5-spread*.13,1.02]);
- clusters.push([.5-spread*.29,height*.82,.5+spread*.23,1.02]);
- clusters.push([.5+.23,height*.99,.5-.18,kind===1?.84:1.02]);
- for(let i=0;i<clusters.length;i++){
-  const [cx,cy,cz,scale]=clusters[i],radius=(.92+.21*rand())*scale;
-  const size=kind===1?[.82,1.35,.8]:kind===0?[1.15,.88,1.07]:kind===2?[1.07,1.04,.95]:[1.12,1.02,1.02];
-  foliageBlob(out,kind,[cx,cy,cz],size.map(v=>v*radius),palette,rand);
  }
  const result=new Float32Array(out);
  TREE_TEMPLATES.set(key,result);return result;
+}
+
+const GROWTH_TEMPLATES=new Map();
+export function dampGrowthMesh(style,variation){
+ const sprout=Boolean(style&1),key=(sprout?4:0)+Math.min(3,Math.floor(variation*4));
+ if(GROWTH_TEMPLATES.has(key))return GROWTH_TEMPLATES.get(key);
+ const out=[],random=mulberry(7793+key*1001);
+ const colors=['#425043','#566248','#5f6347','#666451'].map(rgb);
+ const center=[.18+random()*.41,.012,.26+random()*.44];
+ for(let i=0;i<11;i++){
+  const angle=random()*PI*2,r=.025+random()*.23;
+  const x=center[0]+Math.cos(angle)*r,z=center[2]+Math.sin(angle)*r,y=center[1]+i*.0006;
+  const width=.034+random()*.07;
+  const tip=[x+Math.cos(angle)*width,y+.004,z+Math.sin(angle)*width];
+  const root=[x-Math.cos(angle)*width*.84,y,z-Math.sin(angle)*width*.84];
+  const c=colors[i%4];
+  triangle(out,root,tip,[x+Math.sin(angle)*width,y+.016,z-Math.cos(angle)*width],c,.76,true);
+  triangle(out,tip,root,[x-Math.sin(angle)*width*.74,y+.009,z+Math.cos(angle)*width*.74],c,.83,true);
+ }
+ if(sprout)for(let i=0;i<5;i++){
+  const angle=random()*PI*2,length=.08+random()*.14;
+  const root=[center[0]+Math.cos(angle)*.021,.025,center[2]+Math.sin(angle)*.021];
+  foldedLeaf(out,root,angle,length,.012+random()*.022,.08+random()*.16,colors[(i+2)%4],.87);
+ }
+ const mesh=new Float32Array(out);GROWTH_TEMPLATES.set(key,mesh);return mesh;
 }
 export function leafLitterMesh(kind,variant=0){
  if(kind<0||kind>=TREE_SPECIES.length)throw RangeError('Invalid litter species');

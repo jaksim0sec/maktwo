@@ -1,4 +1,4 @@
-import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK} from '../core/chunk.js';
+import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,CITY_DOOR_STEEL} from '../core/chunk.js';
 import {BLOCK as B,isBed,isBedFoot,itemId, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor,materialUVTransform,FIXTURE_MATERIAL} from './textures.js';
@@ -11,7 +11,7 @@ import {FORMED} from '../core/construction.js';
 import {MOUNT_PARTS,mountPoint} from '../core/mounts.js';
 import {partById} from '../core/part-library.js';
 import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from '../core/part-prisms.js';
-import {treeGeometryForBlock} from './tree-mesh.js';
+import {treeGeometryForBlock,dampGrowthMesh} from './tree-mesh.js';
 
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
@@ -25,7 +25,7 @@ const FACES = [
 const COLORS = BLOCKS.map(({color}) => rgb(color));
 const TRANSPARENT = BLOCKS.map(({render})=>render==='fluid'||render==='glass'||render==='portal');
 const OPAQUE = BLOCKS.map(({opaque})=>opaque);
-const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part','tree','leaf-litter'].includes(render));
+const CROSS = BLOCKS.map(({render})=>['cross','fixture','door','door-top','path','mushroom','fence','workbench','stairs','slab','panel','frame','chair','flower-pot','part','tree','leaf-litter','growth'].includes(render));
 const CUTOUT = BLOCKS.map(({render})=>render==='cutout');
 const partTemplates=new Map();
 
@@ -139,6 +139,8 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
  // Thin crossed planes must remain double-sided, irrespective of face culling.
  for(let y=yMin;y<yMax;y++)for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const idx=(y*SIZE+z)*SIZE+x,id=chunk.data[idx],form=FORMED[forms?.[idx]];
+  if(id===B.CITY_STAIR_MARKER&&chunk.styles&&(detailY===undefined||detailY!==null&&Math.abs(y-detailY)<16))
+   emitPart(opaque,stairSignMesh(chunk.styles[idx]),ox+x,y,oz+z);
   if(form){
    for(const face of form.faces){
     if(face.side>=0){
@@ -158,6 +160,11 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
    continue;
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
+  if(id===B.CITY_DAMP_GROWTH){
+   if(detailY===undefined||detailY!==null&&Math.abs(y-detailY)<18)
+    emitPart(opaque,dampGrowthMesh(chunk.styles?.[idx]||0,hash(ox+x,y,oz+z,visualSeed)),ox+x,y,oz+z);
+   continue;
+  }
   if(BLOCKS[id].render==='tree'||BLOCKS[id].render==='leaf-litter'){
    const local=treeGeometryForBlock(id,(chunk.styles?.[idx]||0)&3);
    if(local)emitPart(opaque,local,ox+x,y,oz+z);
@@ -215,7 +222,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
    continue;
   }
   if(isStairs(id)||isSlab(id)||BLOCKS[id].render==='panel'||BLOCKS[id].render==='frame'||id===B.CHAIR||id===B.FLOWER_POT){shapeMesh(opaque,id,wx,y,wz,joints?{...state,panelJoints:joints}:state,transparent);continue}
-  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent,Boolean(style&EXTERIOR_STYLE));continue}
+  if(id===B.DOOR){doorMesh(opaque,wx,y,wz,state,transparent,Boolean(style&EXTERIOR_STYLE),Boolean(style&CITY_DOOR_STEEL));continue}
   const start=opaque.length;
   if(id===B.FENCE){
    const metal=variant===6||variant===7;
@@ -429,10 +436,10 @@ function fluorescentMesh(dest,id){
 
 // The door's full two-block model is emitted once from the lower cell.
 // Rendering it separately avoids breaking greedy face merging or chunk storage.
-export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,framed=false){
+export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,framed=false,steel=false){
  const b=doorBounds(x,z,state?.facing||0,Boolean(state?.open));
  if(framed){
-  const closed=doorBounds(x,z,state?.facing||0),frame=rgb('#59534a');
+  const closed=doorBounds(x,z,state?.facing||0),frame=rgb(steel?'#444c50':'#59534a');
   if(closed.w>closed.d){
    for(const dx of [0,.91])cube(dest,x+dx,y,closed.z-.02,.09,2,closed.d+.04,frame);
    cube(dest,x,y+1.98,closed.z-.02,1,.04,closed.d+.04,frame);
@@ -443,12 +450,12 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,f
  }
  const style=Math.max(0,Math.min(5,state?.variant||0)),acrossX=b.w>b.d;
  const colors=['#af9372','#957e66','#737b80','#a3b3b9','#6f655c','#80868b'];
- const color=rgb(colors[style]);
+ const color=rgb(steel?'#9299a3':colors[style]);
  const part=(target,along,start,height,thickness,c)=>{
   if(acrossX)cube(target,b.x+along*b.w,y+start,b.z+(b.d-thickness)/2,b.w*(1-along*2),height,thickness,c);
   else cube(target,b.x+(b.w-thickness)/2,y+start,b.z+along*b.d,thickness,height,b.d*(1-along*2),c);
  };
- if(style===3||style===4){
+ if(!steel&&(style===3||style===4)){
   // Actual clear infill: no opaque panel underneath the window.
   part(dest,0,.04,.38,b.w>b.d?b.d:b.w,color);
   part(dest,0,1.72,.26,b.w>b.d?b.d:b.w,color);
@@ -466,15 +473,69 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,f
  }else{
   for(let f=0;f<FACES.length;f++){
    const face=FACES[f],verts=face.corners.map(([a,c,d])=>[b.x+a*b.w,y+.04+c*DOOR_HEIGHT,b.z+d*b.d]);
-   quad(dest,verts,color,face.shade+4*materialFor(18,f));
+   quad(dest,verts,color,face.shade+4*materialFor(steel?B.METAL_PANEL:B.DOOR,f));
   }
-  if(style===2||style===5){
+  if(steel){
+   const thickness=acrossX?b.d:b.w,width=acrossX?b.w:b.d;
+   const plate=(along,low,w,h,c)=>{
+    if(acrossX)cube(dest,b.x+b.w*along,y+low,b.z-.009,w,h,thickness+.018,c);
+    else cube(dest,b.x-.009,y+low,b.z+b.d*along,thickness+.018,h,w,c);
+   };
+   for(const edge of [.09,.87])plate(edge,.09,.014,1.86,rgb('#737f87'));
+   plate(.49,1.62,.12,.043,rgb('#797251'));
+   plate(.54,1.45,.028,.026,rgb('#323a40'));
+   plate(.75,.85,Math.min(width*.12,.09),.16,rgb('#575e60'));
+  }else if(style===2||style===5){
    for(let i=0;i<4;i++)part(dest,.17,1.2+i*.09,.025,acrossX?b.d+.024:b.w+.024,rgb('#444e53'));
   }
   if(style===1)for(const h of [.37,1.57])part(dest,.09,h,.055,acrossX?b.d+.02:b.w+.02,rgb('#b49b7c'));
   if(style===5)part(dest,.12,.92,.055,acrossX?b.d+.07:b.w+.07,rgb('#c8c5b9'));
  }
- cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb('#cdbd8f'));
+ cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb(steel?'#a6a5a0':'#cdbd8f'));
+}
+
+const STAIR_FONT={
+ '0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
+ '2':['111','001','111','100','111'],'3':['111','001','111','001','111'],
+ '4':['101','101','111','001','001'],'5':['111','100','111','001','111'],
+ '6':['111','100','111','101','111'],'7':['111','001','010','010','010'],
+ '8':['111','101','111','101','111'],'9':['111','101','111','001','111'],
+ '/':['001','001','010','100','100'],F:['111','100','110','100','100'],
+};
+const stairSigns=new Map();
+function stairSignMesh(style){
+ if(stairSigns.has(style))return stairSigns.get(style);
+ const out=[],floor=style>>2,facing=style&3;
+ const point=(u,v,d)=>[[u,v,1+d],[1+d,v,1-u],[1-u,v,-d],[-d,v,u]][facing];
+ const face=(points,d,color)=>quad(out,points.map(([u,v])=>point(u,v,d)),rgb(color),.94);
+ const rect=(x,y,w,h,d,color)=>face([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],d,color);
+ if(floor){
+  rect(.22,.34,.56,.36,.019,'#77796e');
+  rect(.235,.356,.53,.329,.021,'#bbb9a3');
+  const text=`5/${floor}F`,pixel=.021;
+  const start=.5-(text.length*4-1)*pixel/2;
+  for(let i=0;i<text.length;i++)for(const [row,line] of STAIR_FONT[text[i]].entries()){
+   for(let col=0;col<line.length;col++)if(line[col]==='1')
+    rect(start+(i*4+col)*pixel,.484+(4-row)*pixel,pixel,pixel,.023,'#303434');
+  }
+  for(let i=0;i<3;i++)rect(.66+i*.021,.39,.021,(i+1)*.013,.023,'#52554e');
+ }else{
+  rect(.25,.26,.50,.39,.035,'#6d7067');
+  rect(.27,.282,.46,.347,.038,'#426750');
+  rect(.438,.319,.192,.269,.040,'#cacbb4');
+  rect(.456,.338,.13,.222,.042,'#527560');
+  rect(.427,.509,.062,.058,.043,'#babfa8');
+  const stroke=(a,b,width,color)=>{
+   const length=Math.hypot(b[0]-a[0],b[1]-a[1]),dx=(b[1]-a[1])*width/length,dz=(a[0]-b[0])*width/length;
+   face([[a[0]+dx,a[1]+dz],[b[0]+dx,b[1]+dz],[b[0]-dx,b[1]-dz],[a[0]-dx,a[1]-dz]],.044,color);
+  };
+  for(const [a,b] of [[ [.47,.49],[.516,.415] ],[[.47,.48],[.395,.447]],[[.395,.447],[.345,.459]],
+    [[.478,.473],[.548,.47]],[[.548,.47],[.58,.434]],[[.516,.415],[.463,.374]],
+    [[.463,.374],[.45,.329]],[[.516,.415],[.565,.386]],[[.565,.386],[.615,.388]]])stroke(a,b,.017,'#babfa8');
+  stroke([.682,.596],[.639,.552],.005,'#737a63');
+  stroke([.639,.552],[.65,.518],.004,'#737a63');
+ }
+ const mesh=new Float32Array(out);stairSigns.set(style,mesh);return mesh;
 }
 
 // A stair flight sets style 7 on side posts; render connected rising handrails.

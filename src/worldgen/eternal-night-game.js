@@ -1,4 +1,4 @@
-import {SIZE,TURN_STYLE,EXTERIOR_STYLE} from '../core/chunk.js';
+import {SIZE,TURN_STYLE,EXTERIOR_STYLE,CITY_DOOR_STEEL} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {containsRect,insidePolygon} from './eternal-night-buildings.js';
@@ -161,6 +161,14 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     ? x>=shaft.x0&&x<shaft.x1&&(Math.abs(z-shaft.z0)<1.1||Math.abs(z-shaft.z1)<1.1)
     : z>=shaft.z0&&z<shaft.z1&&(Math.abs(x-shaft.x0)<1.1||Math.abs(x-shaft.x1)<1.1));
   const stairWallTurn=stairAlongX?0:2;
+  // Pick the wall cells beside the top of each flight, facing into the shaft.
+  const long=stairAlongX?x:z,short=stairAlongX?z:x;
+  const far=stairAlongX?shaft?.x1:shaft?.z1;
+  const nearSide=stairAlongX?shaft?.z0:shaft?.x0;
+  const farSide=stairAlongX?shaft?.z1:shaft?.x1;
+  const signFacing=far-long>0&&far-long<=1
+    ?short<nearSide&&nearSide-short<=1?(stairAlongX?0:1)
+    :short>=farSide&&short-farSide<1?(stairAlongX?2:3):null:null;
   const half=stairs.length/2, firstFlight=step<half;
   const facing=mod(v.stairFacing+(firstFlight?0:4),8);
   const rail=step>=0&&stairOuterRail(stairs[step],step,stairs.length,stairAlongX,x,z);
@@ -171,7 +179,11 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
   let lastKey,lastCachedShape;
   const columnHash=hash(xi,v.id,zi,seed);
   const roofY=Math.round(v.roof.y);
-  if(inside(v.roof.outline,x,z)&&!v.roof.holes.some(h=>containsRect(h,x,z)))put(roofY-1,kits.at(-1).body);
+  if(inside(v.roof.outline,x,z)&&!v.roof.holes.some(h=>containsRect(h,x,z))){
+    put(roofY-1,kits.at(-1).body);
+    if(columnHash>.62&&hash(Math.floor(x/4),roofY,Math.floor(z/4),seed^0x7841)>.87&&
+      empty(roofY)&&!reservedPassage(roofY))put(roofY,B.CITY_DAMP_GROWTH,undefined,false,columnHash>.9?1:0);
+  }
   let lastShape=null;
   for(let floorIndex=0;floorIndex<v.floors.length;floorIndex++) {
     const f=v.floors[floorIndex];
@@ -201,7 +213,9 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
     const {edge,corridor,room,door,doorKind,partition}=shape;
     const partitionWall=interiorWallFinish(f,kit.roomWall);
     const scarred=hash(Math.floor(x/3),f.level,Math.floor(z/3),seed^0x72b4)<(f.damage??0)*.27;
-    const wallFinish=y=>scarred&&(y-floor<2||ceiling-y<2)?(y-floor<2?B.MOLD_PLASTER:B.STAINED_PLASTER):partitionWall;
+    const housing=f.program==='housing';
+    const paint=y=>y===floor?(scarred?B.STATION_STATION_ALGAE:B.CITY_PAINT_GRAY):B.CITY_PAINT_WHITE;
+    const wallFinish=y=>housing?paint(y):scarred&&(y-floor<2||ceiling-y<2)?(y-floor<2?B.MOLD_PLASTER:B.STAINED_PLASTER):partitionWall;
     const hole=f.holes.find(h=>containsRect(h,x,z));
     if(hole?.kind==='atrium'&&f.blueprint)continue;
 
@@ -263,7 +277,11 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
       }
     } else if(!hole && step<0 && !onLanding && !atAccess) {
       if(shaftSide&&!corridor) {
-        for(let y=floor;y<ceiling;y++)put(y,wallFinish(y));
+        for(let y=floor;y<ceiling;y++)put(y,paint(y));
+        if(signFacing!==null&&ceiling>floor+2&&!reservedPassage(floor+1)&&!reservedPassage(floor+2)){
+          put(floor+1,B.CITY_STAIR_MARKER,undefined,false,Math.min(63,f.level+1)*4+signFacing);
+          put(floor+2,B.CITY_STAIR_MARKER,undefined,false,signFacing);
+        }
       } else if(partition) {
         const turn=lineTurn(partition.a,partition.b);
         for(let y=floor;y<ceiling;y++) {
@@ -279,13 +297,15 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
         const midX=Math.floor((door.a[0]+door.b[0])/2),midZ=Math.floor((door.a[1]+door.b[1])/2);
         const atDoor=midX===xi&&midZ===zi;
         if(atDoor&&doorKind!=='shop') {
-          put(floor,B.DOOR,turn>>1,true);
+          put(floor,B.DOOR,turn>>1,true,housing?CITY_DOOR_STEEL:0);
           put(floor+1,B.DOOR_TOP);
         }else if(doorKind!=='shop'&&!reservedPassage(floor)){
           put(floor,wallFinish(floor));
           put(floor+1,wallFinish(floor+1));
         }
       } else if(corridor) {
+        if((corridor.kind==='balcony'||corridor.kind==='open-corridor')&&scarred&&columnHash>.73&&
+          empty(floor)&&!reservedPassage(floor))put(floor,B.CITY_DAMP_GROWTH,undefined,false,columnHash>.93?1:0);
         // Older, low-headroom corridors keep their legacy ceiling light;
         // enclosed high corridors use the suspended integrated light panel.
         if(!hasCeiling){
@@ -529,12 +549,16 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
       stampCoreTower(tower,x,z,put);
     if(plan.stations.length)stampElevatedStationColumn(plan,x,z,put);
-    if((cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION)&&zone===CORE_ZONE.MAIN_ROUTE){
+    if((cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION)&&zone===CORE_ZONE.MAIN_ROUTE&&empty(CITY_BASE_Y)&&
+      !plan.columns[index].length&&![...reservedLevels].some(level=>level>=CITY_BASE_Y&&level<=CITY_BASE_Y+13)){
       const tree=roadsideTreeCell(x,z,layout,seed);
       // Trees occupy only free lower sidewalks, never a bridge, doorway or track.
-      if(tree&&empty(CITY_BASE_Y)&&!plan.columns[index].length&&
-        ![...reservedLevels].some(level=>level>=CITY_BASE_Y&&level<=CITY_BASE_Y+13))
-        put(CITY_BASE_Y,tree.id,undefined,false,tree.variant);
+      if(tree)put(CITY_BASE_Y,tree.id,undefined,false,tree.variant);
+      else if(Math.min(Math.abs(x-layout.centerX),Math.abs(z-layout.centerZ))>layout.roadHalfWidth*.42&&
+        hash(Math.floor(x/4),21,Math.floor(z/4),seed)>.83){
+        const patch=hash(lx+chunk.cx*SIZE,22,lz+chunk.cz*SIZE,seed);
+        if(patch>.63)put(CITY_BASE_Y,B.CITY_DAMP_GROWTH,undefined,false,patch>.88?1:0);
+      }
     }
   }
   return chunk;
