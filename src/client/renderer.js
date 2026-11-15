@@ -1,5 +1,6 @@
 import {ObserverRenderer} from './observer-render.js';
 import {weaponView} from './weapon-view.js';
+import {HeldLight,heldLightView,heldLightUniforms,HELD_LIGHT_SHADER} from './held-light.js';
 import {weaponBasis} from '../core/combat.js';
 import {raycast} from '../core/physics.js';
 import {block as itemBlock} from '../core/blocks.js';
@@ -34,6 +35,7 @@ uniform vec3 uCamera;
 uniform float uLodNear;uniform float uNearRing;
 uniform bool uCanyonCoverage;uniform int uCoveredChunks[9];uniform bool uFarPass;uniform vec2 uNearY;
 out vec4 frag;
+${HELD_LIGHT_SHADER}
 void main(){
  if(uDistant){
   vec2 delta=abs(floor(vPos.xz/16.)-uCenterChunk);
@@ -79,6 +81,7 @@ void main(){
     daylight=mix(daylight,light.a,weight);
    }
   }
+  emission=max(emission,heldLightAt(vPos+normal*.02,normal));
  }
  vec3 ambient=vec3(.65,.72,.93)*uBrightness;
  if(uCityDaylight){
@@ -315,6 +318,8 @@ export class Renderer{
   this.distanceBlurProgram=p;
   this.distanceBlurUniforms={scene:gl.getUniformLocation(p,'uScene'),depth:gl.getUniformLocation(p,'uDepth'),pixel:gl.getUniformLocation(p,'uPixel'),clip:gl.getUniformLocation(p,'uClip')};
  }catch(error){console.warn('Far blur disabled: shader unavailable',error);this.distanceBlurEnabled=false}
+ this.heldLight=new HeldLight(gl);
+ this.heldLightUniforms=heldLightUniforms(gl,this.program);
  this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
  this.meshes=new Map();this.chunkFrustum=new Float32Array(24);this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
@@ -411,7 +416,7 @@ export class Renderer{
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
- resetWorld(world){this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){for(const name of ['opaque','transparent','doorSteel','doorGlass'])this.dispose(mesh[name]);for(const states of mesh.levers)for(const lever of states)this.dispose(lever);}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
+ resetWorld(world){this.heldLight.clear();this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){for(const name of ['opaque','transparent','doorSteel','doorGlass'])this.dispose(mesh[name]);for(const states of mesh.levers)for(const lever of states)this.dispose(lever);}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
  queueMesh(world,key,chunk,yMin,yMax,detailY){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
@@ -425,7 +430,7 @@ export class Renderer{
   if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed,yMin,yMax,detailY});this.completed.push({task,data:{...geo,bounds:chunkMeshBounds(geo.opaque,geo.transparent)}});return}
   const buffers=[];
   const offset=Math.max(0,(yMin??0)-1)*SIZE*SIZE,end=Math.min(chunk.height,(yMax??chunk.height)+1)*SIZE*SIZE;
-  const copy=(a)=>{const data=new Uint8Array(a.subarray(offset,end));buffers.push(data.buffer);return data.buffer};
+  const copy=(a)=>{const data=a.slice(offset,end);buffers.push(data.buffer);return data};
   this.inflight.set(key,task);
   const neighborBuffers=neighbors.map(([dx,dz,data,forms,styles])=>{
    if(!dx||!dz)return [dx,dz,copy(data),forms&&copy(forms),styles&&copy(styles)];
@@ -433,10 +438,10 @@ export class Renderer{
    const corner=(dz<0?SIZE-1:0)*SIZE+(dx<0?SIZE-1:0);
    const copyCorner=array=>{
     if(!array)return undefined;
-    const strip=new Uint8Array((end-offset)/(SIZE*SIZE));
+    const strip=new array.constructor((end-offset)/(SIZE*SIZE));
     for(let i=0;i<strip.length;i++)strip[i]=array[offset+i*SIZE*SIZE+corner];
     buffers.push(strip.buffer);
-    return strip.buffer;
+    return strip;
    };
    return [dx,dz,copyCorner(data),copyCorner(forms),copyCorner(styles),offset/(SIZE*SIZE)];
   });
@@ -573,7 +578,7 @@ export class Renderer{
   for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);
   return new Float32Array(arr)
  }
- frame(world,player,entities,effects,dt=1/60,combat=null,observers=null){
+ frame(world,player,entities,effects,dt=1/60,combat=null,observers=null,heldLamp=null){
   const gl=this.gl,canvas=this.canvas;
   const pixels=hologramFrameSize(canvas.clientWidth,canvas.clientHeight,this.maxPixelRatio*this.renderScale,
    typeof devicePixelRatio==='number'?devicePixelRatio:1,Boolean(this.hologram?.opened));
@@ -637,6 +642,9 @@ export class Renderer{
   gl.uniform1i(this.u.CityDaylight,city?1:0);
   if(city)gl.uniform3f(this.u.LowerFog,.094,.148,.177);
   this.updateLightVolume(world,player);
+  const frameTime=performance.now();
+  this.heldLight.update(world,heldLamp,[player.x,cameraEyeY(player)-.32,player.z],frameTime);
+  this.heldLight.bindUniforms(this.heldLightUniforms,frameTime);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,this.lightTexture);
   gl.uniform1i(this.u.lightVolume,0);
   gl.uniform1i(this.u.materials,2);
@@ -752,21 +760,25 @@ export class Renderer{
    drawDoors(e,mesh,false);
   }
   gl.uniform3f(this.u.entityOffset,0,0,0);
-  const time=performance.now()*.001;
+  const time=frameTime*.001;
   const scene=this.dynamicData(entities,effects,time);
   let data=scene;
-  if(combat&&(combat.main||combat.off)){
-   const held=weaponView(combat,eye,baseYaw,player.pitch,time,this.walkAmount,(center,ray,reach)=>{
+  if(combat&&(combat.main||combat.off||heldLamp)){
+   const wallDistance=(center,ray,reach)=>{
     const origin={x:center[0],y:center[1],z:center[2]};
     let room=raycast(world,origin,ray,reach,{solidOnly:true})?.distance??reach;
     for(const train of world.trainColliders??[])room=train.shellDistance(origin,ray,room);
     return room;
-   });
-   data=new Float32Array(scene.length+held.length);
-   data.set(scene);data.set(held,scene.length);
+   };
+   const weapons=combat.main||combat.off?weaponView(combat,eye,baseYaw,player.pitch,time,this.walkAmount,wallDistance):null;
+   const lamp=heldLamp?heldLightView(heldLamp,eye,baseYaw,player.pitch,time,this.walkAmount,wallDistance):null;
+   data=new Float32Array(scene.length+(weapons?.length??0)+(lamp?.length??0));
+   data.set(scene);
+   if(weapons)data.set(weapons,scene.length);
+   if(lamp)data.set(lamp,scene.length+(weapons?.length??0));
   }
   this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
-  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62],this.lightOrigin,[LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH]);
+  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62],this.lightOrigin,[LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH],this.heldLight,frameTime);
   gl.useProgram(this.program);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);

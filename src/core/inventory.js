@@ -104,7 +104,11 @@ export class SurvivalInventory{
   // Apply all ingredients and the output as a single ledger mutation.
   for(const [id,n] of Object.entries(recipe.needs)){
    const key=Number(id),left=this.count(key)-n;
-   if(left)this.items.set(key,left);else this.items.delete(key);
+   if(left)this.items.set(key,left);
+   else{
+    this.items.delete(key);
+    this.quickSlots=this.quickSlots.map(slot=>slot===key?null:slot);
+   }
   }
   this.items.set(recipe.id,this.count(recipe.id)+recipe.count);this.seen.add(recipe.id);this.save();return true;
  }

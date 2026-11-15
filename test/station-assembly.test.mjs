@@ -23,13 +23,14 @@ const chunks=()=>{const map=new Map();
  };
  return {map,at};
 };
-test('append-only station registry preserves 188 previous IDs and 8-bit chunk format',()=>{
+test('append-only station registry preserves previous IDs and byte-sized station chunks',()=>{
  assert.equal(B.CRATE,187);
  assert.equal(STATION_MATERIAL_START,188);
  assert.equal(STATION_PART_START,208);
  assert.ok(BLOCKS.length>=246);assert.equal(BLOCK_LABELS.length,BLOCKS.length);
  assert.equal(STATION_MATERIALS.length,20);assert.equal(STATION_PARTS.length,30);
- assert.ok(BLOCKS.every((b,id)=>b.id===id&&id<=255));
+ assert.ok(BLOCKS.every((b,id)=>b.id===id));
+ assert.ok(new Chunk(0,0).data instanceof Uint8Array);
  assert.equal(PARTS.length,70);
  for(const part of STATION_PARTS)assert.equal(partById(part.id)?.id,part.id);
  assert.equal(new Set(STATION_PARTS.map(p=>p.id)).size,30);

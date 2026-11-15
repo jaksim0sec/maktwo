@@ -1,5 +1,6 @@
 import {observerPose,observerCollapseProgress} from '../entities/observers.js';
 import {BLOCK_SIZE} from '../core/scale.js';
+import {HELD_LIGHT_SHADER,heldLightUniforms} from './held-light.js';
 
 const VERT=`#version 300 es
 precision highp float;
@@ -65,6 +66,7 @@ uniform vec2 uFogRange;
 uniform float uPresence;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin,uLightSize;
 out vec4 frag;
+${HELD_LIGHT_SHADER}
 void main(){
  vec3 n=normalize(cross(dFdx(vPos),dFdy(vPos)));
  if(uPresence<=0.)discard;
@@ -78,7 +80,8 @@ void main(){
   light=texelFetch(uLightVolume,ivec3(floor(pos)),0);
  float facing=max(0.,dot(n,normalize(vec3(-.38,.71,.57))));
  vec3 ambient=vec3(.105,.112,.116)+vec3(.24,.29,.28)*light.a;
- vec3 color=vColor*(ambient+light.rgb*.85)*(.72+.28*facing);
+ vec3 emit=max(light.rgb,heldLightAt(vPos/${BLOCK_SIZE.toFixed(2)}+n*.02,n));
+ vec3 color=vColor*(ambient+emit*.85)*(.72+.28*facing);
  float fog=clamp((distance(vPos,uEye)-uFogRange.x)/uFogRange.y,0.,1.);
  frag=vec4(mix(color,uFog,fog*.91),1.);
 }`;
@@ -113,6 +116,7 @@ export class ObserverRenderer {
   this.program=p;
   this.u=Object.fromEntries(['VP','Place','Blend','Cloud','EyeFrom','Eye','Fog','FogRange',
    'Neck','EyeAim','Gait','Stride','WalkPose','Breath','Presence','Collapse','CollapseSide','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
+  this.heldLightUniforms=heldLightUniforms(gl,p);
   this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
   upload(new Uint16Array(parts[2]),gl.ELEMENT_ARRAY_BUFFER);
   upload(new Uint8Array(parts[1]),gl.ARRAY_BUFFER);
@@ -123,7 +127,7 @@ export class ObserverRenderer {
   gl.bindVertexArray(null);
   this.eyeFrom=meta.eyeFrom;this.indexCount=parts[2].byteLength/2;this.ready=true;
  }
- draw(pack,vp,eye,fog,fogRange,lightOrigin=[0,0,0],lightSize=[0,0,0]){
+ draw(pack,vp,eye,fog,fogRange,lightOrigin=[0,0,0],lightSize=[0,0,0],heldLight=null,now=0){
   if(!pack?.views.length)return 0;
   if(!this.ready){
    if(performance.now()<(this.tryAt??0))return 0;
@@ -136,6 +140,8 @@ export class ObserverRenderer {
   gl.uniform3fv(u.Eye,eye);gl.uniform3fv(u.Fog,fog);gl.uniform2fv(u.FogRange,fogRange);
   gl.uniform1i(u.EyeFrom,this.eyeFrom);
   gl.uniform1i(u.LightVolume,0);gl.uniform3fv(u.LightOrigin,lightOrigin);gl.uniform3fv(u.LightSize,lightSize);
+  if(heldLight)heldLight.bindUniforms(this.heldLightUniforms,now);
+  else gl.uniform4f(this.heldLightUniforms.Current,0,0,0,-1);
   gl.disable(gl.CULL_FACE);
   let calls=0;
   for(const e of pack.views){

@@ -1,4 +1,4 @@
-import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId,RETIRED_BLOCK_IDS} from './blocks.js';
+import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId,portableLight,RETIRED_BLOCK_IDS} from './blocks.js';
 import {RECIPES} from './crafting.js';
 import {CITY_MODE,CITY_SEED} from '../worldgen/eternal-night-game.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
@@ -21,7 +21,7 @@ const placeables=new Set([
  B.FLOWER,B.GLOW_MUSHROOM,B.REEDS,B.FIREFLY_GRASS,B.CITY_DAMP_GROWTH,
 ]);
 const visible=BLOCKS.filter(({id})=>!RETIRED_BLOCK_IDS.has(id)&&id!==B.AIR&&id!==B.BEDROCK&&id!==B.DOOR_TOP&&id!==B.PORTAL&&itemId(id)===id).map(({id})=>id);
-export const isPlaceableItem=id=>placeables.has(id);
+export const isPlaceableItem=id=>placeables.has(id)||Boolean(portableLight(id));
 export const CREATIVE_ITEMS=Object.freeze(visible);
 export const PALETTES=Object.freeze({
  blocks:{label:'건축재',items:visible.filter(id=>(id<PART_ID_START||B.STATION_TRACK_BALLAST<=id&&id<B.PART_STATION_TRAINWALL_1||id===B.CITY_PAINT_WHITE||id===B.CITY_PAINT_GRAY)&&!isPlaceableItem(id))},

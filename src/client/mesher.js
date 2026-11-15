@@ -142,7 +142,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
     }
     const transparent=TRANSPARENT[id];
     mask[i]=(!otherForm&&OPAQUE[other])||(id===other&&(transparent||CUTOUT[id]))||(!transparent&&other===B.GLASS)
-      ?0:id|(id===B.WATER&&n!==1?y<<8:0)|(n===1?(cubeTurns?.[idx]||0)<<14:0);
+      ?0:id|(id===B.WATER&&n!==1?y<<16:0)|(n===1?(cubeTurns?.[idx]||0)<<26:0);
    }
    for(let j=0;j<nv;j++)for(let k=0;k<nu;){
     const idx=j*nu+k,mat=mask[idx];if(!mat){k++;continue}
@@ -150,7 +150,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
     while(k+width<nu&&mask[idx+width]===mat)width++;
     heightLoop:while(j+height<nv){for(let t=0;t<width;t++)if(mask[(j+height)*nu+k+t]!==mat)break heightLoop;height++}
     for(let jj=0;jj<height;jj++)mask.fill(0,(j+jj)*nu+k,(j+jj)*nu+k+width);
-    const id=mat&255,dest=TRANSPARENT[id]?transparent:opaque;
+    const id=mat&0xffff,dest=TRANSPARENT[id]?transparent:opaque;
     const c=[0,0,0];c[n]=layer;c[u]=k;c[v]=j;
     const xyz=[ox+c[0],yMin+c[1],oz+c[2]],water=id===B.WATER;
     const verts=corners.map(q=>{
@@ -163,7 +163,7 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
     const variation=id===B.GLASS?1:.95+variationSeed*.06;
     const material=materialFor(id,faceIndex);
     // One deterministic transform per greedy quad, encoded in existing vertex bits.
-    const turns=materialUVTransform(material,variationSeed,id===B.WATER?0:(mat>>>14)&3);
+    const turns=materialUVTransform(material,variationSeed,id===B.WATER?0:(mat>>>26)&3);
     quad(dest,verts,[color[0]*variation,color[1]*variation,color[2]*variation],
       (id===B.GLASS?1:shade)+4*material+512*turns);
     k+=width;
@@ -444,6 +444,18 @@ export function fixture(dest,id,x,y,z){
   textured(.359,.675,.359,.282,.038,.282,'#42494d',metal);
   for(const px of [.411,.556])textured(px,.714,.465,.035,.122,.067,'#716959',metal);
   textured(.410,.817,.464,.182,.031,.069,'#a48b69',metal);
+ }else if(id===B.ELECTRIC_LAMP){
+  const metal=FIXTURE_MATERIAL.LANTERN_METAL;
+  textured(.23,.045,.23,.54,.105,.54,'#46545a',metal);
+  textured(.28,.15,.28,.44,.17,.44,'#2e393f',metal);
+  // A blue-white diffuser housed between protective ribs and a folding handle.
+  shape(.331,.318,.331,.338,.245,.338,'#dcf3ff',-1.18);
+  for(const px of [.299,.661])for(const pz of [.299,.661])
+   textured(px,.27,pz,.04,.34,.04,'#5c6b6f',metal);
+  textured(.28,.56,.28,.44,.073,.44,'#48565d',metal);
+  textured(.31,.633,.31,.38,.042,.38,'#6d7b7f',metal);
+  for(const px of [.365,.59])textured(px,.675,.474,.045,.13,.052,'#4f6269',metal);
+  textured(.365,.793,.474,.27,.041,.052,'#687b7e',metal);
  }else if(id===B.CAMPFIRE){
   shape(.13,.09,.28,.74,.18,.18,'#80624d');
   shape(.28,.06,.13,.18,.19,.74,'#7b5d4a');
