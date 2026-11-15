@@ -13,6 +13,8 @@ import {partById} from '../core/part-library.js';
 import {partPrisms,prismFaces,prismNormal,stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from '../core/part-prisms.js';
 import {treeGeometryForBlock,dampGrowthMesh} from './tree-mesh.js';
 
+// Declared before COLORS below, which calls rgb() while this module is still initializing.
+const rgbCache=new Map();
 // Winding and direction are kept consistent with the WebGL cull-face convention.
 const FACES = [
   {d:[1,0,0],  n:0, u:1, v:2, corners:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]],shade:.78},
@@ -52,12 +54,45 @@ function partTemplate(id,facing,connected,simple,stairRise,cityStair,treadHeight
  partTemplates.set(key,template);return template;
 }
 
+// A fence is fully described by its joint list and material. There are only a few dozen
+// distinct configurations, so each is built once (cell-relative, full double precision so
+// the emitted floats match per-instance construction) and then translated per block.
+const fenceTemplates=new Map();
+function fenceTemplate(joints,metal){
+ const key=(metal?'m':'w')+joints.map(j=>j.join(',')).join(';');
+ let template=fenceTemplates.get(key);
+ if(template)return template;
+ const out=[],color=rgb(metal?'#41484b':'#937755');
+ fencePrisms(0,0,0,joints,metal).forEach((piece,pieceIndex)=>{
+  prismFaces(piece).forEach((face,faceIndex)=>{
+   // Piece 0 is the post. Every rail starts at the post centre; face 2 is the end cap
+   // there, which lies strictly inside the post and can never be seen.
+   if(pieceIndex>0&&faceIndex===2)return;
+   for(let i=1;i<face.length-1;i++)for(const j of [0,i,i+1])out.push(...face[j],...color,.87);
+  });
+ });
+ template=Float64Array.from(out);
+ fenceTemplates.set(key,template);
+ return template;
+}
+
 function emitPart(target,vertices,x,y,z){
  for(let i=0;i<vertices.length;i+=7)target.push(x+vertices[i],y+vertices[i+1],z+vertices[i+2],vertices[i+3],vertices[i+4],vertices[i+5],vertices[i+6]);
 }
 
-export function rgb(hex){const s=hex.replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
-export function quad(arr,v,color,shade){for(const i of [0,1,2,0,2,3])arr.push(...v[i],...color,shade)}
+// Hex parsing runs per fixture part and per entity per frame; the parsed triple never changes.
+// Results are frozen so a caller can never corrupt the shared entry.
+export function rgb(hex){
+ let c=rgbCache.get(hex);
+ if(!c){const s=hex.replace('#','');c=Object.freeze([parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]);rgbCache.set(hex,c)}
+ return c;
+}
+// Explicit pushes: spreading three small arrays per vertex dominated profiles of large meshes.
+const QUAD_ORDER=[0,1,2,0,2,3];
+export function quad(arr,v,color,shade){
+ const r=color[0],g=color[1],b=color[2];
+ for(let t=0;t<6;t++){const p=v[QUAD_ORDER[t]];arr.push(p[0],p[1],p[2],r,g,b,shade)}
+}
 export function cube(arr,x,y,z,w,h,d,color,shade=1){for(const face of FACES){const v=face.corners.map(([a,b,c])=>[x+a*w,y+b*h,z+c*d]);quad(arr,v,color,face.shade*shade)}}
 
 // Six directional masks; every rectangular run of the same block becomes ONE quad.
@@ -229,11 +264,16 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   const start=opaque.length;
   if(id===B.FENCE){
    const metal=variant===6||variant===7;
-   const joints=fenceJoints((dx,dy,dz)=>neighbor(dx,dy,dz).id);
-   const color=rgb(metal?'#41484b':'#937755');
-   for(const piece of fencePrisms(wx,y,wz,joints,metal))for(const face of prismFaces(piece)){
-    for(let i=1;i<face.length-1;i++)for(const j of [0,i,i+1])opaque.push(...face[j],...color,.87);
-   }
+   // Joint detection only needs block ids. The generic neighbor() also builds a state object
+   // and a string key for every probe, and a fence probes up to ~60 cells.
+   const joints=fenceJoints((dx,dy,dz)=>{
+    const nx=x+dx,nz=z+dz,ny=y+dy,cx=Math.floor(nx/SIZE),cz=Math.floor(nz/SIZE);
+    const data=cx||cz?adjacent.get(`${cx},${cz}`):chunk;
+    const k=data?.cornerY===undefined?(ny*SIZE+(nz+SIZE)%SIZE)*SIZE+(nx+SIZE)%SIZE:ny-data.cornerY;
+    return data?.data?.[k]||B.AIR;
+   });
+   const template=fenceTemplate(joints,metal);
+   for(let i=0;i<template.length;i+=7)opaque.push(wx+template[i],y+template[i+1],wz+template[i+2],template[i+3],template[i+4],template[i+5],template[i+6]);
    continue;
   }
   if(id===B.PATH||id===B.GLOW_MUSHROOM||id===B.WORKBENCH)gardenMesh(opaque,id,wx,y,wz);

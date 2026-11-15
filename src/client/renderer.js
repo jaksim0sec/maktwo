@@ -13,6 +13,7 @@ import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,makeDaylightSnapshot,buildLightVolume} from '../core/lightVolume.js';
 import {cameraEyeY,dampStepOffset,VERTICAL_FOV,FOV_TAN} from './camera.js';
+import {frustumPlanes,boxIntersectsFrustum} from './frustum.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
 import {TRAIN,trainDoorMotion} from '../worldgen/station-train.js';
@@ -649,7 +650,7 @@ export class Renderer{
   gl.uniform1i(this.u.materials,2);
   gl.uniform3fv(this.u.lightOrigin,this.lightOrigin);
   gl.uniform3f(this.u.lightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
-  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=this.maxDistance||88;const visible=[],coverage=new Int32Array(9);for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m);
+  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=this.maxDistance||88;const visible=[],coverage=new Int32Array(9);const planes=frustumPlanes(vp),pad=2,worldTop=world.height??64;for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;if(boxIntersectsFrustum(planes,(chunk.cx*SIZE-pad)*BLOCK_SIZE,((m.yMin??0)-pad)*BLOCK_SIZE,(chunk.cz*SIZE-pad)*BLOCK_SIZE,((chunk.cx+1)*SIZE+pad)*BLOCK_SIZE,((m.yMax??worldTop)+pad)*BLOCK_SIZE,((chunk.cz+1)*SIZE+pad)*BLOCK_SIZE))visible.push(m);
    if(canyon&&m.yMin===this.nearYMin&&m.yMax===this.nearYMax){
     const row=chunk.cz-Math.floor(cz/SIZE)+4,col=chunk.cx-Math.floor(cx/SIZE)+4;
     if(row>=0&&row<9&&col>=0&&col<9)coverage[row]|=1<<col;
