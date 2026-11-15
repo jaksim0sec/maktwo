@@ -171,7 +171,7 @@ function pointerRay(player,nx,ny,aspect){
 }
 function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(`Spatial inventory shader: ${gl.getShaderInfoLog(shader)}`);return shader}
 export class Hologram{
- constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dirty=true;
+ constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dragSource=null;this.dragTarget=null;this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
@@ -202,7 +202,7 @@ export class Hologram{
 
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
- close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}
+ close(){this.opened=false;this.pointer=null;this.hover=null;this.dragSource=null;this.dragTarget=null;this.keyboardMode=false}
  setInventory(palette,items,selected,station='hand',page=null,craftFilter='all',inspection=null,options={}){
   const changed=this.palette!==palette;
   this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.craftFilter=craftFilter;this.activeItemId=inspection?.blockId??options.selectedId??null;
@@ -389,7 +389,7 @@ export class Hologram{
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
-  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.keyboardMode?this.cards.findIndex(card=>card.id===this.focusId):-1);
+  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.dragTarget?this.cards.findIndex(card=>card.id===this.dragTarget):this.hover?.index??-1);gl.uniform1i(this.u.selected,this.dragSource?this.cards.findIndex(card=>card.id===this.dragSource):this.keyboardMode?this.cards.findIndex(card=>card.id===this.focusId):-1);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
   // Spatial head-attached UI is not world geometry: keep full 3D perspective
