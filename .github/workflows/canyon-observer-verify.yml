@@ -14,3 +14,18 @@ jobs:
           node-version: '22'
       - name: Observer and canyon integration tests
         run: node --test test/canyon-v2-observer.test.mjs test/observer-stealth.test.mjs test/observer-pack.test.mjs test/canyon-v2.test.mjs
+      - name: Full game regression suite
+        run: npm test
+
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Main regression baseline
+        run: npm test
