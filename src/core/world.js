@@ -26,8 +26,8 @@ export class World{
   if(existing)return existing;
   const saved=this.edits.get(k);
   if(saved)for(const [idx,id] of saved){
-   if(idx<0||idx>=chunk.data.length)continue;
-   chunk.data[idx]=id;
+   if(idx<0||idx>=chunk.data.length||!Number.isInteger(id)||id<0||id>=BLOCKS.length)continue;
+   chunk.writeBlock(idx,id);
    if(chunk.styles)chunk.styles[idx]=0;
    if(chunk.forms)chunk.forms[idx]=0;
   }

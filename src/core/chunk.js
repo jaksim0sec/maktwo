@@ -16,5 +16,9 @@ export class Chunk{
  get height(){return this.data.length/(SIZE*SIZE)}
  static index(x,y,z){return (y*SIZE+z)*SIZE+x}
  get(x,y,z){if(x<0||x>=SIZE||z<0||z>=SIZE||y<0||y>=this.height)return 0;return this.data[Chunk.index(x,y,z)]}
- set(x,y,z,id){if(x<0||x>=SIZE||z<0||z>=SIZE||y<0||y>=this.height)return false;const i=Chunk.index(x,y,z);if(this.data[i]===id)return false;this.data[i]=id;this.dirty=true;this.revision++;return true}
+ writeBlock(index,id){
+  if(id>255&&this.data instanceof Uint8Array)this.data=Uint16Array.from(this.data);
+  this.data[index]=id;
+ }
+ set(x,y,z,id){if(x<0||x>=SIZE||z<0||z>=SIZE||y<0||y>=this.height)return false;const i=Chunk.index(x,y,z);if(this.data[i]===id)return false;this.writeBlock(i,id);this.dirty=true;this.revision++;return true}
 }

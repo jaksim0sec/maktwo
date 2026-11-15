@@ -1,6 +1,6 @@
 import {Combat,weapons} from '../core/combat.js';
 import {WorldManager} from '../core/world.js';
-import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';
+import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,portableLight,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';
 import {TerrainWorker} from './terrain-worker.js';
 import {applyCameraLook,cameraEyeY,FOV_TAN} from './camera.js';import {Hologram} from './hologram.js';
 import {inventoryPageSize} from './hologram-layout.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
@@ -122,6 +122,10 @@ class Game{
   this.updateFormControls();
  }
  get paletteItems(){return this.inventory.quickSlots}
+ get heldLightId(){
+  const id=this.paletteItems[this.selected];
+  return portableLight(id)&&this.inventory.has(id)?id:null;
+ }
  renderHotbar(){
   const bar=$('hotbar');bar.replaceChildren();for(let i=0;i<7;i++){
    const id=this.inventory.quickSlots[i];
@@ -274,7 +278,7 @@ class Game{
   if(step==='quantity')item.amount=Math.max(1,Math.min(item.amount,this.inspectionLimit(item)));
   const actions=recipe?[['craft',inventory.canCraft(recipe,this.activeStation())?'제작하기':'제작 조건 확인']]:
    container?[['quantity',stored?'꺼내기':'넣기']]:[['slots','빠른 슬롯'],['move','슬롯 이동'],...(!this.player.creative?[['quantity','버리기']]:[])];
-  const description=weapons[id]?'손에 장착해 공격에 사용':isContainer(id)?'아이템을 넣고 꺼낼 수 있는 수납품':
+  const description=portableLight(id)?'손에 들면 주변을 밝히고 클릭하면 설치':weapons[id]?'손에 장착해 공격에 사용':isContainer(id)?'아이템을 넣고 꺼낼 수 있는 수납품':
    isBed(id)?'휴식과 부활 지점 저장':definition.light?'주변을 밝히는 광원':
    part?(PART_FAMILIES.find(f=>f.key===part.family)?.label||'건축 부품'):definition.solid?'설치할 수 있는 건축재':'설치하거나 제작에 쓰는 아이템';
   const ingredients=recipe?Object.entries(recipe.needs).map(([key,n])=>`${blockLabel(Number(key))} ${inventory.count(Number(key))}/${n}`):[];
@@ -524,7 +528,10 @@ class Game{
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
   const previous=this.paletteItems[this.selected];
   this.selected=toggle&&this.selected===i?-1:(i>=0&&(this.paletteItems[i]===null||this.inventory.count(this.paletteItems[i])===0)?-1:i);
-  if(this.paletteItems[this.selected]!==previous)this.manualAngle=null;
+  if(this.paletteItems[this.selected]!==previous){
+   this.manualAngle=null;
+   if(this.heldLightId)this.combat.cancel();
+  }
   this.mining.reset();this.showMining(0);
   document.querySelectorAll('.slot').forEach(el=>{const active=Number(el.dataset.slot)===this.selected;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
   $('block-name').textContent=this.selected<0?'':blockLabel(this.paletteItems[this.selected]);
@@ -844,10 +851,10 @@ class Game{
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
   this.interactTimer=Math.max(0,this.interactTimer-dt);
   const p=this.player,d=p.direction(),origin={x:p.x,y:cameraEyeY(p),z:p.z};
-  const miningMode=input.mine;
+  const miningMode=input.mine,heldLamp=this.heldLightId;
   const aim=this.input.locked?null:(input.aim||this.input.canvasCursor());
   const ray=aim?screenRay(p,aim.x,aim.y,this.canvas.clientWidth,this.canvas.clientHeight):d;
-  if(this.combat.main||(this.combat.off&&this.selected<0)||this.combat.attack){
+  if(!heldLamp&&(this.combat.main||(this.combat.off&&this.selected<0)||this.combat.attack)){
    if(input.use)this.combat.start(ray,p);
    if(this.combat.main||input.use||this.combat.attack){
     this.target=null;this.mining.reset();this.showMining(0);return;
@@ -887,7 +894,7 @@ class Game{
   }
   // Cursor-specific entity targeting, checked before construction.
   const hitMob=this.entities.hitRay(origin,ray,3.8,interactionDistance,.18);
-  if((input.use||miningMode)&&this.interactTimer<=0&&hitMob){
+  if((input.use&&!heldLamp||miningMode)&&this.interactTimer<=0&&hitMob){
    hitMob.hurt(4,p);this.effects.burst(hitMob.x,hitMob.y+hitMob.height*.6,hitMob.z,'#b8a08f',4);
    this.interactTimer=.38;this.mining.reset();this.showMining(0);return;
   }
@@ -1000,7 +1007,7 @@ class Game{
    this.combat.tick(dt,this.world,this.entities,p,cameraEyeY(p),this.effects);
   }
  }
- frame(time){if(this.travelPending){this.last=time;this.scheduleFrame();return}const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){if(this.hologram.syncViewport())this.updateHologram(true);this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);if(this.travelPending){this.scheduleFrame();return}this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);this.terrainWorker.stream(this.world,this.player.x,this.player.z,this.renderRadius||3,this.frameCount%3===0);this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
+ frame(time){if(this.travelPending){this.last=time;this.scheduleFrame();return}const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){if(this.hologram.syncViewport())this.updateHologram(true);this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);if(this.travelPending){this.scheduleFrame();return}this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);this.terrainWorker.stream(this.world,this.player.x,this.player.z,this.renderRadius||3,this.frameCount%3===0);this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers,this.player.dead?null:this.heldLightId);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
  hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 원거리 ${(this.renderer.distanceMesh?.count??0)+(this.renderer.farMesh?.count??0)} verts / ${this.renderer.lastDistanceDrawCalls??0} draw · 전체 ${this.renderer.lastDrawCalls??0} draw · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';this.renderStatusRing('health',p.hp,p.maxHp);this.renderStatusRing('stamina',p.stamina,100);document.body.classList.toggle('submerged',this.world.get(p.x,p.y+p.eye,p.z,false)===B.WATER);$('flight').textContent=p.fly?'비행 중':'걷는 중'}
 }

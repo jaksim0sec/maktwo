@@ -22,7 +22,7 @@ test('eight appended tree and litter IDs preserve all preexisting 0-237 save ind
  assert.equal(B.FALLEN_SAKURA,242);assert.equal(B.FALLEN_GINKGO,243);
  assert.equal(B.FALLEN_MAPLE,244);assert.equal(B.FALLEN_GREEN,245);
  assert.ok(BLOCKS.length>=246);assert.equal(BLOCK_LABELS.length,BLOCKS.length);
- assert.ok(BLOCKS.every((b,i)=>b.id===i&&i<=255));
+ assert.ok(BLOCKS.every((b,i)=>b.id===i));
  assert.equal(TREE_SPECIES.length,4);
  assert.equal(TREE_BLOCKS.length,4);assert.equal(FALLEN_LEAF_BLOCKS.length,4);
  for(const p of [...TREE_BLOCKS,...FALLEN_LEAF_BLOCKS]){

@@ -14,6 +14,7 @@ export const RECIPES=Object.freeze([
  make('steel_bar',B.STEEL_BAR,1,'bench',['  O',' O ','O  '],{O:B.ORE},'긴 철파이프'),
  make('planks',B.PLANKS,4,'hand',['W'],{W:B.WOOD},'나무 판자 ×4'),
  make('torch',B.TORCH,4,'hand',['P','P'],{P:B.PLANKS},'랜턴 ×4'),
+ make('electric_lamp',B.ELECTRIC_LAMP,1,'bench',['G','L','M'],{G:B.DIRTY_GLASS,L:B.TORCH,M:B.RUSTED_METAL},'전기램프'),
  make('workbench',B.WORKBENCH,1,'hand',['PP','PP'],{P:B.PLANKS},'작업대'),
  make('door',B.DOOR,1,'bench',['PP','PP','PP'],{P:B.PLANKS},'나무 문'),
  make('fence',B.FENCE,3,'bench',['PPP','P P'],{P:B.PLANKS},'나무 울타리 ×3'),
