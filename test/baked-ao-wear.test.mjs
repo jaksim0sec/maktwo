@@ -31,7 +31,7 @@ test('dome outer wall uses the same white tile material as enclosed passage wall
 });
 test('both status progress rings have no glow shadow',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
- const rule=css.match(/\.ring-fill\{([^}]+)\}/)?.[1]||'';
+ const rule=[...css.matchAll(/\.ring-fill\{([^}]+)\}/g)].map(m=>m[1]).join(';');
  assert.ok(rule.includes('transition:stroke-dasharray'));
  assert.doesNotMatch(rule,/(?:filter|box-shadow|text-shadow)/);
 });

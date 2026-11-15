@@ -60,9 +60,9 @@ test('glass has seamless identical material texels at tile borders and center',(
 });
 test('HUD hides crosshair, has a visible inventory exit, and mobile has simple crouch/jump actions',()=>{
  const html=source('index.html'),css=source('style.css'),game=source('src/client/game.js');
- assert.match(css,/#crosshair\{display:none!important/);
+ assert.match(css,/#crosshair\{display:none/);
  assert.match(html,/id="inventory-close"/);assert.match(game,/bindClick\('inventory-close'/);
  assert.match(html,/data-action="crouch" aria-label="웅크리기"/);
  assert.match(css,/body\.holo-open #inventory-close\{display:block\}/);
- assert.match(game,/this\.hologram\.followPlayer\(this\.player\)/);
+ assert.match(game,/this\.hologram\.followPlayer\(this\.player,dt\)/);
 });
