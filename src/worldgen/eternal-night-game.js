@@ -12,6 +12,7 @@ import {createCoreTower,stampCoreTower} from './eternal-night-tower.js';
 import {createCoreLibrary,stampCoreLibrary} from './eternal-night-library.js';
 import {stampElevatedStationColumn} from './eternal-night-station-build.js';
 import {roadsideTreeCell} from './trees.js';
+import {designStreetDetails} from './eternal-night-street-details.js';
 import {floorFinish,hasDropCeiling,ceilingFixture,interiorWallFinish} from './eternal-night-interiors.js';
 import {floorEnvironment,lightProbability,survivingFixture,collapsePlan,stampCollapse} from './eternal-night-decay.js';
 
@@ -51,6 +52,10 @@ export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
       collapse:cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION?collapsePlan(v,seed):null,
       stairs:v.stairs[0]?.treads??[],landing:v.stairs[0]?.landing,access:v.stairs[0]?.upperLanding};
   });
+  if(cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION){
+    plan.starter=starterShelter(plan,seed);
+    plan.street=designStreetDetails(plan,seed,CITY_BASE_Y);
+  }
   return cached=plan;
 }
 
@@ -65,6 +70,38 @@ function lineDistance(x,z,a,b) {
 }
 
 const inside=insidePolygon;
+
+function starterShelter(plan,seed){
+ const {centerX,centerZ,width}=plan.layout;
+ const buildings=plan.volumes.filter(v=>v.support===null&&v.floors.length>=8)
+  .sort((a,b)=>score(a)-score(b));
+ function score(v){return Math.abs(Math.hypot((v.x0+v.x1)*.5-centerX,(v.z0+v.z1)*.5-centerZ)-width*.33);}
+ for(const v of buildings){
+  const mid=Math.floor(v.floors.length*(.4+.16*hash(v.id,1,2,seed)));
+  const {stairs,landing,access,collapse}=plan.details[v.id];
+  for(const f of v.floors.slice(Math.max(1,mid-2),mid+3)){
+   const y=Math.round(f.y);
+   if(collapse?.base===y)continue;
+   for(const hall of f.corridors){
+    if(hall.kind!=='corridor')continue;
+    const alongX=hall.x1-hall.x0>hall.z1-hall.z0;
+    const lo=Math.ceil((alongX?hall.x0:hall.z0)-.5),hi=Math.ceil((alongX?hall.x1:hall.z1)-.5);
+    const cross=Math.floor(alongX?(hall.z0+hall.z1)*.5:(hall.x0+hall.x1)*.5);
+    const line=[];
+    for(let i=lo;i<hi;i++){
+     const x=(alongX?i:cross)+.5,z=(alongX?cross:i)+.5,shape=inspectShape(f,x,z);
+     const clear=shape?.corridor===hall&&shape.edge<0&&!shape.partition&&!shape.door&&
+      !f.holes.some(h=>containsRect(h,x,z))&&![landing,access,...stairs].some(t=>t&&containsRect(t,x,z));
+     if(!clear){line.length=0;continue;}
+     line.push({x,y,z});
+     if(line.length<11||i<hi-1&&line.length<23)continue;
+     const spawn=line[0],head=line.at(-3),foot=line.at(-2),lamp=line.at(-1);
+     return {spawn:{...spawn,yaw:alongX?-Math.PI/2:Math.PI},head,foot,lamp,facing:alongX?1:0};
+    }
+   }
+  }
+ }
+}
 
 export function* citySpawnCandidates(seed,cityBlueprints=true) {
  const plan=createCityPlan(seed,cityBlueprints);
@@ -535,6 +572,8 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     }
     const reservedPassage=y=>reservedLevels.has(y);
     for(const v of plan.columns[index])stampBuilding(v,plan.details[v.id],x,z,seed,put,empty,reservedPassage,chunk.height);
+    const street=plan.street?.columns.get(Math.floor(x)+','+Math.floor(z));
+    if(street)for(const args of street.blocks)put(...args);
     let stationAccess=null;
     for(const {link,part} of paths){
       if(link.kind==='station')stationAccess=link;
@@ -549,6 +588,13 @@ export function stampCityChunk(chunk,seed,cityBlueprints=true) {
     if(Math.abs(x-tower.x)<=tower.radius+4&&Math.abs(z-tower.z)<=tower.radius+4)
       stampCoreTower(tower,x,z,put);
     if(plan.stations.length)stampElevatedStationColumn(plan,x,z,put);
+    const shelter=plan.starter;
+    if(shelter){
+      const {head,foot,lamp,facing}=shelter;
+      if(head.x===x&&head.z===z)put(head.y,B.BED,facing);
+      if(foot.x===x&&foot.z===z)put(foot.y,B.BED_FOOT,facing);
+      if(lamp.x===x&&lamp.z===z&&empty(lamp.y))put(lamp.y,B.TORCH);
+    }
     if((cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION)&&zone===CORE_ZONE.MAIN_ROUTE&&empty(CITY_BASE_Y)&&
       !plan.columns[index].length&&![...reservedLevels].some(level=>level>=CITY_BASE_Y&&level<=CITY_BASE_Y+13)){
       const tree=roadsideTreeCell(x,z,layout,seed);

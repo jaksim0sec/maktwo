@@ -2,7 +2,7 @@ import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {STATION_PREVIEW_MODE,STATION_PREVIEW_SPAWN} from '../worldgen/station-preview.js';
 import {ARBORETUM_MODE,ARBORETUM_SPAWN} from '../worldgen/trees.js';
-import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,CITY_STATION_REDESIGN_VERSION,CITY_BOTANICAL_VERSION,citySpawnCandidates} from '../worldgen/eternal-night-game.js';
+import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,CITY_STATION_REDESIGN_VERSION,CITY_BOTANICAL_VERSION,citySpawnCandidates,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from './part-prisms.js';import {LightIndex} from './lighting.js';
@@ -257,6 +257,17 @@ export class World{
  snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,time:this.time,edits,states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
  stream(x,z,radius=3,budget=2,{roundEdges=false}={}){const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
+ firstSpawn(){
+  if(this.mode===CITY_MODE&&this.version>=CITY_BOTANICAL_VERSION){
+   const shelter=createCityPlan(this.seed,this.version).starter;
+   if(shelter){
+    const {x,y,z}=shelter.spawn,{head,foot}=shelter;
+    if(this.get(head.x,head.y,head.z)===B.BED&&this.get(foot.x,foot.y,foot.z)===B.BED_FOOT&&
+      block(this.get(x,y-1,z)).opaque&&this.get(x,y,z)===B.AIR&&this.get(x,y+1,z)===B.AIR)return {...shelter.spawn};
+   }
+  }
+  return this.spawn();
+ }
  spawn(){
   if(this.mode===CITY_MODE){
    let fallback;

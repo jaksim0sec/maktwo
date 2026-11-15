@@ -1,4 +1,4 @@
-import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,CITY_DOOR_STEEL} from '../core/chunk.js';
+import {SIZE,MESH_NEIGHBORS, TURN_STYLE, EXTERIOR_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,CITY_DOOR_STEEL,ROAD_MIRROR_STYLE} from '../core/chunk.js';
 import {BLOCK as B,isBed,isBedFoot,itemId, BLOCKS, block} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {materialFor,materialUVTransform,FIXTURE_MATERIAL} from './textures.js';
@@ -161,8 +161,11 @@ export function meshChunkData(chunk,{neighbors=[],states=new Map(),visualSeed=0,
   }
   if(!CROSS[id]||id===B.DOOR_TOP)continue;
   if(id===B.CITY_DAMP_GROWTH){
-   if(detailY===undefined||detailY!==null&&Math.abs(y-detailY)<18)
-    emitPart(opaque,dampGrowthMesh(chunk.styles?.[idx]||0,hash(ox+x,y,oz+z,visualSeed)),ox+x,y,oz+z);
+   if(detailY===undefined||detailY!==null&&Math.abs(y-detailY)<18){
+    const style=chunk.styles?.[idx]||0;
+    const mesh=style&ROAD_MIRROR_STYLE?roadMirrorMesh(style&3):dampGrowthMesh(style,hash(ox+x,y,oz+z,visualSeed));
+    emitPart(opaque,mesh,ox+x,y,oz+z);
+   }
    continue;
   }
   if(BLOCKS[id].render==='tree'||BLOCKS[id].render==='leaf-litter'){
@@ -492,6 +495,34 @@ export function doorMesh(dest,x,y,z,state={facing:0,open:false},glassDest=dest,f
   if(style===5)part(dest,.12,.92,.055,acrossX?b.d+.07:b.w+.07,rgb('#c8c5b9'));
  }
  cube(dest,b.x+(acrossX?b.w*.78:-.025),y+.93,b.z+(acrossX?b.d+.008:b.d*.78),acrossX?.065:.06,.08,acrossX?.06:.065,rgb(steel?'#a6a5a0':'#cdbd8f'));
+}
+
+const roadMirrors=new Map();
+function roadMirrorMesh(facing){
+ if(roadMirrors.has(facing))return roadMirrors.get(facing);
+ const out=[];
+ cube(out,.43,0,.43,.14,.12,.14,rgb('#787773'));
+ cube(out,.464,.08,.464,.072,2.14,.072,rgb('#ac6c31'),.85);
+ cube(out,.41,2.03,.51,.18,.10,.17,rgb('#59534d'));
+ const rings=[[.49,.55,'#824621'],[.495,.62,'#ba6b2d'],[.451,.65,'#c9864c'],[.414,.66,'#c6c4ba'],[.29,.714,'#c4c9c4']];
+ const point=([r,z],i)=>[.5+r*Math.cos(i*Math.PI/12),2.25+r*Math.sin(i*Math.PI/12),z];
+ for(let i=0;i<24;i++){
+  const back=[.5,2.25,.55],a=point(rings[0],i),b=point(rings[0],i+1);
+  out.push(...back,...rgb('#875027'),.8,...b,...rgb('#875027'),.8,...a,...rgb('#875027'),.8);
+  for(let j=0;j<rings.length-1;j++){
+   const ring=rings[j],next=rings[j+1],lens=j===3;
+   quad(out,[point(ring,i),point(ring,i+1),point(next,i+1),point(next,i)],rgb(next[2]),lens?4*FIXTURE_MATERIAL.ROAD_MIRROR+.94:.91);
+  }
+  const color=rgb('#c4c9c4'),outer=rings.at(-1);
+  const shade=4*FIXTURE_MATERIAL.ROAD_MIRROR+.94;
+  out.push(...point(outer,i),...color,shade,...point(outer,i+1),...color,shade,.5,2.25,.738,...color,shade);
+ }
+ const sin=Math.sin(facing*Math.PI/2),cos=Math.cos(facing*Math.PI/2);
+ for(let i=0;i<out.length;i+=7){
+  const x=out[i]-.5,z=out[i+2]-.5;
+  out[i]=.5+x*cos-z*sin;out[i+2]=.5+x*sin+z*cos;
+ }
+ const mesh=new Float32Array(out);roadMirrors.set(facing,mesh);return mesh;
 }
 
 const STAIR_FONT={

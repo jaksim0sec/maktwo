@@ -8,8 +8,8 @@ import {STATION_MATERIALS,STATION_MATERIAL_START} from '../core/station-material
 import {sampleStationTexture} from './station-textures.js';
 import {sampleDetailedMaterial} from './material-art.js';
 export const TEXTURE_SIZE=32;
-export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label),'석회암 석재','대리석 석재','콘크리트 보 표면','천장 마감 표면','침대 목재','침대 린넨','침대 이불','랜턴 금속','낡은 백색 페인트','낡은 회색 페인트'];
-export const FIXTURE_MATERIAL=Object.freeze({BED_WOOD:95,BED_LINEN:96,BED_COVER:97,LANTERN_METAL:98});
+export const MATERIALS=['잔디 윗면','잔디 측면','흙','돌','모래','나무 옆면','나무 단면','잎','조약돌','판자','유리','광석','문','작업대 윗면','눈','얼음','층상 퇴적암','화강암','이끼','붉은 모래','침엽수 수피','석영','낡은 콘크리트','금 간 콘크리트','벗겨진 회벽','회색 바닥 타일','사무실 천장 패널','긁힌 철판','녹슨 철판','더러운 유리','상가 셔터','바랜 간판','상가 벽돌','노출 철근','곰팡이 회벽','콘크리트 잔해','천 차양','젖은 타일','흰 벽 타일','낡은 경고 표시',...ARCH_MATERIALS.map(m=>m.label),...STATION_MATERIALS.map(m=>m.label),'석회암 석재','대리석 석재','콘크리트 보 표면','천장 마감 표면','침대 목재','침대 린넨','침대 이불','랜턴 금속','낡은 백색 페인트','낡은 회색 페인트','흐린 도로반사경'];
+export const FIXTURE_MATERIAL=Object.freeze({BED_WOOD:95,BED_LINEN:96,BED_COVER:97,LANTERN_METAL:98,ROAD_MIRROR:101});
 // Only orientation-safe material families are transformed. Directional seams stay aligned.
 // Modes: 3 = quarter-turns and reflection; 1 = reflection; 0 = unchanged.
 const UV_VARIANTS=new Uint8Array(MATERIALS.length+1);
@@ -178,6 +178,14 @@ export function makeTextureLayers(size=TEXTURE_SIZE){
   const n=rand(x,y,m),fine=rand(x>>1,y>>1,m+31),patch=rand(x>>2,y>>2,m+71);
   let f=.89+.13*patch+.055*(fine-.5),r=1,g=1,b=1;
   const px=x*32/size,py=y*32/size;
+   if(m===100){
+    const haze=fn(x/size,y/size,5,971);
+    const grime=fn(x/size,(y/size*.25+.12)%1,11,113);
+    const level=215+21*haze-34*Math.max(0,grime-.52)-14*(n>.92);
+    const at=(m*size*size+y*size+x)*4;
+    out[at]=level;out[at+1]=level+2;out[at+2]=level;out[at+3]=255;
+    continue;
+   }
    if(m>=98){
     // Broader damp streaks collect along the two-tone boundary and at the skirting.
     const u=x/size,v=y/size,lower=m===99;

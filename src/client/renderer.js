@@ -103,6 +103,12 @@ void main(){
  }
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
  vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
+ // Weathered mirror lacquer returns a broad sky sheen with no reflected scene.
+ if(vMaterial==101){
+  vec3 viewDir=normalize(uCamera-vPos*${BLOCK_SIZE.toFixed(2)});
+  float glint=pow(max(0.,dot(reflect(-viewDir,normal),normalize(vec3(-.28,.80,.53)))),3.);
+  c+=tinted*vec3(.43,.51,.57)*(.19+.52*daylight+.29*glint);
+ }
  float peak=max(c.r,max(c.g,c.b));
  if(uCityDaylight){
   float knee=vEmission>.5?.60:.39;

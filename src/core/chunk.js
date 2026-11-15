@@ -4,6 +4,7 @@ export const MESH_NEIGHBORS=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,
 export const TURN_STYLE=32;
 export const EXTERIOR_STYLE=64;
 export const CITY_DOOR_STEEL=8;
+export const ROAD_MIRROR_STYLE=128;
 // Reserved high bit marks a generated single-tread city stair. Legacy parts are unchanged.
 export const CITY_GENERATED_STYLE=128,CITY_STAIR_STYLE=CITY_GENERATED_STYLE,CITY_STAIR_LEVEL_MASK=24;
 export class Chunk{
