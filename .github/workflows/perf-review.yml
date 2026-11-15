@@ -1,0 +1,21 @@
+name: Perf patch verification
+on:
+  pull_request:
+    paths:
+      - 'src/client/mesher.js'
+      - 'src/client/frustum.js'
+      - 'src/client/renderer.js'
+      - 'src/core/lightVolume.js'
+      - 'test/**'
+      - '.github/workflows/perf-review.yml'
+jobs:
+  focused-node-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Focused tests
+        run: node --test test/fence-template.test.mjs test/frustum.test.mjs test/light-volume.test.mjs test/optimization.test.mjs test/performance.test.mjs
