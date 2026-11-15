@@ -24,3 +24,16 @@ jobs:
           node --check src/core/inventory.js
       - name: Run full regression suite
         run: npm test
+
+  main-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run baseline regression suite
+        run: npm test
