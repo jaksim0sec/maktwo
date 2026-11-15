@@ -14,3 +14,26 @@ jobs:
           node-version: '22'
       - name: Real V2 encounter geometry audit
         run: node --test test/observer-perception-audit.test.mjs
+      - name: Install screenshot test utilities
+        run: npm install --no-save playwright-core pngjs
+      - name: Start the test server and expose game instance only in CI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/client/game.js')
+          s=p.read_text()
+          assert 'try{new Game()}catch(err)' in s
+          p.write_text(s.replace('try{new Game()}catch(err)', 'try{window.__auditGame=new Game()}catch(err)'))
+          PY
+          (python3 -m http.server 8080 >/tmp/maktwo-server.log 2>&1 &)
+      - name: Browser WebGL observer visibility check
+        run: |
+          export CHROME_BIN=$(command -v google-chrome || command -v chromium || true)
+          node test/observer-browser-audit.mjs
+      - name: Upload visual contrast evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-observer-visual-audit
+          path: /tmp/observer-*.png
+          if-no-files-found: ignore
