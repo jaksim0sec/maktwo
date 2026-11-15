@@ -97,5 +97,5 @@ try{
  const standingHeight=standingBox.maxY-standingBox.minY,corpseHeight=deadBox.maxY-deadBox.minY;
  console.log('OBSERVER_DEATH_VISUAL '+JSON.stringify({standingHeightPx:standingHeight,corpseHeightPx:corpseHeight,
   standingPixels:changed,corpsePixels:deadChanged,corpseLongerLivedAtSeconds:120}));
- if(corpseHeight>standingHeight*.92)throw Error('Collapse did not lower apparent silhouette height by at least 8%');
+ if(corpseHeight>standingHeight*.57)throw Error('Collapse did not lower apparent silhouette height by at least 43%');
 }finally{await browser.close()}
