@@ -131,7 +131,7 @@ test('mouse dragging is limited to outside hologram and suppressed after UI dism
 
 test('mouse starts and finishes the same item drag interaction as touch',()=>{
  const game=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
- assert.match(game,/this\\.input\\.hologramPointerDown\\(event\\)/);
- assert.match(game,/this\\.input\\.hologramPointerMove\\(event\\)/);
- assert.match(game,/this\\.input\\.hologramPointerUp\\(event,false\\)/);
+ assert.match(game,/this\.input\.hologramPointerDown\(event\)/);
+ assert.match(game,/this\.input\.hologramPointerMove\(event\)/);
+ assert.match(game,/this\.input\.hologramPointerUp\(event,false\)/);
 });
