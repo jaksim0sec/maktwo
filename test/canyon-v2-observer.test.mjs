@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {World} from '../src/core/world.js';
-import {EntityManager} from '../src/entities/entities.js';
+import {EntityManager,Player} from '../src/entities/entities.js';
 import {ObserverPack,OBSERVER_NAME} from '../src/entities/observers.js';
 import {CANYON_MODE} from '../src/worldgen/canyon-v2-plan.js';
 import {CITY_MODE} from '../src/worldgen/eternal-night-game.js';
@@ -52,6 +52,11 @@ test('V2 vertical window rebase retains observer and all encounter coordinates',
  g.members.set(s.id,{hp:1,hitAt:3,at:at(s.x,s.y,s.z)});
  pack.previous=pack.views.map(v=>({...v,previous:at(v.x,v.y,v.z)}));
  pack.lightCache={position:at(0,40,0),at:1,revision:1,lights:[]};
+ const sibling=[...g.stalkers.values()].find(track=>track!==s);
+ assert(sibling,'expected a second observer to exercise shared references');
+ sibling.sighting={start:at(sibling.x,sibling.y,sibling.z-6),seen:at(sibling.x,sibling.y,sibling.z-2),phase:'approach'};
+ sibling.target=sibling.sighting.seen;
+ const sharedY=sibling.target.y;
  const before={
   group:g.point.y,stalker:s.y,target:s.target.y,start:s.sighting.start.y,seen:s.sighting.seen.y,
   groupTarget:g.at.y,member:g.members.get(s.id).at.y,
@@ -67,6 +72,8 @@ test('V2 vertical window rebase retains observer and all encounter coordinates',
   assert.equal(after[key],before[key]-448,key);
  for(const key of ['views','previous'])
   assert.deepEqual(after[key],before[key].map(y=>y-448),key);
+ assert.equal(sibling.target.y,sharedY-448,'sighting target alias must rebase only once');
+ assert.equal(sibling.sighting.seen.y,sharedY-448);
  assert.equal(pack.lightCache,null,'old-height light candidates must be invalidated');
  assert.equal(s.x,s.target.x-2,'horizontal position unchanged');
 });
@@ -74,4 +81,20 @@ test('canyon recenter hook shifts active observer with the player',()=>{
  const source=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
  assert.match(source,/this\.entities\.observers\?\.rebaseVertical\(shift\)/,
   'V2 recenter must rebase existing observer coordinates, not respawn it');
+});
+
+test('actual V2 shelter terrain permits a rendered observer near the player', {timeout:120000},()=>{
+ const world=new World({mode:CANYON_MODE,seed:9999});
+ const starting=world.firstSpawn();
+ const p=new Player(starting.x,starting.y,starting.z);
+ p.yaw=starting.yaw??0;p.pitch=0;
+ // Load the vicinity as the game streams it, rather than mocking a flat floor.
+ world.stream(p.x,p.z,2,25);
+ const entityManager=new EntityManager(world),pack=entityManager.observers;
+ assert(pack,'observer pack is not enabled');
+ const viewport={aspect:16/9,tan:Math.tan(65*Math.PI/360)};
+ for(let attempt=0;attempt<8&&!pack.active;attempt++)pack.tick(3,p,48,viewport);
+ assert(pack.active,'at least one real observer should find a loaded V2 surface');
+ assert(pack.views.some(view=>Math.abs(view.y-p.y)<10),
+  'observer must appear at the current V2 floor, not an old absolute altitude');
 });
