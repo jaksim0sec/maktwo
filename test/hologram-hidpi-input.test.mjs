@@ -81,3 +81,49 @@ test('two pointers may separately manipulate hologram and rotate camera',()=>{
   h.canvas.emit('pointerup',touch(11,910,440));
  }finally{h.restore()}
 });
+
+test('hologram-only FBO is allocated at world resolution, reused and released',()=>{
+ const calls=[];let id=0;
+ const gl={
+  FRAMEBUFFER:1,TEXTURE_2D:2,RENDERBUFFER:3,COLOR_ATTACHMENT0:4,DEPTH_ATTACHMENT:5,
+  RGBA8:6,RGBA:7,UNSIGNED_BYTE:8,DEPTH_COMPONENT16:9,
+  TEXTURE_MIN_FILTER:10,TEXTURE_MAG_FILTER:11,TEXTURE_WRAP_S:12,TEXTURE_WRAP_T:13,
+  NEAREST:14,CLAMP_TO_EDGE:15,FRAMEBUFFER_COMPLETE:16,
+  createFramebuffer(){return ++id},createTexture(){return ++id},createRenderbuffer(){return ++id},
+  bindFramebuffer(...a){calls.push(['bindFramebuffer',...a])},bindTexture(){},bindRenderbuffer(){},
+  texParameteri(){},texImage2D(_,__,___,w,h){calls.push(['texImage2D',w,h])},
+  framebufferTexture2D(){},renderbufferStorage(_,__,w,h){calls.push(['depth',w,h])},
+  framebufferRenderbuffer(){},checkFramebufferStatus(){return this.FRAMEBUFFER_COMPLETE},
+  deleteFramebuffer(){calls.push(['deleteFramebuffer'])},deleteTexture(){},deleteRenderbuffer(){}
+ };
+ const r=Object.create(renderer.Renderer.prototype);r.gl=gl;r.hologramScene=null;
+ assert.equal(r.prepareHologramScene(750,450),true);
+ assert.deepEqual(calls.find(x=>x[0]==='texImage2D'),['texImage2D',750,450]);
+ assert.deepEqual(calls.find(x=>x[0]==='depth'),['depth',750,450]);
+ const first=r.hologramScene.fbo;
+ assert.equal(r.prepareHologramScene(750,450),true);
+ assert.equal(r.hologramScene.fbo,first,'same render target should be reused per frame');
+ r.releaseHologramScene();
+ assert.equal(r.hologramScene,null);
+ assert(calls.some(x=>x[0]==='deleteFramebuffer'),'GPU target must be released on close');
+});
+test('mouse dragging is limited to outside hologram and suppressed after UI dismissal',()=>{
+ const h=inputHarness();try{
+  const input=new Input(h.canvas);input.setInventoryMode(true);
+  input.hologramOwnsPointer=e=>e.clientX>300&&e.clientX<700;
+  h.canvas.emit('mousedown',{button:0,clientX:500,clientY:350,preventDefault(){}});
+  h.doc.emit('mousemove',{clientX:580,clientY:370});
+  assert.deepEqual(input.consumeLook(),[0,0],'inside hologram must not rotate camera');
+  h.doc.emit('mouseup',{button:0});
+  h.canvas.emit('mousedown',{button:0,clientX:850,clientY:350,preventDefault(){}});
+  h.doc.emit('mousemove',{clientX:900,clientY:365});
+  assert(input.consumeLook()[0]>0,'outside hologram mouse drag must rotate camera');
+  h.doc.emit('mouseup',{button:0});
+  assert.equal(input.mouseLook,false);
+  input.ignoreMouseUntilUp=true;
+  input.setInventoryMode(false);
+  h.canvas.emit('mousedown',{button:0,clientX:500,clientY:350,preventDefault(){}});
+  h.doc.emit('mouseup',{button:0});
+  assert.equal(input.read().use,false,'closing inventory must never place a block');
+ }finally{h.restore()}
+});
