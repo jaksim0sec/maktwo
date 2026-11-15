@@ -53,11 +53,11 @@ test('dead observer remains at its final location through extended encounter and
  const member=pack.active.members.get(0);
  assert(member.dead);assert.equal(pack.count,0);
  const origin={...member.at};
- pack.tick(12,player,48);pack.publish(player,48);
+ pack.tick(12,player,48);
  assert(pack.active,'corpse must not vanish after ten seconds');
  assert(pack.views.some(v=>v.member?.dead),'corpse should remain renderable');
  assert.deepEqual(member.at,origin);
- pack.tick(54,player,48);pack.publish(player,48);
+ pack.tick(54,player,48);
  assert(pack.views.some(v=>v.member?.dead),'corpse should remain after one minute');
  pack.tick(60,player,48);
  assert.equal(pack.active,null,'old corpses are eventually freed for performance');
