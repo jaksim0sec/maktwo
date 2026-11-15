@@ -615,9 +615,14 @@ export class ObserverPack {
   if(g&&this.count===0&&[...g.members.values()].every(m=>this.clock-m.hitAt>CORPSE_LIFETIME)){
    this.active=null;this.views=[];return;
   }
-  const livingNear=g?.stalkers&&[...g.stalkers.values()].some(s=>
-   !g.members.get(s.id)?.dead&&distance(s,player)<=range&&
-   Math.abs(s.y-player.y)<=range&&this.loaded(s));
+  // A nearby fallen observer still belongs to the rendered encounter.
+  // Ignoring dead members made the very last corpse vanish on the next tick,
+  // despite publish() allowing it to stay for the intended lifetime.
+  const livingNear=g?.stalkers&&[...g.stalkers.values()].some(s=>{
+   const member=g.members.get(s.id),p=member?.dead?member.at:s;
+   return Boolean(p)&&(!member?.dead||this.clock-member.hitAt<CORPSE_LIFETIME)&&
+    distance(p,player)<=range&&Math.abs(p.y-player.y)<=range&&this.loaded(p);
+  });
   if(g&&!(livingNear??(distance(g.point,player)<=range&&
     Math.abs(g.point.y-player.y)<=range&&this.loaded(g.point)))){
    this.sleep??=this.clock;
