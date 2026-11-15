@@ -280,6 +280,16 @@ function matMultiply(a,b){const o=new Float32Array(16);for(let j=0;j<4;j++)for(l
 export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)/(near-far),-1,0,0,2*far*near/(near-far),0])}
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
+// The world keeps its adaptive pixel budget. The spatial UI gets a sharper
+// display surface but does not force the scene to render at that resolution.
+export function hologramFrameSize(clientWidth,clientHeight,sceneScale,deviceRatio,opened){
+ const w=Math.max(1,Number(clientWidth)||1),h=Math.max(1,Number(clientHeight)||1);
+ const worldDpr=Math.max(.25,Math.min(3,Number(sceneScale)||1));
+ const displayDpr=opened?Math.max(worldDpr,Math.min(2,Math.max(1,Number(deviceRatio)||1))):worldDpr;
+ const worldWidth=Math.max(1,Math.round(w*worldDpr)),worldHeight=Math.max(1,Math.round(h*worldDpr));
+ const width=Math.max(1,Math.round(w*displayDpr)),height=Math.max(1,Math.round(h*displayDpr));
+ return {width,height,worldWidth,worldHeight,split:opened&&(width>worldWidth||height>worldHeight)};
+}
 export class Renderer{
  constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.observerRenderer=new ObserverRenderer(gl);this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','NearRing','CanyonCoverage','CoveredChunks[0]','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
  this.dustProgram=gl.createProgram();
@@ -294,7 +304,7 @@ export class Renderer{
   this.farEnabled=new URLSearchParams(globalThis.location?.search).get('far')==='1';
  // Only an explicit test URL allocates the extra shader/framebuffer.
  this.distanceBlurEnabled=new URLSearchParams(globalThis.location?.search).get('farblur')==='1';
- this.distanceBlurTarget=null;this.distanceBlurProgram=null;this.distanceBlurUniforms=null;
+ this.distanceBlurTarget=null;this.distanceBlurProgram=null;this.distanceBlurUniforms=null;this.hologramScene=null;
  if(this.distanceBlurEnabled)try{
   const p=gl.createProgram();
   gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,SKY_VERT));
@@ -334,6 +344,37 @@ export class Renderer{
   this.lightWorker.onerror=(error)=>{console.warn('Light Worker unavailable',error.message);this.lightWorker.terminate();this.lightWorker=null;this.lightBusy=false};
  }}catch(error){console.warn('Light Worker unavailable',error)}
  gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clearColor(.039,.040,.046,1)}
+ // Only allocated while the hologram is visible. No scene mesh/shader changes.
+ releaseHologramScene(){
+  const t=this.hologramScene;if(!t)return;
+  const gl=this.gl;gl.deleteFramebuffer(t.fbo);gl.deleteTexture(t.color);gl.deleteRenderbuffer(t.depth);
+  this.hologramScene=null;
+ }
+ prepareHologramScene(width,height){
+  const gl=this.gl,t=this.hologramScene;
+  if(t?.width===width&&t?.height===height)return true;
+  this.releaseHologramScene();
+  const fbo=gl.createFramebuffer(),color=gl.createTexture(),depth=gl.createRenderbuffer();
+  if(!fbo||!color||!depth)return false;
+  try{
+   gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+   gl.bindTexture(gl.TEXTURE_2D,color);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,color,0);
+   gl.bindRenderbuffer(gl.RENDERBUFFER,depth);
+   gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,width,height);
+   gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,depth);
+   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('incomplete hologram scene target');
+   this.hologramScene={fbo,color,depth,width,height};return true;
+  }catch(error){
+   console.warn('High-resolution hologram fallback:',error);
+   gl.deleteFramebuffer(fbo);gl.deleteTexture(color);gl.deleteRenderbuffer(depth);return false;
+  }finally{gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.bindRenderbuffer(gl.RENDERBUFFER,null)}
+ }
  prepareDistanceBlur(width,height){
   const gl=this.gl,old=this.distanceBlurTarget;
   if(old&&old.width===width&&old.height===height)return true;
@@ -539,7 +580,16 @@ export class Renderer{
   for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);
   return new Float32Array(arr)
  }
- frame(world,player,entities,effects,dt=1/60,combat=null,observers=null){const gl=this.gl,canvas=this.canvas,dpr=this.maxPixelRatio*(this.hologram?.opened?Math.max(this.renderScale,.96):this.renderScale),width=Math.round(canvas.clientWidth*dpr),height=Math.round(canvas.clientHeight*dpr);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}gl.viewport(0,0,width,height);
+ frame(world,player,entities,effects,dt=1/60,combat=null,observers=null){
+  const gl=this.gl,canvas=this.canvas;
+  const pixels=hologramFrameSize(canvas.clientWidth,canvas.clientHeight,this.maxPixelRatio*this.renderScale,
+   typeof devicePixelRatio==='number'?devicePixelRatio:1,Boolean(this.hologram?.opened));
+  const {width,height,worldWidth,worldHeight}=pixels;
+  if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}
+  const separate=pixels.split&&this.prepareHologramScene(worldWidth,worldHeight);
+  if(!separate)this.releaseHologramScene();
+  if(separate){gl.bindFramebuffer(gl.FRAMEBUFFER,this.hologramScene.fbo);gl.viewport(0,0,worldWidth,worldHeight)}
+  else{gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,width,height)}
   this.lastDrawCalls=1;this.lastDistanceDrawCalls=0;
   const walkingSpeed=player.fly||!player.grounded?0:Math.min(7,Math.hypot(player.vx,player.vz));
   this.walkAmount+=(Math.min(1,walkingSpeed/5)-this.walkAmount)*(1-Math.exp(-dt*8));
@@ -739,6 +789,15 @@ export class Renderer{
   }
   gl.depthMask(true);gl.disable(gl.BLEND);
   if(blurActive)this.applyDistanceBlur(width,height,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:260);
+  if(separate){
+   // Upscale the lower-resolution world first, then draw the UI at full output size.
+   // Hologram.render disables depth testing, so the old scene depth is unnecessary.
+   gl.bindFramebuffer(gl.READ_FRAMEBUFFER,this.hologramScene.fbo);
+   gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
+   gl.blitFramebuffer(0,0,worldWidth,worldHeight,0,0,width,height,gl.COLOR_BUFFER_BIT,gl.LINEAR);
+   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+   gl.viewport(0,0,width,height);
+  }
   if(this.hologram?.render(vp,performance.now()*.001))this.lastDrawCalls++;
   player.visualStepOffset=dampStepOffset(player.visualStepOffset,dt);
  }

@@ -19,7 +19,7 @@ const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoLastTap=null;this.holoDragging=null;this.movePending=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoDragging=null;this.movePending=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -127,7 +127,7 @@ class Game{
  get uiOpen(){return Boolean(this.panel)}
  setPanel(name){
   if(this.cinematic&&name!=='cinematic')return;
-  const prior=this.panel;this.panel=name||null;this.holoLastTap=null;this.holoDragging=null;this.movePending=null;
+  const prior=this.panel;this.panel=name||null;this.holoDragging=null;this.movePending=null;
   if(this.panel)this.combat.cancel();
   if(this.panel!=='inventory')this.openContainer=null;
   if(this.panel!=='inventory'){this.inspectedItem=null;this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
@@ -306,7 +306,7 @@ class Game{
  updateControlHint(){
   this.updateCameraButton();const el=$('control-hint');if(!el)return;
   el.classList.toggle('ui-active',this.uiOpen);
-  el.textContent=this.panel==='inventory'?'방향키 탐색 · Enter 선택 · E 닫기':
+  el.textContent=this.panel==='inventory'?'창 안 터치 · 드래그 이동 / 창 밖 드래그 시점 회전 · E 닫기':
    this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 돌아가기로 복귀':
    this.selected<0?'길게 클릭해 채굴 · 우클릭 드래그 또는 C 시점 고정 · E 가방':
    '클릭 설치 · 길게 누르면 채굴 · 우클릭 드래그 / C 시점 고정 · E 가방';
@@ -317,27 +317,40 @@ class Game{
 
  bindUI(){
   this.renderHotbar();this.updateControlHint();
-  // Only the second press of a double tap owns the item pointer.
+  // A gesture is owned by the 3D workspace where it begins, not by screen half
+  // or a double-tap timer. Other pointers still rotate the free camera.
+  this.input.hologramOwnsPointer=event=>this.panel==='inventory'&&
+   this.hologram.containsAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
   this.input.hologramPointerDown=event=>{
-   const last=this.holoLastTap,now=performance.now();
-   if(this.panel!=='inventory'||!last||now-last.time>340||Math.hypot(event.clientX-last.x,event.clientY-last.y)>28)return false;
-   const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
-   if(hit!==last.hit||!hit?.startsWith('item:'))return false;
-   this.holoDragging={source:hit,startX:event.clientX,startY:event.clientY,target:null,moved:false};
-   this.holoLastTap=null;return true;
+   if(!this.input.hologramOwnsPointer(event))return false;
+   if(!this.holoDragging){
+    const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+    this.holoDragging={pointerId:event.pointerId,source:hit,startX:event.clientX,startY:event.clientY,moved:false};
+   }
+   return true;
   };
   this.input.hologramPointerMove=event=>{
-   const drag=this.holoDragging;if(!drag)return;
-   drag.moved||=(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>10);
-   if(drag.moved)drag.target=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+   const drag=this.holoDragging;if(!drag||drag.pointerId!==event.pointerId)return;
+   if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>12)drag.moved=true;
+   if(!drag.moved||!drag.source?.startsWith('item:'))return;
+   const target=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+   this.hologram.dragSource=drag.source;
+   this.hologram.dragTarget=target;
   };
   this.input.hologramPointerUp=(event,cancel)=>{
-   const drag=this.holoDragging;this.holoDragging=null;
-   if(!drag||cancel||!drag.moved)return;
-   const target=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
-   if(!this.hologramDrop(drag.source,target))this.status('이동할 수 없는 위치입니다');
+   const drag=this.holoDragging;
+   if(!drag||drag.pointerId!==event.pointerId)return;
+   this.holoDragging=null;this.hologram.dragSource=null;this.hologram.dragTarget=null;
+   const rect=this.canvas.getBoundingClientRect();
+   const target=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect);
+   if(cancel)return;
+   if(!drag.moved){this.inventoryClick(drag.source);return}
+   if(drag.source?.startsWith('item:')&&target&&target!==drag.source&&
+      !this.hologramDrop(drag.source,target))this.status('이 위치에는 옮길 수 없어요');
   };
-  this.input.hologramPointerCancel=()=>{this.holoDragging=null;this.holoLastTap=null};
+  this.input.hologramPointerCancel=()=>{
+   this.holoDragging=null;this.hologram.dragSource=null;this.hologram.dragTarget=null;
+  };
 
   bindClick('menu-btn',()=>this.toggleMenu());
   bindClick('camera-btn',()=>this.toggleCameraMode());
@@ -394,7 +407,13 @@ class Game{
    for(const n of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(n,()=>this.input.held[action]=false);
   }
   // Clicking the world closes menus and captures the mouse in one gesture.
-  this.canvas.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse')return;if(this.panel==='inventory'){if(event.button===0){event.preventDefault();const rect=this.canvas.getBoundingClientRect();const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect,{center:this.input.locked});this.inventoryClick(hit)}return}if(this.uiOpen)this.requestGameFocus()});
+  this.canvas.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse')return;if(this.panel==='inventory'){
+   if(event.button===0&&this.input.hologramOwnsPointer(event)){
+    event.preventDefault();this.input.ignoreMouseUntilUp=true;
+    this.input.hologramPointerDown(event);
+    try{this.canvas.setPointerCapture(event.pointerId)}catch{}
+   }return;
+  }if(this.uiOpen)this.requestGameFocus()});
   document.addEventListener('pointerlockchange',()=>{
    // Esc may release pointer lock. Do not automatically spawn a menu over the scene.
    if(this.input.locked)this.hologram.pointer=null;
@@ -402,21 +421,22 @@ class Game{
    this.updateControlHint();this.updateCameraButton();
   });
   this.canvas.addEventListener('pointermove',event=>{
+   if(event.pointerType==='mouse'&&this.panel==='inventory'&&this.holoDragging?.pointerId===event.pointerId)
+    this.input.hologramPointerMove(event);
    if(event.pointerType==='mouse'&&!this.uiOpen&&!this.input.locked){const crosshair=$('crosshair');if(crosshair){crosshair.style.left=event.clientX+'px';crosshair.style.top=event.clientY+'px'}const progress=$('mine-progress');if(progress){progress.style.left=event.clientX+'px';progress.style.top=(event.clientY+27)+'px'}}
    if(this.panel==='inventory'&&!this.input.locked&&event.pointerType==='mouse'){this.hologram.point(event.clientX,event.clientY,this.canvas.getBoundingClientRect());this.hologram.aim(this.player)}
   });
-  // A right-side *tap* selects an inventory card. Dragging either zone keeps
-  // movement/camera working; selection must not happen on touch-down.
   this.canvas.addEventListener('pointerup',event=>{
-   if(this.panel!=='inventory'||(event.pointerType!=='touch'&&event.pointerType!=='pen'))return;
-   const tap=this.input.gestures.consumeTapPoint();this.input.gestures.consumeTaps();
-   if(!tap)return;
-   event.preventDefault();const hit=this.hologram.pickAt(this.player,tap.x,tap.y,this.canvas.getBoundingClientRect());
-   this.inventoryClick(hit);
-   this.holoLastTap=hit?.startsWith('item:')?{hit,x:tap.x,y:tap.y,time:performance.now()}:null;
-   this.hologram.pointer=null;
+   if(event.pointerType!=='mouse'||event.button!==0||this.panel!=='inventory'||
+      this.holoDragging?.pointerId!==event.pointerId)return;
+   event.preventDefault();this.input.hologramPointerUp(event,false);
+   if(this.canvas.hasPointerCapture?.(event.pointerId))try{this.canvas.releasePointerCapture(event.pointerId)}catch{}
   });
-  this.canvas.addEventListener('wheel',e=>{
+  this.canvas.addEventListener('pointercancel',event=>{
+   if(event.pointerType==='mouse'&&this.holoDragging?.pointerId===event.pointerId)
+    this.input.hologramPointerUp(event,true);
+  });
+    this.canvas.addEventListener('wheel',e=>{
    e.preventDefault();if(this.panel==='inventory'||this.uiOpen)return;
    const occupied=this.paletteItems.map((id,i)=>id!==null&&this.inventory.count(id)>0?i:-1).filter(i=>i>=0);
    if(!occupied.length)return;

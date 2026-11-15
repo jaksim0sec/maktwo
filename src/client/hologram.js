@@ -143,6 +143,25 @@ export function spatialHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
  }
  return result;
 }
+// Ray-test the workspace plane, including empty gaps between the individual cards.
+// This is a world-space hit, not a screen-coordinate rectangle that loses alignment
+// when the panel follows a turning player.
+export function spatialWorkspaceHit(anchor,cards,camera,ray,scale=PANEL_SCALE){
+ if(!anchor||!cards?.length)return false;
+ const eye=[camera.x,camera.y+camera.eye+(camera.visualStepOffset||0),camera.z];
+ const denominator=dot(ray,anchor.forward);
+ if(denominator<=1e-5)return false;
+ const distance=dot(sub(anchor.center,eye),anchor.forward)/denominator;
+ if(distance<=.05||distance>6)return false;
+ const hit=sub(add(eye,ray,distance),anchor.center);
+ const x=dot(hit,anchor.right)/scale,y=dot(hit,anchor.up)/scale;
+ const left=Math.min(...cards.map(card=>card.x-card.w*.5));
+ const right=Math.max(...cards.map(card=>card.x+card.w*.5));
+ const bottom=Math.min(...cards.map(card=>card.y-card.h*.5));
+ const top=Math.max(...cards.map(card=>card.y+card.h*.5));
+ const margin=.026;
+ return x>=left-margin&&x<=right+margin&&y>=bottom-margin&&y<=top+margin;
+}
 function pointerRay(player,nx,ny,aspect){
  const sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),cp=Math.cos(player.pitch),sp=Math.sin(player.pitch);
  const forward=[-sy*cp,sp,-cy*cp],right=[cy,0,-sy],up=[sy*sp,cp,cy*sp];
@@ -152,7 +171,7 @@ function pointerRay(player,nx,ny,aspect){
 }
 function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(`Spatial inventory shader: ${gl.getShaderInfoLog(shader)}`);return shader}
 export class Hologram{
- constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dirty=true;
+ constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dragSource=null;this.dragTarget=null;this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
@@ -183,7 +202,7 @@ export class Hologram{
 
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
- close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}
+ close(){this.opened=false;this.pointer=null;this.hover=null;this.dragSource=null;this.dragTarget=null;this.keyboardMode=false}
  setInventory(palette,items,selected,station='hand',page=null,craftFilter='all',inspection=null,options={}){
   const changed=this.palette!==palette;
   this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.craftFilter=craftFilter;this.activeItemId=inspection?.blockId??options.selectedId??null;
@@ -227,6 +246,12 @@ export class Hologram{
    for(const [x,y,u,v] of quad)vertices.push(...point(c,a.right,a.up,x,y,0,a.forward),u,v,i);
   });
   gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));this.count=vertices.length/6;
+ }
+ containsAt(player,clientX,clientY,rect){
+  if(!this.opened)return false;
+  const nx=((clientX-rect.left)/Math.max(1,rect.width))*2-1;
+  const ny=((clientY-rect.top)/Math.max(1,rect.height))*2-1;
+  return spatialWorkspaceHit(this.anchor,this.cards,player,pointerRay(player,nx,ny,rect.width/Math.max(1,rect.height)),this.scale??PANEL_SCALE);
  }
  point(clientX,clientY,rect){this.keyboardMode=false;this.pointer={nx:((clientX-rect.left)/Math.max(1,rect.width))*2-1,ny:((clientY-rect.top)/Math.max(1,rect.height))*2-1,aspect:rect.width/Math.max(1,rect.height)}}
  aim(player){if(!this.opened)return null;
@@ -364,7 +389,7 @@ export class Hologram{
  }
  render(vp){if(!this.opened||!this.anchor||!this.count)return;const gl=this.gl;
   if(this.dirty){this.drawAtlas();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.canvas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false)}
-  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.hover?.index??-1);gl.uniform1i(this.u.selected,this.keyboardMode?this.cards.findIndex(card=>card.id===this.focusId):-1);
+  gl.useProgram(this.program);gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform1i(this.u.atlas,1);gl.uniform1i(this.u.hover,this.dragTarget?this.cards.findIndex(card=>card.id===this.dragTarget):this.hover?.index??-1);gl.uniform1i(this.u.selected,this.dragSource?this.cards.findIndex(card=>card.id===this.dragSource):this.keyboardMode?this.cards.findIndex(card=>card.id===this.focusId):-1);
   gl.bindVertexArray(this.vao);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);
   gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.CULL_FACE);gl.depthMask(false);
   // Spatial head-attached UI is not world geometry: keep full 3D perspective

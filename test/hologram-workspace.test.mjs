@@ -63,12 +63,12 @@ test('details occupy the contextual region without discarding the underlying ite
  for(const card of left)for(const right of detail)
   assert(!overlapping(card,right),'Detail overlaps item '+card.id);
 });
-test('mobile double-tap drag captures only an item pointer, not all camera gestures',()=>{
+test('single-touch hologram drag captures item pointers without freezing outside camera gestures',()=>{
  const game=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
  const input=readFileSync(new URL('../src/client/input.js',import.meta.url),'utf8');
- assert.match(game,/now-last.time>340/);
- assert.match(game,/hit!==last.hit/);
+ assert.match(game,/hologram\.containsAt/);
+ assert.doesNotMatch(game,/holoLastTap/);
  assert.match(game,/hologramDrop\(drag.source,target\)/);
  assert.match(input,/hologramCaptured\.add/);
- assert.match(input,/this\.gestures\.move\(e.pointerId,e.clientX,e.clientY\)/);
+ assert.match(input,/hologramCamera\.set/);
 });
