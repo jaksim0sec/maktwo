@@ -39,11 +39,11 @@ void main(){
   float settle=smoothstep(0.,1.,uCollapse);
   float buckle=smoothstep(0.,.44,settle);
   p.z+=.13*buckle*smoothstep(.4,1.9,p.y);
-  float angle=1.42*uCollapseSide*settle;
+  float angle=1.57*uCollapseSide*settle;
   float ca=cos(angle),sa=sin(angle);
-  vec2 local=p.xy-vec2(0.,.18);
+  vec2 local=p.xy-vec2(0.,.07);
   p.x=local.x*ca+local.y*sa;
-  p.y=max(.055,.18+local.y*ca-local.x*sa);
+  p.y=max(.04,.07+local.y*ca-local.x*sa);
   p.z-=.12*settle;
  }
  float c=cos(uPlace.w),s=sin(uPlace.w);
