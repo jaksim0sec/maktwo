@@ -108,3 +108,18 @@ Architectural floor-plan references (structural organization only, no copyrighte
 These are precedents for **circulation and spatial planning**, not copied architectural plans. `src/worldgen/architecture-v3.js` contains five original procedural archetypes `shop-house`, `office`, `walkup`, `arcade`, `service`. A shared circulation module and stairwell are placed near one side, with a back landing and longitudinal connecting corridor. The optional L / notched wing borrows another archetype's room program but always inherits the parent building's facade material. Elevations have consistent bay/window rhythm instead of per-level material stripes.
 
 The system uses 6-block storeys and 12 half-block steps to rise between landings. Floor structure, lower half-block floor finish, and upper half-block ceiling lining are separate. Metal window frames use thin partial-depth geometry. `EternalNightR3` is the default world. Older ruins saves use the same current building generator. This **does not** add hundreds of vertical voxels. The altitude-responsive shader already allows the unnaturally clear sky gradient to be evaluated above 200 voxels, but gameplay cannot physically reach that height until vertical streaming is implemented.
+
+## Canyon V2
+
+The selectable `EternalNightCanyonV2` world samples its geometry by absolute
+city level and longitudinal bay. Building volumes reuse the original floor,
+facade and stair kits. Walkways and their distant silhouettes share the same
+terrace heights and endpoints. No voxel is required to represent empty space
+outside the active window.
+
+The canyon keeps the existing chunk layout and shifts its vertical origin as
+the player crosses levels. Voxel edits, block states and fixture mounts are
+shifted together before chunks are regenerated. The save stores that origin
+alongside the edits. Player positions, bed checkpoints and container keys use
+absolute altitude, so they retain their meaning across a shift. The V2 preset
+and seeded V2 slots have their own save keys.

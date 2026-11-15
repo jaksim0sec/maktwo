@@ -7,6 +7,7 @@ import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
 import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
+import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
 import {CITY_MODE,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {screenRay} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
@@ -17,7 +18,7 @@ const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];const start=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -52,7 +53,7 @@ class Game{
  updateModeControls(){
   const p=this.player,mode=$('mode'),flight=$('flight-toggle'),sky=$('sky-brightness-setting');
   if(sky)sky.hidden=!p.creative;
-  const citySky=$('city-sky-setting');if(citySky)citySky.hidden=this.world.mode!==CITY_MODE;
+  const citySky=$('city-sky-setting');if(citySky)citySky.hidden=this.world.mode!==CITY_MODE&&this.world.mode!==CANYON_MODE;
   this.renderer.skyBrightness=p.creative?this.skyBrightness:0;
   mode.textContent=p.creative?'모드 · 크리에이티브':'모드 · 서바이벌';
   mode.setAttribute('aria-pressed',String(p.creative));
@@ -398,7 +399,7 @@ class Game{
    let player=this.player;
    if(scene?.type==='death')player={...player,...scene.respawn,hp:player.maxHp,stamina:100,pitch:0,fly:false};
    if(scene?.type==='sleep')player={...player,x:scene.x,z:scene.z,pitch:scene.pitch};
-   savePlayerState(localStorage,this.world.name,player);
+   savePlayerState(localStorage,this.world.name,player,this.world.yOrigin);
    localStorage.setItem(ACTIVE_WORLD_KEY,this.world.name);return true;
   }catch(error){
    console.warn('[MakTwo] Local game save failed',error);
@@ -407,7 +408,7 @@ class Game{
  }
  refreshWorldChoices(){
   const menu=$('world');if(!menu)return;
-  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode==='eternal-city-lab'||w.mode==='station-preview').map(w=>{
+  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode===CITY_MODE||w.mode===CANYON_MODE||w.mode==='station-preview').map(w=>{
    const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
   }));
   menu.value=this.world.name;
@@ -435,7 +436,7 @@ class Game{
    if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(rand);
    else rand[0]=Math.floor(Math.random()*0x100000000);
    const nonce=Date.now().toString()+String(Math.floor(Math.random()*1000)).padStart(3,'0');
-   const slot=addWorldSlot(localStorage,rand[0]|0,nonce);
+   const slot=addWorldSlot(localStorage,rand[0]|0,nonce,this.world.mode===CANYON_MODE?CANYON_MODE:undefined);
    this.worldPresets.push(slot);this.manager.add(slot.name,slot.seed,slot.mode);
    if(this.travel(slot.name)){this.refreshWorldChoices();this.requestGameFocus();}
   }catch(error){console.warn('[MakTwo] New game failed',error);this.status('새 게임 생성 실패 · 로컬 저장 공간 확인')}
@@ -445,7 +446,7 @@ class Game{
   if(!name||!this.manager.worlds.has(name)){this.status('불러올 게임을 선택해 주세요');return}
   if(name===this.world.name||this.travel(name))this.requestGameFocus();
  }
- travel(name){if(!this.saveGameState())return false;this.player.clearPush();this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.offWeapon=null;this.combat.cancel();this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height)||this.world.firstSpawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.applyGraphics();this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
+ travel(name){if(!this.saveGameState())return false;this.player.clearPush();this.world=this.manager.travel(name);this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.selected=-1;this.offWeapon=null;this.combat.cancel();this.inventoryPalette=null;this.station=null;this.renderHotbar();this.entities=new EntityManager(this.world);this.bindWorld();this.effects=new Effects();const pos=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();Object.assign(this.player,pos,{vx:0,vy:0,vz:0,visualStepOffset:0,canyonFallStart:undefined,creative:pos.creative??false,fly:pos.fly??false,hp:pos.hp??20,stamina:pos.stamina??100});if(pos.yaw===undefined)this.player.yaw=0;if(pos.pitch===undefined)this.player.pitch=0;this.updateModeControls();this.updatePartGalleryControls();if($('part-family-select'))$('part-family-select').value='0';this.mining.reset();this.showMining(0);this.renderer.resetWorld(this.world);this.applyGraphics();this.world.stream(pos.x,pos.z,2,4);$('seed').textContent=String(this.world.seed);this.refreshWorldChoices();try{localStorage.setItem(ACTIVE_WORLD_KEY,name)}catch{}this.status('게임 불러옴: '+(this.worldPresets.find(w=>w.name===name)?.label||worldLabel(name)));return true}
  bedPair(target){
   const {id,x,y,z}=target;
   const facing=this.world.getShapeState(x,y,z).facing;
@@ -473,7 +474,9 @@ class Game{
   return true;
  }
  respawnPosition(){
-  const saved=this.survivalInventory.checkpoint,p=this.player;
+  const checkpoint=this.survivalInventory.checkpoint,p=this.player;
+  if(checkpoint)this.shiftCanyonView(checkpoint.y-this.world.yOrigin);
+  const saved=checkpoint&&{...checkpoint,y:checkpoint.y-this.world.yOrigin};
   if(saved&&saved.y>0&&saved.y<this.world.height-2){
    const id=this.world.get(saved.x,saved.y,saved.z);
    const pair=isBed(id)&&this.bedPair({...saved,id});
@@ -485,13 +488,16 @@ class Game{
     }
    }
   }
-  return this.world.spawn();
+  const origin=this.world.yOrigin;
+  const spawn=this.world.spawn();
+  this.shiftCanyonView(this.player.y, this.world.yOrigin-origin);
+  return spawn;
  }
  useBed(target){
   const pair=this.bedPair(target);
   if(!pair){this.status('침대가 부서져 있어요');return}
   const old=this.survivalInventory.checkpoint;
-  this.survivalInventory.checkpoint=pair.head;
+  this.survivalInventory.checkpoint={...pair.head,y:pair.head.y+this.world.yOrigin};
   if(!this.saveGameState()){
    this.survivalInventory.checkpoint=old;return;
   }
@@ -540,7 +546,7 @@ class Game{
     const pos=scene.respawn;
     p.clearPush();
     Object.assign(p,pos,{dead:false,fly:false,grounded:false,crouching:false,
-     height:p.standingHeight,eye:p.standingEye,stamina:100,staminaRecovery:0,exhausted:false,pitch:0});
+     canyonFallStart:undefined,height:p.standingHeight,eye:p.standingEye,stamina:100,staminaRecovery:0,exhausted:false,pitch:0});
     this.world.stream(pos.x,pos.z,2,4);
     this.portalCooldown=1;
    }else Object.assign(p,{x:scene.x,z:scene.z,pitch:scene.pitch,eye:scene.eye});
@@ -554,9 +560,9 @@ class Game{
  }
  showContainer(target){
   if(!this.saveGameState())return;
-  const key=this.world.stateKey(target.x,target.y,target.z);
+  const key=this.world.stateKey(target.x,target.y+this.world.yOrigin,target.z);
   if(target.id===B.CRATE&&!this.survivalInventory.prepareCrate(key,this.world.seed,
-   target.x,target.y,target.z,this.world.isGeneratedBlock(target.x,target.y,target.z))){
+   target.x,target.y+this.world.yOrigin,target.z,this.world.isGeneratedBlock(target.x,target.y,target.z))){
    this.status('상자 내용을 저장하지 못했어요');return;
   }
   this.openContainer={...target,world:this.world,key};
@@ -704,7 +710,7 @@ class Game{
   if(result.completed&&target){
    if(target.mounted||this.world.get(target.x,target.y,target.z)===target.id){
     const {x,y,z,id}=target;
-    if(!target.mounted&&isContainer(id)&&this.survivalInventory.containers.has(this.world.stateKey(x,y,z))){
+    if(!target.mounted&&isContainer(id)&&this.survivalInventory.containers.has(this.world.stateKey(x,y+this.world.yOrigin,z))){
      this.status('내용물을 먼저 꺼내세요');this.mining.reset();this.showMining(0);return;
     }
     const mined=target.mounted?this.world.removeMount(x,y,z):id===B.DOOR||id===B.DOOR_TOP?
@@ -717,11 +723,31 @@ class Game{
   }
  }
 
+ shiftCanyonView(y,shift=this.world.recenterCanyon(y)){
+  if(!shift)return;
+  this.player.y-=shift;
+  if(this.player.pushedFromY!==undefined)this.player.pushedFromY-=shift;
+  for(const entity of this.entities.entities)entity.y-=shift;
+  for(const particle of this.effects.particles)particle.y-=shift;
+  if(this.openContainer)this.openContainer.y-=shift;
+  this.renderer.resetWorld(this.world);
+  this.target=null;
+  this.mining.reset();this.showMining(0);
+ }
  tick(dt){
   if(this.cinematic){this.updateCinematic(dt);return}
   this.portalCooldown=Math.max(0,this.portalCooldown-dt);
   const p=this.player,input=this.input.read();
   p.update(this.world,dt,input);
+  if(this.world.mode===CANYON_MODE){
+   const altitude=p.y+this.world.yOrigin;
+   if(p.grounded||p.fly||p.water)p.canyonFallStart=undefined;
+   else {
+    p.canyonFallStart=Math.max(p.canyonFallStart??altitude,altitude);
+    if(p.canyonFallStart-altitude>44)p.hurt(p.hp);
+   }
+   this.shiftCanyonView(p.y);
+  }
   if(p.dead){this.beginCinematic('death');return}
   if(this.portalCooldown===0&&(this.world.get(p.x,p.y+.4,p.z)===B.PORTAL||this.world.get(p.x,p.y+1.1,p.z)===B.PORTAL)){
    const names=[...this.manager.worlds.keys()];

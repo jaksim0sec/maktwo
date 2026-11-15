@@ -1,6 +1,7 @@
 import {ObserverPack} from './observers.js';
 import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels,toMeters} from '../core/scale.js';
+import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
 import {CITY_MODE,CITY_STATION_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {createStationTrain,TRAIN,trainControls} from '../worldgen/station-train.js';
 import {STATION_PREVIEW_MODE,STATION_PREVIEW_SITE} from '../worldgen/station-preview.js';
@@ -191,7 +192,7 @@ export class EntityManager{
   }
   this.entities=this.entities.filter(e=>e.type==='train'||!e.dead&&(e.type==='drop'?e.age<180:e.age<(e.natural?180:240))&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
   this.spawnTimer-=dt;
-  if(this.spawnTimer<=0){
+  if(this.spawnTimer<=0&&this.world.mode!==CANYON_MODE){
    this.spawnTimer=SPAWN_INTERVAL;
    if(this.entities.filter(e=>e.natural&&e.type==='sheep').length<LIMIT){
     const seed=this.world.seed,t=this.spawnSequence++,angle=hash(t,this.entities.length,0,seed)*Math.PI*2,r=16+hash(t,0,1,seed)*14;

@@ -185,7 +185,7 @@ function furnishRoom(room,x,z,kit,seed) {
   return null;
 }
 
-function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLimit=Infinity) {
+export function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLimit=Infinity) {
   const xi=Math.floor(x),zi=Math.floor(z),{stairs,landing,access,kits}=detail;
   const stairAlongX=v.stairFacing===2;
   const sampleX=stairAlongX?.25:0,sampleZ=stairAlongX?0:.25;
@@ -277,7 +277,7 @@ function stampBuilding(v,detail,x,z,seed,put,empty,reservedPassage=()=>false,yLi
       const exit=f.doors.find(d=>Math.abs((x-d.x)*d.dz-(z-d.z)*d.dx)<d.width/2+.38&&Math.abs((x-d.x)*d.dx+(z-d.z)*d.dz)<1.20);
       const stride=kit.wall===4?6:5;
       const bay=mod(Math.floor(Math.abs(b[0]-a[0])>=Math.abs(b[1]-a[1])?x-a[0]:z-a[1]),stride);
-      const frontEdge=f.key==='shop'?(f.doors[0]?.edge??0):0;
+      const frontEdge=v.front?.edge??(f.key==='shop'?(f.doors[0]?.edge??0):0);
       const railEdge=f.railEdges?.[edge];
       const classroomEdge=f.blueprint==='school'||f.blueprint==='ring';
       const span=Math.hypot(b[0]-a[0],b[1]-a[1]);

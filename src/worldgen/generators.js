@@ -6,6 +6,8 @@ import {stampPartGallery} from './part-gallery.js';
 import {STATION_PREVIEW_MODE,stampStationPreview} from './station-preview.js';
 import {ARBORETUM_MODE,stampArboretum} from './trees.js';
 import {CITY_MODE,CITY_BASE_Y,stampCityChunk} from './eternal-night-game.js';
+import {CANYON_MODE} from './canyon-v2-plan.js';
+import {stampCanyonChunk} from './canyon-v2.js';
 import {BLOCK as B} from '../core/blocks.js';import {fbm,hash,clamp} from '../util/math.js';
 export const SEA=17, GENERATION_VERSION=5;
 export const BIOMES={plains:{tree:.012},forest:{tree:.075},desert:{tree:0},mountains:{tree:.008},marsh:{tree:.02},alpine:{tree:.004},volcanic:{tree:0},badlands:{tree:0},wetlands:{tree:.032},boreal:{tree:.047},meadow:{tree:.014},limestone:{tree:.004}};
@@ -37,7 +39,8 @@ const BIOME_MATERIALS={
  meadow:{soil:B.DIRT,surface:()=>B.GRASS},
  forest:{soil:B.DIRT,surface:r=>r>.7?B.MOSS:B.GRASS}
 };
-export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true){
+export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true,yOrigin=0){
+ if(mode===CANYON_MODE)return stampCanyonChunk(chunk,seed,yOrigin);
  if(mode===CITY_MODE)return stampCityChunk(chunk,seed,cityBlueprints);
  if(mode===STATION_PREVIEW_MODE)return stampStationPreview(chunk,seed);
  if(mode===ARBORETUM_MODE)return stampArboretum(chunk,seed);

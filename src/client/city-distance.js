@@ -200,7 +200,7 @@ function legacyVertexCount(plan,volume){
  return count;
 }
 
-function buildingSilhouette(plan,v,enhanced){
+export function buildingSilhouette(plan,v,enhanced){
  const mesh=[];
  let first=0;
  while(first<v.floors.length){

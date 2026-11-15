@@ -6,6 +6,8 @@ import {block as itemBlock} from '../core/blocks.js';
 import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_BASE_Y,CITY_BLUEPRINT_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
+import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
+import {distantCanyonMesh} from './canyon-distance.js';
 import {distantCityMesh,distanceSectorVisible} from './city-distance.js';
 import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
@@ -28,13 +30,13 @@ uniform vec3 uFog;uniform vec3 uLowerFog;uniform float uBrightness;uniform float
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;uniform bool uDistant;uniform vec2 uCenterChunk;
 uniform vec3 uCamera;
-uniform float uLodNear;uniform bool uFarPass;uniform vec2 uNearY;
+uniform float uLodNear;uniform float uNearRing;uniform bool uFarPass;uniform vec2 uNearY;
 out vec4 frag;
 void main(){
  if(uDistant){
   vec2 delta=abs(floor(vPos.xz/16.)-uCenterChunk);
   float ring=max(delta.x,delta.y);
-  bool nearChunk=ring<3.||(ring==3.&&delta.x+delta.y<=4.);
+  bool nearChunk=ring<uNearRing||(ring==uNearRing&&delta.x+delta.y<=uNearRing+1.);
   // Only the streamed vertical band has near geometry. Keep the full-height
   // silhouette above and below it, even for buildings in the same chunk.
   bool outsideNearY=vPos.y<uNearY.x||vPos.y>uNearY.y;
@@ -273,7 +275,7 @@ export function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);retur
 export function view(yaw,pitch,x,y,z){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);const fx=-sy*cp,fy=sp,fz=-cy*cp;const rx=cy,ry=0,rz=-sy;const ux=sy*sp,uy=cp,uz=cy*sp;return new Float32Array([rx,ux,-fx,0,ry,uy,-fy,0,rz,uz,-fz,0,-(rx*x+ry*y+rz*z),-(ux*x+uy*y+uz*z),fx*x+fy*y+fz*z,1])}
 function glClearLight(gl,texture){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_3D,texture);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,0,gl.RGBA,gl.UNSIGNED_BYTE,null)}
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.observerRenderer=new ObserverRenderer(gl);this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.observerRenderer=new ObserverRenderer(gl);this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','NearRing','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
  this.dustProgram=gl.createProgram();
  gl.attachShader(this.dustProgram,shader(gl,gl.VERTEX_SHADER,DUST_VERT));
  gl.attachShader(this.dustProgram,shader(gl,gl.FRAGMENT_SHADER,DUST_FRAG));
@@ -392,10 +394,11 @@ export class Renderer{
   });
   this.worker.postMessage({key,revision,token,yMin,yMax,detailY,offset,height:chunk.height,seed:world.seed,cx:chunk.cx,cz:chunk.cz,data:copy(chunk.data),forms:chunk.forms&&copy(chunk.forms),styles:chunk.styles&&copy(chunk.styles),mounts:chunk.mounts,neighbors:neighborBuffers,doorStates:states},buffers);
  }
- syncCityDistance(world,cx,cz){
+ syncCityDistance(world,cx,cz,focusY){
   // Rebuild the distant panorama only when the camera changes its 32-block anchor.
   const ax=Math.round(cx/2)*2,az=Math.round(cz/2)*2;
-  const key=ax+','+az;
+  const canyon=world.mode===CANYON_MODE?{origin:world.yOrigin,y:focusY}:null;
+  const key=ax+','+az+(canyon?','+focusY:'');
   if(this.farResult){
    const {middle,far,coveredRadius,job}=this.farResult;
    this.farResult=null;
@@ -405,7 +408,7 @@ export class Renderer{
    this.distanceKey=job.key;
   }
   if(this.distanceKey===key||this.farJob)return;
-  if(this.farEnabled&&typeof Worker!=='undefined'&&!this.farWorkerFailed){
+  if((canyon||this.farEnabled)&&typeof Worker!=='undefined'&&!this.farWorkerFailed){
    try{
     if(!this.farWorker){
      this.farWorker=new Worker(new URL('./city-far.worker.js',import.meta.url),{type:'module'});
@@ -418,9 +421,14 @@ export class Renderer{
      this.farWorker.onerror=event=>this.failFarWorker(event.message);
     }
     this.farJob={cx:ax,cz:az,key};
-    this.farWorker.postMessage({seed:world.seed,cityBlueprints:world.version>=CITY_BLUEPRINT_VERSION?world.version:false,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh});
+    this.farWorker.postMessage({seed:world.seed,cityBlueprints:world.version>=CITY_BLUEPRINT_VERSION?world.version:false,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh,canyon});
     return;
    }catch(error){this.failFarWorker(error)}
+  }
+  if(canyon){
+   this.distanceMesh=this.replace(this.distanceMesh,distantCanyonMesh(world.seed,ax,az,canyon.origin,canyon.y));
+   this.distanceKey=key;
+   return;
   }
   const plan=createCityPlan(world.seed,world.version>=CITY_BLUEPRINT_VERSION?world.version:false),options={enhanced:this.farEnabled,partitionForView:!this.farEnabled};
   if(this.farEnabled&&!this.farMesh)this.farMesh=this.upload(cityFarMesh(plan));
@@ -443,9 +451,9 @@ export class Renderer{
   const band=Math.max(0,Math.min(height-1,Math.floor(player.y/64)*64));
   const yMin=tall?Math.max(0,band-160):0,yMax=Math.min(height,band+208);
   const px=Math.floor(player.x/SIZE),pz=Math.floor(player.z/SIZE);
-  if(world.mode===CITY_MODE){
+  if(world.mode===CITY_MODE||world.mode===CANYON_MODE){
    this.nearYMin=yMin;this.nearYMax=yMax;
-   this.syncCityDistance(world,px,pz);
+   this.syncCityDistance(world,px,pz,band);
   }
   const detailFor=c=>!tall?undefined:Math.max(Math.abs(c.cx-px),Math.abs(c.cz-pz))<=1?Math.floor(player.y/8)*8:null;
   for(const [key,mesh] of this.meshes)if(!world.chunks.has(key)){this.dispose(mesh.opaque);this.dispose(mesh.transparent);this.meshes.delete(key)}
@@ -476,7 +484,7 @@ export class Renderer{
   if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
   const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:oy,maxY:oy+LIGHT_HEIGHT,limit:32,focus}).map(l=>({...l,rgb:rgb(l.color)}));
   const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;this.lightRequestWorld=world;this.lightRequestRevision=world.lightRevision;
-  const city=world.mode===CITY_MODE;
+  const city=world.mode===CITY_MODE||world.mode===CANYON_MODE;
   if(!sources.length&&!city){
    if(this.lightHasSources)glClearLight(this.gl,this.lightTexture);
    this.lightHasSources=false;this.lightAppliedKey=requestKey;this.lightBusy=false;
@@ -531,10 +539,10 @@ export class Renderer{
   this.walkAmount+=(Math.min(1,walkingSpeed/5)-this.walkAmount)*(1-Math.exp(-dt*8));
   this.walkPhase+=walkingSpeed*dt*2.2;
   const walkSway=Math.sin(this.walkPhase)*this.walkAmount*.012;
-  const city=world.mode===CITY_MODE,farLook=city&&this.farEnabled;
+  const canyon=world.mode===CANYON_MODE,city=world.mode===CITY_MODE||canyon,farLook=world.mode===CITY_MODE&&this.farEnabled;
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
-  const clarity=skyClarityAt(cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
+  const clarity=skyClarityAt(canyon?360:cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
   const fog=city?[.139,.212,.253]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);
   const swing=combat?.pose(),baseYaw=player.yaw+walkSway;
@@ -558,10 +566,10 @@ export class Renderer{
   gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
   const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(pitch)/(2*FOV_TAN)));
   gl.uniform1f(this.skyHorizon,horizon);
-  gl.uniform2f(this.skyGround,pitch,Math.max(1,toMeters(eye[1]-CITY_BASE_Y)));
+  gl.uniform2f(this.skyGround,pitch,canyon?240:Math.max(1,toMeters(eye[1]-CITY_BASE_Y)));
   gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,city?1:0);gl.uniform2f(this.skyGradient,this.citySkyTone,this.cityGroundFade);
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
-  if(city){
+  if(city&&!canyon){
    const towers=new Float32Array(48),horizontalScale=2*FOV_TAN*aspect;
    for(let group=0;group<4;group++)for(let n=0;n<3;n++){
     const i=group*3+n,angle=group*Math.PI/2+[-.31,.02,.35][n];
@@ -575,8 +583,8 @@ export class Renderer{
   }
   gl.bindVertexArray(null);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniform3f(this.u.entityOffset,0,0,0);
   const [camX,camY,camZ]=eye.map(toMeters);
-  const vp=matMultiply(perspective(VERTICAL_FOV,aspect,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:city?260:140),view(yaw,pitch,camX,camY,camZ));
-  gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
+  const vp=matMultiply(perspective(VERTICAL_FOV,aspect,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:canyon?300:city?260:140),view(yaw,pitch,camX,camY,camZ));
+  gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,canyon?132:62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
   gl.uniform1i(this.u.CityDaylight,city?1:0);
   if(city)gl.uniform3f(this.u.LowerFog,.094,.148,.177);
   this.updateLightVolume(world,player);
@@ -587,9 +595,14 @@ export class Renderer{
   gl.uniform3f(this.u.lightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
   const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=this.maxDistance||88;const visible=[];for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m)}this.lastDrawnChunks=visible.length;for(const m of visible)this.drawMesh(m.opaque);
   if(this.distanceMesh?.count||this.farMesh?.count){
-   gl.uniform2f(this.u.fogRange,30,230);
+   gl.uniform2f(this.u.fogRange,30,canyon?265:230);
    gl.uniform1i(this.u.distant,1);
    gl.uniform2f(this.u.centerChunk,Math.floor(cx/SIZE),Math.floor(cz/SIZE));
+   gl.uniform1f(this.u.NearRing,canyon?(world.streamRadius??2):3);
+   if(canyon){
+    gl.uniform1i(this.u.FarPass,1);
+    gl.uniform2f(this.u.NearY,this.nearYMin,this.nearYMax);
+   }
    gl.enable(gl.POLYGON_OFFSET_FILL);
    if(this.distanceMesh?.count){
     gl.polygonOffset(1,1);
@@ -624,9 +637,10 @@ export class Renderer{
     gl.uniform1f(this.u.LodNear,0);
     gl.uniform1i(this.u.FarPass,0);
    }
+   gl.uniform1i(this.u.FarPass,0);
    gl.disable(gl.POLYGON_OFFSET_FILL);
    gl.uniform1i(this.u.distant,0);
-   gl.uniform2f(this.u.fogRange,24,62);
+   gl.uniform2f(this.u.fogRange,24,canyon?132:62);
   }
 
   this.trainMeshes??=new Map();const trains=[];

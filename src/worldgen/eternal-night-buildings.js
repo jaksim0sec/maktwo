@@ -97,7 +97,7 @@ export function designBuilding(volume, unit, random) {
   const storeyHeight=risers*stair.rise;
   const treadCount=volume.highRise&&unit===1.5?storeyHeight*4:risers;
   const half=treadCount/2;
-  const turn=volume.x1-volume.x0>volume.z1-volume.z0;
+  const turn=volume.frontAxis==='x'||volume.x1-volume.x0>volume.z1-volume.z0;
   const cx=(volume.x0+volume.x1)/2, cz=(volume.z0+volume.z1)/2;
   const hw=(turn?volume.z1-volume.z0:volume.x1-volume.x0)/2;
   const hd=(turn?volume.x1-volume.x0:volume.z1-volume.z0)/2;
@@ -121,7 +121,7 @@ export function designBuilding(volume, unit, random) {
   const shaft=rect(su,far-stair.landing,eu,near,'stair');
   const atrium=mall && !volume.blueprint ? rect(-hw*.68,-hd*.62,-passage-unit,hd*.62,'atrium') : null;
   const count=Math.round((volume.y1-volume.y0)/storeyHeight);
-  const entryLevel=volume.support===null && count>=2 ? 1 : 0;
+  const entryLevel=volume.terraceEntry?0:volume.support===null && count>=2 ? 1 : 0;
   const floors=[], stairs=[], ports=[];
   const highRise=volume.highRise;
   const skyLevels=new Set(highRise?[12,26,46,69,94,129,171,220,275,337,407,482,560,635].map(y=>Math.round((y+((volume.precinct??0)%5-2)*1.25)/storeyHeight)).filter(i=>i>0&&i<count):[]);
@@ -240,6 +240,7 @@ export function designBuilding(volume, unit, random) {
     const reserve=!skyLevels.has(level)&&level>entryLevel+2&&level<count-2&&!hasAtrium;
     if(highRise&&reserve&&random(311+level)<eventChance)
       program=random(417+level)<.56?'workshops':'exchange';
+    if(volume.fixedProgram)program=volume.fixedProgram;
     // Nonperiodic two-storey clusters replace the identical 4-floor cycle.
     const pattern=highRise?Math.floor(random(519+Math.floor(level/2))*6):0;
     // A broad commercial podium can support a narrower residential upper plan.

@@ -1,39 +1,189 @@
-// Experimental spatial planner. It does not yet stamp blocks or replace the saved generator.
 import {hash,noise} from '../util/math.js';
+import {designBuilding,stairRisers} from './eternal-night-buildings.js';
+import {cityFloorKit,cityKits} from './eternal-night-kits.js';
+import {collapsePlan,floorEnvironment} from './eternal-night-decay.js';
 
-const TYPES=['apartment','market','housing','industrial'];
-const spec={apartment:[34,68,5,13],market:[26,48,2,5],housing:[17,30,2,5],industrial:[30,55,2,6]};
+export const CANYON_MODE='canyon-v2';
+export const CANYON_HEIGHT=768;
+export const CANYON_PITCH=112;
+export const CANYON_SHIFT=4*CANYON_PITCH;
+const BAY=100, UNIT=1.5, LIMIT=1;
+const PROFILES={
+ apartment:{type:1,program:'housing',span:[23,37],depth:[25,42],floors:[6,13]},
+ market:{type:2,program:'market',span:[24,43],depth:[29,52],floors:[3,7],blueprint:'department'},
+ housing:{type:0,program:'housing',span:[13,23],depth:[15,24],floors:[2,5]},
+ industrial:{type:4,program:'workshops',span:[24,45],depth:[34,50],floors:[2,5]},
+};
+const idFor=(level,bay,side,lot)=>Math.floor(hash(bay,level*31+lot,side,773)*0x7fffffff);
+const integer=(r,a,b)=>a+Math.floor(r*(b-a+1));
+const rect=(x0,x1,z0,z1)=>({x0,x1,z0,z1});
+const mirror=(side,a,b,z0,z1)=>side===1?rect(a,b,z0,z1):rect(-b,-a,z0,z1);
 
-// Each level is indexed independently, so extending the world vertically is deterministic.
-export function planCanyonLevel(seed,level,{length=720,cell=48}={}) {
- if(!Number.isInteger(level)||!Number.isFinite(length)||length<=0||!Number.isFinite(cell)||cell<24)throw new RangeError('Invalid canyon dimensions');
- const count=Math.floor(length/cell),buildings=[],terraces=[],connections=[];
- const rand=(a,b,c=0)=>hash(a,level*197+b,c,seed);
- for(const side of [-1,1]){
-  for(let i=0;i<count;i++){
-   const z=(i-count/2)*cell;
-   const bend=noise(i/5,level/4,seed)*30;
-   const edge=side*(65+Math.round(rand(i,1,side)*35)+bend);
-   const elevation=level*105+Math.round((noise(i/3,side*2+level,seed+7)*19+rand(i,2,side)*12)/4)*4;
-   const depth=42+Math.floor(rand(i,3,side)*60);
-   const district=Math.floor(i/4),kind=TYPES[Math.floor(hash(district,level,side,seed+39)*TYPES.length)];
-   const [minW,maxW,minF,maxF]=spec[kind];
-   const width=Math.min(cell-5,minW+Math.floor(rand(i,4,side)*(maxW-minW)));
-   const floors=minF+Math.floor(rand(i,5,side)*(maxF-minF+1));
-   const id=`${level}:${side}:${i}`;
-   terraces.push({id,side,x:edge,z,y:elevation,width:cell-3,depth,thickness:4+Math.floor(rand(i,6,side)*9)});
-   buildings.push({id,kind,side,x:edge+side*depth*.48,z,y:elevation,width,depth:Math.min(depth-8,20+Math.floor(rand(i,7,side)*28)),floors});
-   if(i>0){
-    const previous=terraces[terraces.length-2];
-    const dy=elevation-previous.y;
-    connections.push({from:previous.id,to:id,kind:Math.abs(dy)<=4?'corridor':'stairs',heightDifference:dy});
-   }
+function deckElevation(seed,level,bay,side){
+ // Absolute levels vary in separation, while each bank keeps a gradual longitudinal grade.
+ const strata=Math.round((hash(level,1,0,seed+941)-.5)*26);
+ return level*CANYON_PITCH+56+strata+Math.round(noise(bay*.31,level*.53+side*3,seed+71)*19)+side*3;
+}
+
+function terrace(seed,level,bay,side){
+ const roll=s=>hash(bay,level*43+s,side,seed);
+ const trend=noise(bay*.21,level*.37+side*14,seed);
+ const ledge=roll(17);
+ const inner=Math.round(84+trend*22+roll(1)*15-(ledge<.20?17:0));
+ const outer=inner+integer(roll(2),64,103);
+ // Longitudinal heights move slowly enough for a short staircase across a joint.
+ const y=deckElevation(seed,level,bay,side),headroom=deckElevation(seed,level+1,bay,side)-y;
+ const margin=integer(roll(3),8,14),end=integer(roll(4),8,14);
+ const z0=bay*BAY+margin,z1=(bay+1)*BAY-end;
+ const thickness=integer(roll(5),4,12);
+ return {kind:'terrace',level,bay,side,inner,outer,y,z0,z1,thickness,headroom,
+  bounds:mirror(side,inner,outer,z0,z1),roll};
+}
+
+function buildLot(t,seed,kind,bounds,lot){
+ const {level,bay,side,y}=t;
+ const id=idFor(level,bay,side,lot),random=s=>hash(bay*71+lot,level*109+s,side,seed);
+ const spec=PROFILES[kind];
+ const volume={...bounds,id,kind,y0:y,type:spec.type,program:spec.program,fixedProgram:spec.program,
+  luxury:.18+random(11)*.56,support:null,highRise:true,frontAxis:'x',terraceEntry:true};
+ if(spec.blueprint&&bounds.z1-bounds.z0>=29&&random(12)<.55)volume.blueprint=spec.blueprint;
+ const risers=stairRisers(volume,UNIT);
+ if(!risers)return null;
+ const pitch=risers*UNIT/4;
+ const floors=Math.min(integer(random(15),...spec.floors),Math.floor((t.headroom-13)/pitch));
+ volume.y1=y+pitch*floors;
+ if(!designBuilding(volume,UNIT,random))return null;
+ const floor=volume.floors[0];
+ const facing=volume.ports.filter(p=>p.level===0&&p.dx===-side)
+  .sort((a,b)=>Math.abs(a.z-(volume.z0+volume.z1)/2)-Math.abs(b.z-(volume.z0+volume.z1)/2))[0];
+ if(facing&&!facing.open){facing.open=true;floor.doors.push(facing);}
+ const facade=cityKits(volume,seed,LIMIT)[1];
+ floorEnvironment(volume,0,bay*BAY+50,seed);
+ const kits=volume.floors.map(f=>cityFloorKit(facade,f,LIMIT));
+ const {landing,upperLanding,treads}=volume.stairs[0];
+ volume.detail={kits,landing,access:upperLanding,stairs:treads,collapse:collapsePlan(volume,seed+level*997)};
+ volume.front=facing;
+ volume.balconyFront=kind==='apartment'&&random(29)<.78;
+ volume.roofWear=random(30);
+ return volume;
+}
+
+function buildingsOn(t,seed){
+ const types=['apartment','market','housing','industrial'];
+ const {level,bay,side,inner,outer,z0,z1}=t;
+ const district=hash(Math.floor(bay/3),level,side,seed+217);
+ const preferred=types[Math.floor(district*types.length)];
+ const buildings=[];
+ let cursor=z0+4;
+ for(let lot=0;cursor+14<=z1-3;lot++){
+  const random=s=>hash(bay*71+lot,level*109+s,side,seed);
+  // Each bay has a dominant use, with separate smaller buildings in its gaps.
+  const kind=level===3&&bay===0&&side===1&&lot===0?'market':
+   lot===0||random(5)<.62?preferred:types[Math.floor(random(6)*types.length)];
+  const spec=PROFILES[kind];
+  const span=Math.min(z1-3-cursor,integer(random(8),...spec.span));
+  if(span<spec.span[0]&&lot!==0)break;
+  const front=inner+integer(random(9),10,19);
+  const rear=Math.min(outer-4,front+integer(random(10),...spec.depth));
+  const building=buildLot(t,seed,kind,mirror(side,front,rear,cursor,cursor+span),lot);
+  if(building)buildings.push(building);
+  const behind=rear+4,remaining=outer-4-behind;
+  if(remaining>=16&&span>=18&&random(20)<.72){
+   const small=preferred==='industrial'&&remaining>=34&&span>=26?'industrial':'housing';
+   const depth=Math.min(remaining,small==='housing'?22:41);
+   const infill=buildLot(t,seed,small,mirror(side,behind,behind+depth,cursor+1,cursor+span-1),lot+10);
+   if(infill)buildings.push(infill);
+  }
+  cursor+=span+integer(random(16),4,8);
+ }
+ return buildings;
+}
+
+function route(list,kind,points,width=5){
+ for(let i=1;i<points.length;i++){
+  const [ax,ay,az]=points[i-1],[bx,by,bz]=points[i];
+  const dx=Math.sign(bx-ax),dz=Math.sign(bz-az),length=Math.abs(bx-ax)+Math.abs(bz-az);
+  if(!length)continue;
+  if(dx&&dz||Math.abs(by-ay)>Math.max(0,length-2*Math.floor(width/2)))throw new RangeError('Canyon route exceeds stair grade');
+  const half=Math.floor(width/2),joint=i>1?half:0,end=i<points.length-1?half:0;
+  const bounds=rect(Math.min(ax-dx*joint,bx+dx*end)-(dz?half:0),Math.max(ax-dx*joint,bx+dx*end)+(dz?half:0)+1,
+   Math.min(az-dz*joint,bz+dz*end)-(dx?half:0),Math.max(az-dz*joint,bz+dz*end)+(dx?half:0)+1);
+  list.push({kind,ax,ay,az,bx,by,bz,dx,dz,length,half,bounds,
+   start:i===1,end:i===points.length-1});
+ }
+}
+
+function joinBay(a,b,routes){
+ const x=a.side*(Math.max(a.inner,b.inner)+5);
+ route(routes,'walkway',[[x,a.y,a.z1-2],[x,b.y,b.z0+2]]);
+}
+
+function crossCanyon(a,b,routes){
+ const z=Math.max(a.z0,b.z0)+25;
+ const ax=-a.inner-6,bx=b.inner+6;
+ // Longer enclosed spans alternate with open transfers. Both finish on public decks.
+ const kind=Math.abs(a.bay%2)===0?'concourse':'bridge';
+ route(routes,kind,[[ax,a.y,z],[bx,b.y,z]],7);
+}
+
+function climb(a,b,routes){
+ const sign=a.side,x=a.inner*sign+sign*5,upper=b.inner*sign+sign*5;
+ const middleX=sign*37, outerX=sign*27, innerX=sign*17;
+ const z0=a.bay*BAY+18,z1=a.bay*BAY+82;
+ const rise=b.y-a.y,y1=a.y+Math.round(rise/3),y2=a.y+Math.round(rise*2/3);
+ route(routes,'stairs',[[x,a.y,z0],[middleX,a.y,z0],[middleX,y1,z1],[outerX,y1,z1],
+  [outerX,y2,z0],[innerX,y2,z0],[innerX,b.y,z1],[upper,b.y,z1]]);
+}
+
+// Absolute levels and bays can be sampled independently, including negative indices.
+export function planCanyonLevel(seed,level,{firstBay=-3,lastBay=3}={}){
+ if(!Number.isSafeInteger(level)||!Number.isSafeInteger(firstBay)||!Number.isSafeInteger(lastBay)||lastBay<firstBay)
+  throw new RangeError('Invalid canyon range');
+ const terraces=[],buildings=[],routes=[];
+ for(let bay=firstBay;bay<=lastBay;bay++){
+  const a=terrace(seed,level,bay,-1),b=terrace(seed,level,bay,1);
+  for(const bank of [a,b]){
+   terraces.push(bank);
+   buildings.push(...buildingsOn(bank,seed));
+   joinBay(bank,terrace(seed,level,bay+1,bank.side),routes);
+  }
+  const pattern=((bay%4)+4)%4;
+  if(pattern===0||pattern===3)crossCanyon(a,b,routes);
+  if(pattern===1||pattern===2){
+   const sign=(pattern===1?1:-1)*((level&1)?-1:1);
+   climb(sign===1?b:a,terrace(seed,level+1,bay,sign),routes);
   }
  }
- // Sparse cross-canyon bridges are candidates; physical route and clearance must be validated before stamping.
- for(let i=0;i<count;i++)if(rand(i,18)<.12){
-  const a=terraces[i],b=terraces[count+i];
-  if(Math.abs(a.y-b.y)<=8)connections.push({from:a.id,to:b.id,kind:'bridge',heightDifference:b.y-a.y});
+ return {level,terraces,buildings,routes};
+}
+
+const plans=new Map();
+export function canyonBay(seed,level,bay){
+ const key=`${seed}:${level}:${bay}`;
+ const cached=plans.get(key);
+ if(cached){plans.delete(key);plans.set(key,cached);return cached;}
+ const plan=planCanyonLevel(seed,level,{firstBay:bay,lastBay:bay});
+ if(plans.size>=240)plans.delete(plans.keys().next().value);
+ plans.set(key,plan);
+ return plan;
+}
+
+export function* canyonBays(seed,origin,height,z0,z1){
+ // Include the previous terrace's outgoing bridges and the buildings overhanging the lower edge.
+ const bottom=Math.floor((origin-156)/CANYON_PITCH),top=Math.floor((origin+height)/CANYON_PITCH);
+ for(let level=bottom;level<=top;level++)
+  for(let bay=Math.floor(z0/BAY)-1;bay<=Math.floor(z1/BAY);bay++)
+   yield canyonBay(seed,level,bay);
+}
+
+export function canyonShelter(seed){
+ const market=canyonBay(seed,3,0).buildings.find(v=>v.kind==='market'&&v.front&&v.front.dx===-1);
+ if(!market){
+  const deck=canyonBay(seed,3,0).terraces[1];
+  return {spawn:{x:deck.inner+5.5,y:deck.y,z:deck.z0+22.5,yaw:-Math.PI/2}};
  }
- return {seed,level,terraces,buildings,connections};
+ const door=market.front;
+ const x=Math.floor(door.x),z=Math.floor(door.z);
+ return {x,z,y:door.y,spawn:{x:x+3.5,y:door.y,z:z+.5,yaw:-Math.PI/2},
+  head:x+15,foot:x+16,lamp:x+17};
 }
