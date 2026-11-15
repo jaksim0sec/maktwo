@@ -37,7 +37,7 @@ const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-
 export function hologramTextLayout(role,w,h){
  if(role==='grid')return{
   iconTop:Math.max(6,h*.10),iconSize:Math.min(w*.43,h*.45),
-  titleY:h*.78,titleSize:21,statusY:h*.95,statusSize:16
+  titleY:h*.78,titleSize:21,statusY:h*.96,statusSize:16
  };
  if(role==='summary'){
   if(h<75)return{compact:true,iconTop:0,iconSize:0,titleY:h*.5+7,titleSize:20};
