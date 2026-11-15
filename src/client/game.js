@@ -204,16 +204,16 @@ class Game{
   }
   if(hit.startsWith('inspect:')){this.inspectAction(hit.slice(8));return}
   if(this.openContainer){this.containerClick(hit);return}
-  if(hit==='view:inventory'){this.inspectedItem=null;this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
-  if(hit==='view:craft'){this.inspectedItem=null;this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
-  if(hit.startsWith('filter:')){this.inspectedItem=null;this.craftFilter=hit.slice(7);this.inventoryPage=0;this.updateHologram();return}
-  if(hit==='hand'){this.select(-1,{toggle:false});this.requestGameFocus();return}
+  if(hit==='view:inventory'){this.movePending=null;this.inspectedItem=null;this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit==='view:craft'){this.movePending=null;this.inspectedItem=null;this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit.startsWith('filter:')){this.movePending=null;this.inspectedItem=null;this.craftFilter=hit.slice(7);this.inventoryPage=0;this.updateHologram();return}
+  if(hit==='hand'){this.movePending=null;this.select(-1,{toggle:false});this.requestGameFocus();return}
   if(hit.startsWith('page:')){
    this.inspectedItem=null;this.inventoryPage+=hit==='page:next'?1:-1;this.updateHologram();return;
   }
   if(hit.startsWith('tab:')){
    const category=hit.slice(4);if(category!=='all'&&!PALETTES[category])return;
-   this.inspectedItem=null;this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
+   this.movePending=null;this.inspectedItem=null;this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
   }
   if(hit.startsWith('item:')){
    const index=Number(hit.slice(5));
