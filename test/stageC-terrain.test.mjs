@@ -16,7 +16,11 @@ test('25 new terrain materials and plants appear in reproducible new-world geogr
   assert.deepEqual(a.data,b.data);
   for(const id of a.data)counts[id]++;
  }
- for(let id=30;id<=54;id++)assert.ok(counts[id]>0,`${BLOCKS[id].name} (${id}) never generated`);
+ const retired=new Set([30,31,32,33,39,40,41,46,48,50,51]);
+ for(let id=30;id<=54;id++){
+  if(retired.has(id))assert.equal(counts[id],0,`${BLOCKS[id].name} (${id}) is retired from terrain generation`);
+  else assert.ok(counts[id]>0,`${BLOCKS[id].name} (${id}) never generated`);
+ }
 });
 test('new texture layers remain a single compact GPU texture array',()=>{
  const {data}=makeTextureLayers(TEXTURE_SIZE);

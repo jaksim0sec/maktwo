@@ -1,5 +1,5 @@
 import {BLOCK as B} from '../core/blocks.js';
-import {createCityPlan,CITY_BOTANICAL_VERSION,stampWalkway} from './eternal-night-game.js';
+import {createCityPlan,prepareCityPlan,CITY_BOTANICAL_VERSION,stampWalkway} from './eternal-night-game.js';
 import {CORE_ZONE,zoneAt} from './eternal-night-core-floor.js';
 import {insidePolygon} from './eternal-night-buildings.js';
 import {stampCoreLibrary} from './eternal-night-library.js';
@@ -10,6 +10,10 @@ import {addCanyonRoute} from './canyon-v2-plan.js';
 let cached;
 export function canyonCore(seed){
  if(cached?.layout.seed!==seed)cached=createCityPlan(seed,CITY_BOTANICAL_VERSION);
+ return cached;
+}
+export async function prepareCanyonCore(seed){
+ if(cached?.layout.seed!==seed)cached=await prepareCityPlan(seed,CITY_BOTANICAL_VERSION);
  return cached;
 }
 

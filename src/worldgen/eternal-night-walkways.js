@@ -109,7 +109,7 @@ export function segmentY(segment,x,z) {
   return from[1]+Math.sign(to[1]-from[1])*count*rise;
 }
 
-export function designWalkways(layout,grid,buildings,occupied,unit,highRise=false,angular=false) {
+export function* designWalkways(layout,grid,buildings,occupied,unit,highRise=false,angular=false) {
   const roots=buildings.filter(b=>b.support===null);
   const {left,top,step,size}=grid;
   const bridges=[],walkways=[];
@@ -197,6 +197,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
   const cell=(p)=>[Math.floor((p[0]-left)/step),Math.floor((p[2]-top)/step)];
   const available=new Uint8Array(occupied.length);
   for(let i=0;i<available.length;i++) {
+    if((i&511)===0)yield;
     if(occupied[i])continue;
     const a=cellPoint(i);
     const zone=zoneAt(layout,a[0],a[2]);
@@ -230,6 +231,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
       next[i]=-1;seeds.set(i,route);queue.push(i);
     }
     for(let n=0;n<queue.length;n++) {
+      if((n&255)===0)yield;
       const i=queue[n],gx=i%size,gz=Math.floor(i/size),a=cellPoint(i);
       for(const [dx,dz] of DIR) {
         const x=gx+dx,z=gz+dz;
@@ -243,6 +245,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     }
     const options=[];
     for(const p of publicPorts) {
+      yield;
       if(grid.sections[buildings[p.building].section].district!==district)continue;
       const start=portPoint(p), doorStep=stub(p,unit*1.5);
       if(!clearDeck(start,doorStep,p.building))continue;
@@ -254,6 +257,7 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
       }
     }
     for(const chosen of options.sort((a,b)=>a.score-b.score)) {
+      yield;
       const {p,lead}=chosen;
       const points=[portPoint(p),...lead];
       let i=chosen.i;
@@ -302,17 +306,21 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     const stationWidth=width+.45;
     for(const side of [-1,1]){
       const candidates=[];
-      for(const root of roots)for(const p of root.ports){
-        if(used.has(p)||Math.abs(p.y-site.y)>unit*9)continue;
-        const a=xAxis?p.x:p.z,c=xAxis?p.z:p.x;
-        const outward=xAxis?p.dz:p.dx;
-        if((c-cCenter)*side<halfWidth+2||Math.abs(a-aCenter)>halfLength+36||outward*side>0)continue;
-        const align=Math.max(aCenter-halfLength+7,Math.min(aCenter+halfLength-7,a));
-        const outside=coord(align,cCenter+side*(halfWidth+margin+.95),site.y);
-        if(distance(portPoint(p),outside)>75)continue;
-        candidates.push({p,align,outside,score:distance(portPoint(p),outside)+Math.abs(p.y-site.y)*2});
+      for(const root of roots){
+        yield;
+        for(const p of root.ports){
+          if(used.has(p)||Math.abs(p.y-site.y)>unit*9)continue;
+          const a=xAxis?p.x:p.z,c=xAxis?p.z:p.x;
+          const outward=xAxis?p.dz:p.dx;
+          if((c-cCenter)*side<halfWidth+2||Math.abs(a-aCenter)>halfLength+36||outward*side>0)continue;
+          const align=Math.max(aCenter-halfLength+7,Math.min(aCenter+halfLength-7,a));
+          const outside=coord(align,cCenter+side*(halfWidth+margin+.95),site.y);
+          if(distance(portPoint(p),outside)>75)continue;
+          candidates.push({p,align,outside,score:distance(portPoint(p),outside)+Math.abs(p.y-site.y)*2});
+        }
       }
       for(const {p,align,outside} of candidates.sort((a,b)=>a.score-b.score)){
+        yield;
         const start=portPoint(p),stubOut=stub(p,margin+.60);
         if(!clearDeck(start,stubOut,p.building)||!clearExisting(start,stubOut))continue;
         const platform=coord(align,cCenter+side*(halfWidth-2.1),site.y);
@@ -346,20 +354,25 @@ export function designWalkways(layout,grid,buildings,occupied,unit,highRise=fals
     buckets.get(key).push(p);
   }
   const pairs=[];
-  for(const a of bridgePorts)for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++) {
-    for(const b of buckets.get(bucket(a.x+dx*limit,a.z+dz*limit))??[]) {
-      if(a.building>=b.building)continue;
-      if(highRise&&Math.abs(a.y-b.y)>unit*6)continue;
-      const length=distance(portPoint(a),portPoint(b));
-      if(length>limit || length<(highRise?width+.12:3*unit))continue;
-      const x=b.x-a.x,z=b.z-a.z;
-      if(x*a.dx+z*a.dz<=0 || x*b.dx+z*b.dz>=0)continue;
-      const near=buildings[a.building].precinct===buildings[b.building].precinct;
-      pairs.push([length+(highRise?Math.abs(a.y-b.y)*.7+(near?-4:0):0),a,b]);
+  for(const a of bridgePorts){
+    yield;
+    for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++) {
+      for(const b of buckets.get(bucket(a.x+dx*limit,a.z+dz*limit))??[]) {
+        if(a.building>=b.building)continue;
+        if(highRise&&Math.abs(a.y-b.y)>unit*6)continue;
+        const length=distance(portPoint(a),portPoint(b));
+        if(length>limit || length<(highRise?width+.12:3*unit))continue;
+        const x=b.x-a.x,z=b.z-a.z;
+        if(x*a.dx+z*a.dz<=0 || x*b.dx+z*b.dz>=0)continue;
+        const near=buildings[a.building].precinct===buildings[b.building].precinct;
+        pairs.push([length+(highRise?Math.abs(a.y-b.y)*.7+(near?-4:0):0),a,b]);
+      }
     }
   }
   const connected=new Set(),degrees=new Map(),paired=new Map();
+  let pairIndex=0;
   for(const [,a,b] of pairs.sort((p,q)=>p[0]-q[0])) {
+    if((pairIndex++&127)===0)yield;
     const key=p=>`${p.building}:${highRise?p.level:0}`;
     const aKey=key(a),bKey=key(b),pair=`${aKey}/${bKey}`;
     // Preserve the primary links, then thin the optional repeats.

@@ -55,10 +55,11 @@ test('world anchored inventory faces player but stays upright and its positions 
  p.yaw=1;p.pitch=.7;p.x=.8;
  assert.equal(faceAnchor(anchor,p),true);assert.deepEqual(anchor.center,center);assert.deepEqual(anchor.up,[0,1,0]);
  const tiles=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`아이템${i}`})));
- assert.ok(tiles.every(c=>c.w<=.5&&c.h<.48));
+ const itemTiles=tiles.filter(c=>c.role==='item');
+ assert.equal(itemTiles.length,10);assert.ok(itemTiles.every(c=>c.w<=.5&&c.h<.48));
 });
 test('material layers keep one compact texture array, with varied color per material',()=>{
- const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,98);assert.equal(data.byteLength,layers*32*32*4);
+ const {size,layers,data}=makeTextureLayers();assert.equal(size,32);assert.equal(layers,101);assert.equal(data.byteLength,layers*32*32*4);
  const hasColor=(m)=>{const offset=m*size*size*4;for(let i=offset;i<offset+size*size*4;i+=4)if(data[i]!==data[i+1]||data[i+1]!==data[i+2])return true;return false};
  assert.ok([0,1,5,9,12].every(hasColor),'materials should have authored color variation');
 });

@@ -8,11 +8,11 @@ import {moveBody} from '../src/core/physics.js';
 import {applyCameraLook,cameraEyeY,dampStepOffset} from '../src/client/camera.js';
 
 test('light sources have compact reach without recoloring source blocks',()=>{
- assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[9,10]);
+ assert.deepEqual(LIGHTBAR.map(id=>block(id).light.radius),[6,10]);
  assert.equal(block(B.GRASS).color,'#78966e');
  assert.equal(block(B.DIRT).color,'#806c59');
  assert.equal(block(B.STONE).color,'#858b90');
- assert.equal(block(B.TORCH).light.color,'#ff8750');
+ assert.equal(block(B.TORCH).light.color,'#ffab65');
 });
 test('step raises physical collision body immediately but eases camera',()=>{
  const world=new World({mode:'flat'}),player=new Player(.5,23.001,.5);player.grounded=true;
@@ -22,7 +22,7 @@ test('step raises physical collision body immediately but eases camera',()=>{
  assert.ok(rose);assert.ok(player.y>23.9);
  const before=player.y+player.eye;
  assert.ok(cameraEyeY(player)<before-.8);
- let old=cameraEyeY(player);for(let i=0;i<24;i++){player.visualStepOffset=dampStepOffset(player.visualStepOffset,1/60);const now=cameraEyeY(player);assert.ok(now>=old,'camera ascends smoothly, never snaps down');old=now}
+ let old=cameraEyeY(player);for(let i=0;i<60;i++){player.visualStepOffset=dampStepOffset(player.visualStepOffset,1/60);const now=cameraEyeY(player);assert.ok(now>=old,'camera ascends smoothly, never snaps down');old=now}
  assert.ok(Math.abs(cameraEyeY(player)-before)<.02);
 });
 test('look is frame-driven and clamps stale pointer spikes',()=>{

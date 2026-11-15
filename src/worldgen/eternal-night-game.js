@@ -3,7 +3,7 @@ import {BLOCK as B} from '../core/blocks.js';
 import {hash} from '../util/math.js';
 import {containsRect,insidePolygon} from './eternal-night-buildings.js';
 import {CORE_FLOOR_DEFAULTS,CORE_ZONE,createFloorLayout,zoneAt} from './eternal-night-core-floor.js';
-import {createDistrictPlan} from './eternal-night-districts.js';
+import {districtPlanSteps} from './eternal-night-districts.js';
 import {cityFloorKit,cityKits,cityPart} from './eternal-night-kits.js';
 import {facadeBay,enclosedPassageBay} from './eternal-night-facade.js';
 import {segmentY} from './eternal-night-walkways.js';
@@ -27,12 +27,38 @@ export const CITY_STATION_REDESIGN_VERSION=8;
 export const CITY_BOTANICAL_VERSION=9;
 export const CITY_BUILDING_OPTIONS=Object.freeze({unit:1.5,buildingDensity:1,highRise:true});
 let cached;
+const cachedPlan=(seed,version)=>cached?.layout.seed===seed&&cached.cityBlueprints===version?cached:null;
+const yieldToBrowser=()=>globalThis.scheduler?.yield?.()??new Promise(resolve=>setTimeout(resolve,0));
 
-export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
-  if(cached?.layout.seed===seed&&cached.cityBlueprints===cityBlueprints)return cached;
+export function createCityPlan(seed=CITY_SEED,cityBlueprints=true){
+  const ready=cachedPlan(seed,cityBlueprints);
+  if(ready)return ready;
+  const steps=cityPlanSteps(seed,cityBlueprints);
+  let step;
+  do{step=steps.next()}while(!step.done);
+  return cached=step.value;
+}
+
+export async function prepareCityPlan(seed,cityBlueprints,{now=()=>performance.now(),yieldTask=yieldToBrowser}={}){
+  const ready=cachedPlan(seed,cityBlueprints);
+  if(ready)return ready;
+  await yieldTask();
+  const steps=cityPlanSteps(seed,cityBlueprints);
+  let deadline=now()+16;
+  let step;
+  for(step=steps.next();!step.done;step=steps.next()){
+    if(now()<deadline)continue;
+    await yieldTask();
+    deadline=now()+16;
+  }
+  // Do not publish a partial plan to spawn, terrain stamping, or the renderer.
+  return cached=step.value;
+}
+
+function* cityPlanSteps(seed,cityBlueprints){
   const latest=cityBlueprints===true||cityBlueprints>=CITY_STATION_REDESIGN_VERSION;
   const layout=createFloorLayout({seed,floorY:CITY_BASE_Y,ratios:latest?{}:{roadHalfWidth:.01}});
-  const plan=createDistrictPlan(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints:cityBlueprints!==false,
+  const plan=yield* districtPlanSteps(layout,120,{...CITY_BUILDING_OPTIONS,cityBlueprints:cityBlueprints!==false,
     stationSites:cityBlueprints===true||cityBlueprints>=CITY_STATION_VERSION});
   plan.cityBlueprints=cityBlueprints;
   plan.tower=createCoreTower(layout,plan.unit,plan.walkways);
@@ -45,18 +71,20 @@ export function createCityPlan(seed=CITY_SEED,cityBlueprints=true) {
       end:Math.max(0,...sites.map(s=>Math.abs((line===0?s.x:s.z)-center)+
         (line===0?s.bounds.x1-s.bounds.x0:s.bounds.z1-s.bounds.z0)/2))};
    });
-  plan.details=plan.volumes.map(v=>{
+  plan.details=[];
+  for(const v of plan.volumes){
+    yield;
     floorEnvironment(v,layout.centerX,layout.centerZ,seed);
     const bands=cityKits(v,seed,layout.districtLuxuryMax);
-    return {kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
+    plan.details.push({kits:v.floors.map(f=>cityFloorKit(bands[f.band],f,layout.districtLuxuryMax)),
       collapse:cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION?collapsePlan(v,seed):null,
-      stairs:v.stairs[0]?.treads??[],landing:v.stairs[0]?.landing,access:v.stairs[0]?.upperLanding};
-  });
+      stairs:v.stairs[0]?.treads??[],landing:v.stairs[0]?.landing,access:v.stairs[0]?.upperLanding});
+  }
   if(cityBlueprints===true||cityBlueprints>=CITY_BOTANICAL_VERSION){
     plan.starter=starterShelter(plan,seed);
-    plan.street=designStreetDetails(plan,seed,CITY_BASE_Y);
+    plan.street=yield* designStreetDetails(plan,seed,CITY_BASE_Y);
   }
-  return cached=plan;
+  return plan;
 }
 
 const mod=(n,d)=>((n%d)+d)%d;

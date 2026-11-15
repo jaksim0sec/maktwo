@@ -25,11 +25,14 @@ test('the light-volume budget retains nearby lights in a dense multistorey city'
  const w=new World({seed:9999,mode:'eternal-city-lab'}),p=w.spawn();
  for(let i=0;i<14;i++)w.stream(p.x,p.z,3,4,{roundEdges:true});
  const x=Math.floor(p.x/16)*16-32,z=Math.floor(p.z/16)*16-32;
- const local=w.lights.near(p.x,p.y,p.z,80,10);
- assert.ok(local.length>0);
- const selected=w.lights.inBounds(x,x+80,z,z+80,{limit:80,focus:[p.x,p.y,p.z]});
- assert.ok(selected.includes(local[0]),'a lamp next to the player survives the volume budget');
- assert.ok(selected.length<=80);
+ const [nearest]=w.lights.near(p.x,p.y,p.z,10,80);
+ assert.ok(nearest);
+ const budget=12,options={maxY:w.height,focus:[p.x,p.y,p.z]};
+ const all=w.lights.inBounds(x,x+80,z,z+80,options);
+ assert.ok(all.length>budget,'the sample must exceed the light budget');
+ const selected=w.lights.inBounds(x,x+80,z,z+80,{...options,limit:budget});
+ assert.ok(selected.includes(nearest),'the nearest lamp survives the volume budget');
+ assert.equal(selected.length,budget);
 });
 test('light index handles negative coordinates and chunk unloading without leaking',()=>{
  const w=new World({mode:'flat'});

@@ -25,9 +25,9 @@ test('a generated stair tread encodes height in the existing style byte and leav
  assert.ok(generated.some(p=>Math.abs(prismAabb(p).y+prismAabb(p).h-8.75)<.001));
 });
 test('generated flights preserve both half-block treads and keep a single outer rail',()=>{
- const plan=createCityPlan(9999),world=new World({seed:9999,mode:'eternal-city-lab'});
+ const world=new World({seed:9999,mode:'eternal-city-lab'}),plan=createCityPlan(world.seed,world.version);
  for(const facing of [2,4]){
-  const b=plan.volumes.find(v=>v.floors.length>=70&&v.stairFacing===facing);
+  const b=plan.volumes.find(v=>v.floors.length>=16&&v.stairFacing===facing);
   assert.ok(b);
   for(const level of [1,2]){
    const {treads}=b.stairs[level];

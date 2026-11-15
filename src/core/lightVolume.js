@@ -13,11 +13,36 @@ for(let dz=-1;dz<=1;dz++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
  if(!dx&&!dy&&!dz)continue;
  STEPS.push({dx,dy,dz,cost:Math.hypot(dx,dy,dz),diagonal:Number(Boolean(dx))+Number(Boolean(dy))+Number(Boolean(dz))>1});
 }
+// Binary min-heap over (cell index, cost) in parallel typed arrays. The sift logic is the
+// same as the original array-of-pairs version, so equal-cost entries pop in the same order
+// and the light output stays byte-identical, without a pair allocation per push.
 class Heap {
- constructor(){this.a=[]}
- push(i,d){const a=this.a;let n=a.length;a.push([i,d]);while(n){const p=(n-1)>>1;if(a[p][1]<=d)break;a[n]=a[p];n=p}a[n]=[i,d]}
- pop(){const a=this.a,root=a[0],last=a.pop();if(a.length){let i=0;while(true){let j=i*2+1;if(j>=a.length)break;if(j+1<a.length&&a[j+1][1]<a[j][1])j++;if(a[j][1]>=last[1])break;a[i]=a[j];i=j}a[i]=last}return root}
- get length(){return this.a.length}
+ constructor(capacity=4096){this.ids=new Int32Array(capacity);this.keys=new Float64Array(capacity);this.length=0;this.poppedKey=0}
+ push(id,key){
+  if(this.length===this.ids.length){
+   const ids=new Int32Array(this.length*2),keys=new Float64Array(this.length*2);
+   ids.set(this.ids);keys.set(this.keys);this.ids=ids;this.keys=keys;
+  }
+  const {ids,keys}=this;let n=this.length++;
+  while(n){const p=(n-1)>>1;if(keys[p]<=key)break;ids[n]=ids[p];keys[n]=keys[p];n=p}
+  ids[n]=id;keys[n]=key;
+ }
+ // Returns the cell index; its cost is left in poppedKey.
+ pop(){
+  const {ids,keys}=this,rootId=ids[0];this.poppedKey=keys[0];
+  const last=--this.length;
+  if(last){
+   const lastId=ids[last],lastKey=keys[last];let i=0;
+   while(true){
+    let j=i*2+1;if(j>=last)break;
+    if(j+1<last&&keys[j+1]<keys[j])j++;
+    if(keys[j]>=lastKey)break;
+    ids[i]=ids[j];keys[i]=keys[j];i=j;
+   }
+   ids[i]=lastId;keys[i]=lastKey;
+  }
+  return rootId;
+ }
 }
 // Solid voxels block light but can still receive it on the illuminated exterior face.
 // Light samples belong to the AIR cell adjacent to a visible face, never the wall.
@@ -29,6 +54,7 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
  if(sky)occluders=occluders.map(cell=>cell&1);
  const output=new Uint8Array(total*4),dist=new Float32Array(total),stamp=new Uint16Array(total);
  let sourceStamp=0;
+ const heap=new Heap();
  const plane=width*height;
  const inside=(x,y,z)=>x>=0&&x<width&&y>=0&&y<height&&z>=0&&z<depth;
  const at=(x,y,z)=>(z*height+y)*width+x;
@@ -40,9 +66,9 @@ export function buildLightVolume(occluders,sources,{width=LIGHT_WIDTH,height=LIG
   const radius=Math.min(22,Math.max(1,src.radius));
   const tint=src.rgb||[1,.58,.29],energy=src.intensity||1;
   const mark=++sourceStamp;stamp[first]=mark;dist[first]=0;
-  const heap=new Heap();heap.push(first,0);
+  heap.length=0;heap.push(first,0);
   while(heap.length){
-   const [index,cost]=heap.pop();if(cost>dist[index]+1e-4||cost>=radius)continue;
+   const index=heap.pop(),cost=heap.poppedKey;if(cost>dist[index]+1e-4||cost>=radius)continue;
    const x=index%width,y=Math.floor(index/width)%height,z=Math.floor(index/plane);
    const k=index*4;
    const fraction=cost/radius,fade=src.falloff?(1-fraction)**src.falloff:(1-fraction*fraction)**2, power=128*energy*fade;

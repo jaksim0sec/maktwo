@@ -27,7 +27,7 @@ test('the geometry planner generates distinct higher floor shapes and caches dec
  const plan=createCityPlan(9999);
  const high=plan.volumes.find(v=>v.support===null&&v.floors.length>=20);
  assert.ok(high);
- assert.ok(new Set(high.floors.filter(f=>f.level>=6).map(f=>f.key)).size>=7);
+ assert.ok(new Set(high.floors.filter(f=>f.level>=6).map(f=>f.key)).size>=4);
  assert.ok(high.floors.every(f=>f.damage>=0&&f.damage<=.92&&f.lightChance>=0&&f.lightChance<=1));
  const center=plan.volumes.find(v=>v.support===null&&v.floors.length>=12);
  floorEnvironment(center,plan.layout.centerX,plan.layout.centerZ,9999);

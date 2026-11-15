@@ -2,7 +2,7 @@ import {FOV_TAN} from './camera.js';
 import {BLOCK_SIZE} from '../core/scale.js';
 import {drawItemIcon} from './item-icons.js';
 import {recipeGrid} from '../core/crafting.js';
-import {workspaceCards} from './hologram-layout.js';
+import {workspaceCards,landscapeInspection} from './hologram-layout.js';
 // A collection of small, world-anchored surfaces, not a screen-space modal.
 // The scene's depth buffer occludes each tile just like any other world object.
 const VS=`#version 300 es
@@ -192,7 +192,7 @@ function pointerRay(player,nx,ny,aspect){
 }
 function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(`Spatial inventory shader: ${gl.getShaderInfoLog(shader)}`);return shader}
 export class Hologram{
- constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dragSource=null;this.dragTarget=null;this.dirty=true;
+ constructor(gl){this.gl=gl;this.opened=false;this.compact=false;this.landscape=false;this.palette='blocks';this.items=[];this.selected=-1;this.anchor=null;this.cards=[];this.hover=null;this.pointer=null;this.focusId=null;this.keyboardMode=false;this.craftFilter='all';this.dragSource=null;this.dragTarget=null;this.dirty=true;
   const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));this.program=p;
   this.u={vp:gl.getUniformLocation(p,'uVP'),atlas:gl.getUniformLocation(p,'uAtlas'),hover:gl.getUniformLocation(p,'uHovered'),selected:gl.getUniformLocation(p,'uSelected'),opacity:gl.getUniformLocation(p,'uOpacity')};
   this.canvas=document.createElement('canvas');this.canvas.width=ATLAS_W;this.canvas.height=ATLAS_H;this.ctx=this.canvas.getContext('2d');
@@ -208,15 +208,18 @@ export class Hologram{
   this.buildGeometry();
  }
  syncViewport(){
-  const canvas=this.gl.canvas,aspect=(canvas?.clientWidth||16)/(canvas?.clientHeight||9);
-  if(this.aspect===aspect)return false;
-  const wasCompact=this.compact;
-  this.aspect=aspect;this.compact=aspect<.8;
+  const canvas=this.gl.canvas,width=canvas?.clientWidth||16,height=canvas?.clientHeight||9,aspect=width/height;
+  const compact=aspect<.8,landscape=aspect>=1.4&&height<500;
+  const layoutChanged=this.compact!==compact||Boolean(this.landscape)!==landscape;
+  if(this.aspect===aspect&&!layoutChanged)return false;
+  this.aspect=aspect;this.compact=compact;this.landscape=landscape;
   // Account for the downward offset and the depth of the nearest card.
   const scaleY=(PANEL_DISTANCE*FOV_TAN-.12)/(.97+.07*FOV_TAN);
-  const scaleX=PANEL_DISTANCE*FOV_TAN*aspect/(this.compact?.45:1.22);
+  // Reserve side room for the movement controls on short landscape screens.
+  const usableAspect=landscape?Math.max(1,width-132)/height:aspect;
+  const scaleX=PANEL_DISTANCE*FOV_TAN*usableAspect/(compact?.45:landscape?1.55:1.22);
   this.scale=Math.min(PANEL_SCALE,scaleY*.96,scaleX*.93);
-  if(wasCompact!==this.compact)return true;
+  if(layoutChanged)return true;
   this.buildGeometry();
   return false;
  }
@@ -229,14 +232,17 @@ export class Hologram{
   this.palette=palette;this.station=station;this.items=items;this.selected=selected;this.craftFilter=craftFilter;this.activeItemId=inspection?.blockId??options.selectedId??null;
   if(!inspection){
    this.basePalette=palette;
-   this.baseCards=cardGeometry(palette,items,this.compact,page,craftFilter,options);
+   this.baseCards=cardGeometry(palette,items,this.compact,page,craftFilter,{...options,landscape:this.landscape});
   }
-  this.cards=inspection?[...(this.baseCards||[]).filter(card=>
+  if(inspection){
+   const storage=this.basePalette?.startsWith('storage:');
+   const details=storage?storageInspectionGeometry(inspection,this.compact):inspectionGeometry(inspection,this.compact);
+   this.cards=[...(this.baseCards||[]).filter(card=>
     !card.id.startsWith('info:')&&card.id!=='hand'&&!card.id.startsWith('page:')&&
-    !(this.compact&&inspection.step!=='details'&&!this.basePalette?.startsWith('storage:')&&card.role==='quick')&&
+    !(this.compact&&inspection.step!=='details'&&!storage&&card.role==='quick')&&
     !(card.role==='filter'&&card.x>.27)),
-    ...(this.basePalette?.startsWith('storage:')?storageInspectionGeometry(inspection,this.compact):
-      inspectionGeometry(inspection,this.compact))]:this.baseCards;
+    ...(this.landscape?landscapeInspection(details,storage):details)];
+  }else this.cards=this.baseCards;
   if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(inspection?'inspect:back':palette.startsWith('storage:')?palette:palette==='craft'?'view:craft':'view:inventory');
   this.dirty=true;this.buildGeometry();
  }

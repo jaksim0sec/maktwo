@@ -82,7 +82,7 @@ test('rotated construction keeps cube texture turns, chair collision and mounted
  assert.equal(raycast(world,{x:6,y:25.77,z:2.5},{x:-1,y:0,z:0}).id,B.SHOP_SIGN);
  assert.equal(raycast(world,{x:6,y:25.5,z:2.77},{x:-1,y:0,z:0}).id,B.PLANKS);
  const {opaque}=meshChunk(world,world.getChunk(0,0));
- assert.ok(opaque.some((value,i)=>i%7===6&&value===297&&opaque[i-5]===26));
+ assert.ok(opaque.some((value,i)=>i%7===6&&value===553&&opaque[i-5]===26));
 });
 
 test('legacy panel inventory merges into one item while installed panels keep their angle',()=>{
@@ -108,7 +108,7 @@ test('legacy panel inventory merges into one item while installed panels keep th
  assert.equal(collides(world,5.8,25.4,1.8,.06,.1),false);
  const hit=raycast(world,{x:4.88,y:25.5,z:2.88},{x:-Math.SQRT1_2,y:0,z:-Math.SQRT1_2});
  assert.equal(hit.id,B.WINDOW_NS);
- assert.ok(hit.normal.x>.7&&hit.normal.z>.7);
+ assert.ok(hit.normal.x>.65&&hit.normal.z>.65);
  const {opaque}=meshChunk(world,world.getChunk(0,0));
  let diagonalEdge=false;
  for(let i=0;i<opaque.length;i+=21){

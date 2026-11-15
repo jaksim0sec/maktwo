@@ -7,10 +7,10 @@ import {BLOCK as B} from '../src/core/blocks.js';
 
 test('four 32px fabric, timber and metal layers are deterministic and lightweight',()=>{
  const a=makeTextureLayers(),b=makeTextureLayers();
- assert.equal(a.size,32);assert.equal(a.layers,98);
- assert.equal(a.data.length,98*32*32*4);assert.ok(a.data.byteLength<512*1024);
+ assert.equal(a.size,32);assert.equal(a.layers,101);
+ assert.equal(a.data.length,101*32*32*4);assert.ok(a.data.byteLength<512*1024);
  assert.deepEqual(a.data,b.data);
- assert.deepEqual(Object.values(FIXTURE_MATERIAL),[95,96,97,98]);
+ assert.deepEqual(Object.values(FIXTURE_MATERIAL),[95,96,97,98,101]);
  for(let kind=0;kind<4;kind++){
   const colors=new Set();
   for(let y=0;y<32;y++)for(let x=0;x<32;x++){
