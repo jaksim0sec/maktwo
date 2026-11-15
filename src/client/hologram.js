@@ -180,7 +180,28 @@ export class Hologram{
   this.texture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   this.vao=gl.createVertexArray();this.buffer=gl.createBuffer();gl.bindVertexArray(this.vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,32*6*6*4,gl.DYNAMIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,24,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,24,20);gl.bindVertexArray(null);this.count=0;
  }
- open(player){this.opened=true;const canvas=this.gl.canvas;this.compact=Boolean(canvas?.clientHeight&&canvas.clientWidth/canvas.clientHeight<.8);this.scale=Math.min(PANEL_SCALE,PANEL_DISTANCE*FOV_TAN*((canvas?.clientWidth||16)/(canvas?.clientHeight||9))*.92/(this.compact?.45:1.22));this.anchor=createAnchor(player,this.compact);this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;this.buildGeometry()}
+ open(player){
+  this.opened=true;
+  this.syncViewport();
+  this.anchor=createAnchor(player,this.compact);
+  followAnchor(this.anchor,player);
+  this.hover=null;this.pointer=null;this.keyboardMode=false;this.focusId=null;
+  this.buildGeometry();
+ }
+ syncViewport(){
+  const canvas=this.gl.canvas,aspect=(canvas?.clientWidth||16)/(canvas?.clientHeight||9);
+  if(this.aspect===aspect)return false;
+  const wasCompact=this.compact;
+  this.aspect=aspect;this.compact=aspect<.8;
+  // Account for the downward offset and the depth of the nearest card.
+  const scaleY=(PANEL_DISTANCE*FOV_TAN-.12)/(.97+.07*FOV_TAN);
+  const scaleX=PANEL_DISTANCE*FOV_TAN*aspect/(this.compact?.45:1.22);
+  this.scale=Math.min(PANEL_SCALE,scaleY*.96,scaleX*.93);
+  if(wasCompact!==this.compact)return true;
+  this.buildGeometry();
+  return false;
+ }
+
  followPlayer(player,dt=1/60){if(this.opened&&followAnchor(this.anchor,player,dt))this.buildGeometry()}
  facePlayer(player){this.followPlayer(player)}
  close(){this.opened=false;this.pointer=null;this.hover=null;this.keyboardMode=false}

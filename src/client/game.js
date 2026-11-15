@@ -217,6 +217,7 @@ class Game{
   const stored=source==='stored',deposit=source==='carried',container=stored||deposit;
   const count=container?(stored?this.survivalInventory.containers.get(this.openContainer.key)?.get(id):this.survivalInventory.count(id))||0:inventory.count(id);
   if(!recipe&&!count){this.inspectedItem=null;this.updateHologram();return}
+  if(step==='quantity')item.amount=Math.max(1,Math.min(item.amount,this.inspectionLimit(item)));
   const actions=recipe?[['craft',inventory.canCraft(recipe,this.activeStation())?'제작하기':'제작 조건 확인']]:
    container?[['quantity',stored?'꺼내기':'넣기']]:[['slots','빠른 슬롯'],...(!this.player.creative?[['quantity','버리기']]:[])];
   const description=weapons[id]?'손에 장착해 공격에 사용':isContainer(id)?'아이템을 넣고 꺼낼 수 있는 수납품':
@@ -232,6 +233,12 @@ class Game{
    slots:inventory.quickSlots.map(slot=>({blockId:slot!==null&&inventory.has(slot)?slot:null})),
    confirm:`${item.amount}개 ${stored?'꺼내기':deposit?'넣기':'버리기'}`
   });
+ }
+ inspectionLimit({id,source}){
+  const carried=this.survivalInventory.count(id);
+  const inStorage=this.openContainer?this.survivalInventory.containers.get(this.openContainer.key)?.get(id)||0:0;
+  return source==='stored'?Math.min(inStorage,MAX_STACK-carried):
+   source==='carried'?Math.min(carried,MAX_STACK-inStorage):carried;
  }
  inspectAction(action){
   const item=this.inspectedItem;
@@ -253,11 +260,10 @@ class Game{
    inventory.assignQuickSlot(id);
    this.renderHotbar();this.status(`${recipe.label} 제작 완료`);
   }else if(step==='quantity'){
-   const carried=this.survivalInventory.count(id);
-   const inStorage=this.openContainer?this.survivalInventory.containers.get(this.openContainer.key)?.get(id)||0:0;
-   const count=stored?Math.min(inStorage,MAX_STACK-carried):deposit?Math.min(carried,MAX_STACK-inStorage):carried;
+   const count=this.inspectionLimit(item);
    if(count<1){this.status('옮길 공간이 없어요');return}
    if(action==='confirm'){
+    if(item.amount>count){this.updateHologram();this.status('가능한 수량을 다시 확인하세요');return}
     const ok=stored||deposit?this.survivalInventory.transfer(this.openContainer.key,id,deposit,item.amount):
      this.dropCarried(id,item.amount);
     if(!ok){this.status('공간 또는 수량을 확인하세요');return}
@@ -345,7 +351,7 @@ class Game{
    for(const n of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(n,()=>this.input.held[action]=false);
   }
   // Clicking the world closes menus and captures the mouse in one gesture.
-  this.canvas.addEventListener('mousedown',event=>{if(this.panel==='inventory'){if(event.button===0){event.preventDefault();const rect=this.canvas.getBoundingClientRect();const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect,{center:this.input.locked});this.inventoryClick(hit)}return}if(this.uiOpen)this.requestGameFocus()});
+  this.canvas.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse')return;if(this.panel==='inventory'){if(event.button===0){event.preventDefault();const rect=this.canvas.getBoundingClientRect();const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect,{center:this.input.locked});this.inventoryClick(hit)}return}if(this.uiOpen)this.requestGameFocus()});
   document.addEventListener('pointerlockchange',()=>{
    // Esc may release pointer lock. Do not automatically spawn a menu over the scene.
    if(this.input.locked)this.hologram.pointer=null;
@@ -823,7 +829,7 @@ class Game{
    this.combat.tick(dt,this.world,this.entities,p,cameraEyeY(p),this.effects);
   }
  }
- frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
+ frame(time){const elapsed=time-this.last,dt=Math.min(Math.max(elapsed/1000,0),.06);this.last=time;this.lastFrameMs=elapsed;const [mx,my]=this.input.consumeLook();if(this.panel==='inventory'||!this.uiOpen)applyCameraLook(this.player,mx,my);if(this.openContainer&&!this.containerInReach())this.requestGameFocus();if(this.panel==='inventory'){if(this.hologram.syncViewport())this.updateHologram();this.hologram.followPlayer(this.player,dt);if(this.station&&this.activeStation()!=='bench'){this.station=null;this.updateHologram()} if(this.input.gestures.right!==null)this.hologram.pointer=null;this.hologram.aim(this.player)};this.acc+=dt;let n=0;while(this.acc>=1/60&&n++<5){this.tick(1/60);this.acc-=1/60}this.frameCount++;this.renderer.observeFrame(elapsed);if(this.frameCount%3===0)this.world.stream(this.player.x,this.player.z,this.renderRadius||3,2,{roundEdges:true});this.renderer.sync(this.world,this.player);this.renderer.frame(this.world,this.player,this.entities.entities,this.effects,dt,this.uiOpen?null:this.combat,this.entities.observers);if(time-this.lastHud>150){this.hud();this.lastHud=time}this.scheduleFrame()}
  scheduleFrame(){requestAnimationFrame(t=>{try{this.frame(t)}catch(error){console.error('[MakTwo] Frame error',error);const el=$('fatal');if(el){el.textContent='화면 오류: '+String(error?.message||error)+' · 새로고침 후에도 반복되면 이 문구를 알려주세요';el.hidden=false}}})}
  hud(){const p=this.player;$('coords').textContent=`${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}`;$('biome').textContent=`${worldLabel(this.world.name)} · ${({'normal':'자연 지형','flat':'평탄한 지형','islands':'섬 지형','highlands':'산맥·협곡 지형'}[this.world.mode]||this.world.mode)}`;$('fps').textContent=`${Math.round(1000/Math.max(1,this.lastFrameMs))} FPS · ${this.world.chunks.size} 청크 / ${this.renderer.lastDrawnChunks} 렌더 · 원거리 ${(this.renderer.distanceMesh?.count??0)+(this.renderer.farMesh?.count??0)} verts / ${this.renderer.lastDistanceDrawCalls??0} draw · 전체 ${this.renderer.lastDrawCalls??0} draw · 동물 ${this.entities.entities.length}`;$('target').textContent=this.target?`조준: ${blockLabel(this.target.id)} · 탭 설치 / 길게 채굴`:this.selected<0?'맨손 · 길게 눌러 채굴':'클릭한 곳에 설치';this.renderStatusRing('health',p.hp,p.maxHp);this.renderStatusRing('stamina',p.stamina,100);document.body.classList.toggle('submerged',this.world.get(p.x,p.y+p.eye,p.z,false)===B.WATER);$('flight').textContent=p.fly?'비행 중':'걷는 중'}
 }

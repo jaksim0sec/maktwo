@@ -34,3 +34,18 @@ test('harvested and discarded drops land and return through the same pickup path
  assert.equal(inventory.count(B.DIRT),8);
  assert(!entities.entities.includes(dropped));
 });
+
+test('a pickup rejected by storage keeps its item and can be retried',()=>{
+ const world=new World({mode:'flat'}),entities=new EntityManager(world);
+ const player=new Player(2.5,23,2.5),inv=new SurvivalInventory();
+ inv.save=()=>false;
+ const drop=entities.spawnDrop(B.COBBLE,player.x,player.y+.1,player.z);
+ for(let i=0;i<20;i++)entities.tick(1/60,player,inv);
+ assert.equal(inv.count(B.COBBLE),0);
+ assert.equal(inv.discovered(B.COBBLE),false);
+ assert.equal(drop.count,1);
+ inv.save=()=>true;
+ for(let i=0;i<32;i++)entities.tick(1/60,player,inv);
+ assert.equal(inv.count(B.COBBLE),1);
+ assert(!entities.entities.includes(drop));
+});

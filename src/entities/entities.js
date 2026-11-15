@@ -207,6 +207,7 @@ export class EntityManager{
        {x:dx/distance,y:dy/distance,z:dz/distance},distance,{solidOnly:true}))){
     const obtained=inventory.add(e.itemId,e.count);e.count-=obtained;
     if(obtained){inventory.assignQuickSlot(e.itemId);this.collected=true}
+    else e.pickupDelay=e.age+.5;
     if(!e.count)e.dead=true;
    }
   }

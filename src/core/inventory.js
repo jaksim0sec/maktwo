@@ -72,11 +72,17 @@ export class SurvivalInventory{
   if(!Number.isInteger(id)||id<=B.AIR||id>=BLOCKS.length||!Number.isSafeInteger(n)||n<1)return 0;
   id=itemId(id);
   const amount=Math.min(n,MAX_STACK-this.count(id));if(amount<=0)return 0;
-  this.items.set(id,this.count(id)+amount);this.seen.add(id);this.save();return amount;
+  const previous=this.count(id),known=this.seen.has(id);
+  this.items.set(id,previous+amount);this.seen.add(id);
+  if(this.save())return amount;
+  if(previous)this.items.set(id,previous);else this.items.delete(id);
+  if(!known)this.seen.delete(id);
+  return 0;
  }
  remove(id,n=1){if(!Number.isSafeInteger(n)||n<1||!this.has(id,n))return false;id=itemId(id);const left=this.count(id)-n;if(left)this.items.set(id,left);else{this.items.delete(id);this.quickSlots=this.quickSlots.map(slot=>slot===id?null:slot)}this.save();return true}
  discard(id,count){
   if(!Number.isSafeInteger(count)||count<1||!this.has(id,count))return false;
+  id=itemId(id);
   const slots=this.quickSlots,original=this.count(id),left=original-count;
   if(left)this.items.set(id,left);
   else{this.items.delete(id);this.quickSlots=slots.map(slot=>slot===id?null:slot)}

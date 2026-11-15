@@ -110,3 +110,21 @@ test('details, destination slots and quantity controls are ray-pickable',()=>{
   }
  }
 });
+
+test('landscape pagination and inspection controls stay inside the camera after a viewport change',()=>{
+ const h=Object.create(Hologram.prototype);
+ const canvas={clientWidth:960,clientHeight:540};
+ h.gl={canvas};h.compact=false;
+ assert.equal(h.syncViewport(),false);
+ const panels=[
+  cardGeometry('all',Array.from({length:6},()=>({name:'Item'})),false,{index:0,total:2}),
+  inspectionGeometry({step:'quantity',name:'Item',amount:1,confirm:'버리기'},false),
+ ];
+ for(const cards of panels)for(const card of cards){
+  const limit=(PANEL_DISTANCE+card.depth*h.scale)*FOV_TAN;
+  assert(Math.abs(card.y*h.scale-.12)+card.h*h.scale/2<limit,card.id);
+ }
+ canvas.clientWidth=380;canvas.clientHeight=780;
+ assert.equal(h.syncViewport(),true);
+ assert(h.compact);
+});
