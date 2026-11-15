@@ -1,0 +1,15 @@
+name: Hologram typography check
+on:
+  push:
+    branches:
+      - fix/hologram-typography-balance-20261115
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test hologram visuals and geometry
+        run: node --test test/hologram-typography.test.mjs test/hologram.test.mjs test/hologram-workspace.test.mjs
