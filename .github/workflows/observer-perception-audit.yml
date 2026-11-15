@@ -1,0 +1,16 @@
+name: V2 Observer Perceptibility Audit
+on:
+  push:
+    branches: [audit/v2-observer-human-visibility-20261115]
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real V2 encounter geometry audit
+        run: node --test test/observer-perception-audit.test.mjs
