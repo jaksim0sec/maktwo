@@ -19,7 +19,7 @@ const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoLastTap=null;this.holoDragging=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -127,7 +127,7 @@ class Game{
  get uiOpen(){return Boolean(this.panel)}
  setPanel(name){
   if(this.cinematic&&name!=='cinematic')return;
-  const prior=this.panel;this.panel=name||null;
+  const prior=this.panel;this.panel=name||null;this.holoLastTap=null;this.holoDragging=null;
   if(this.panel)this.combat.cancel();
   if(this.panel!=='inventory')this.openContainer=null;
   if(this.panel!=='inventory'){this.inspectedItem=null;this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
@@ -167,11 +167,12 @@ class Game{
   if(this.openContainer){this.renderContainer();return}
   const category=this.inventoryPalette||'all',station=this.activeStation(),craft=category==='craft';
   // Bag content and craft output are different views. Bench recipes remain inspectable.
-  const catalog=craft?[...this.inventory.knownRecipes('bench')].sort((a,b)=>Number(this.inventory.canCraft(b,station))-Number(this.inventory.canCraft(a,station))):
+  const raw=craft?[...this.inventory.knownRecipes('bench')].sort((a,b)=>Number(this.inventory.canCraft(b,station))-Number(this.inventory.canCraft(a,station))):
    category==='all'?CREATIVE_ITEMS.filter(id=>this.inventory.count(id)>0):
     paletteItems(category).filter(id=>this.inventory.count(id)>0);
+  const catalog=craft?raw:this.inventory.orderedIds(raw);
   const entries=craft&&this.craftFilter==='available'?catalog.filter(recipe=>this.inventory.canCraft(recipe,station)):catalog;
-  const pageSize=craft?(this.hologram.compact?6:10):(this.hologram.compact?5:6),total=Math.max(1,Math.ceil(entries.length/pageSize));
+  const pageSize=craft?(this.hologram.compact?6:9):(this.hologram.compact?6:12),total=Math.max(1,Math.ceil(entries.length/pageSize));
   this.inventoryPage=Math.min(total-1,Math.max(0,this.inventoryPage));
   const page=entries.slice(this.inventoryPage*pageSize,(this.inventoryPage+1)*pageSize);
   if(craft)this.visibleRecipes=page;else this.visibleItems=page;
@@ -181,24 +182,33 @@ class Game{
     ...(craft?{craftable:this.inventory.canCraft(entry,station),recipe:entry,
      missing:Object.entries(entry.needs).reduce((sum,[key,num])=>sum+Math.max(0,num-this.inventory.count(Number(key))),0)}:{})};
   });
-  this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total},this.craftFilter);
+  this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total},this.craftFilter,null,{
+   quickSlots:this.inventory.quickSlots.map(id=>({blockId:id!==null&&this.inventory.has(id)?id:null,count:id===null?0:this.inventory.count(id)}))
+  });
  }
  inventoryClick(hit=this.hologram.click()){
   if(!hit)return;
   if(hit==='close'){this.requestGameFocus();return}
-  if(hit==='empty')return;
+  if(hit==='empty'||hit.startsWith('info:summary'))return;
+  if(hit==='info:shortcut'&&this.inspectedItem){this.inspectAction('slots');return}
+  if(hit.startsWith('quick:')){
+   const index=Number(hit.slice(6)),item=this.inspectedItem;
+   if(item&&item.source!=='stored'&&item.source!=='recipe'&&this.inventory.moveShortcut(item.id,index)){
+    this.select(index,{toggle:false});this.renderHotbar();this.updateHologram();
+   }return;
+  }
   if(hit.startsWith('inspect:')){this.inspectAction(hit.slice(8));return}
   if(this.openContainer){this.containerClick(hit);return}
-  if(hit==='view:inventory'){this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
-  if(hit==='view:craft'){this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
-  if(hit.startsWith('filter:')){this.craftFilter=hit.slice(7);this.inventoryPage=0;this.updateHologram();return}
+  if(hit==='view:inventory'){this.inspectedItem=null;this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit==='view:craft'){this.inspectedItem=null;this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
+  if(hit.startsWith('filter:')){this.inspectedItem=null;this.craftFilter=hit.slice(7);this.inventoryPage=0;this.updateHologram();return}
   if(hit==='hand'){this.select(-1,{toggle:false});this.requestGameFocus();return}
   if(hit.startsWith('page:')){
-   this.inventoryPage+=hit==='page:next'?1:-1;this.updateHologram();return;
+   this.inspectedItem=null;this.inventoryPage+=hit==='page:next'?1:-1;this.updateHologram();return;
   }
   if(hit.startsWith('tab:')){
    const category=hit.slice(4);if(category!=='all'&&!PALETTES[category])return;
-   this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
+   this.inspectedItem=null;this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
   }
   if(hit.startsWith('item:')){
    const index=Number(hit.slice(5));
@@ -295,6 +305,27 @@ class Game{
 
  bindUI(){
   this.renderHotbar();this.updateControlHint();
+  // Only the second press of a double tap owns the item pointer.
+  this.input.hologramPointerDown=event=>{
+   const last=this.holoLastTap,now=performance.now();
+   if(this.panel!=='inventory'||!last||now-last.time>340||Math.hypot(event.clientX-last.x,event.clientY-last.y)>28)return false;
+   const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+   if(hit!==last.hit||!hit?.startsWith('item:'))return false;
+   this.holoDragging={source:hit,startX:event.clientX,startY:event.clientY,target:null,moved:false};
+   this.holoLastTap=null;return true;
+  };
+  this.input.hologramPointerMove=event=>{
+   const drag=this.holoDragging;if(!drag)return;
+   drag.moved||=(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>10);
+   if(drag.moved)drag.target=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+  };
+  this.input.hologramPointerUp=(event,cancel)=>{
+   const drag=this.holoDragging;this.holoDragging=null;
+   if(!drag||cancel||!drag.moved)return;
+   const target=this.hologram.pickAt(this.player,event.clientX,event.clientY,this.canvas.getBoundingClientRect());
+   if(!this.hologramDrop(drag.source,target))this.status('이동할 수 없는 위치입니다');
+  };
+  this.input.hologramPointerCancel=()=>{this.holoDragging=null;this.holoLastTap=null};
 
   bindClick('menu-btn',()=>this.toggleMenu());
   bindClick('camera-btn',()=>this.toggleCameraMode());
@@ -368,7 +399,10 @@ class Game{
    if(this.panel!=='inventory'||(event.pointerType!=='touch'&&event.pointerType!=='pen'))return;
    const tap=this.input.gestures.consumeTapPoint();this.input.gestures.consumeTaps();
    if(!tap)return;
-   event.preventDefault();const hit=this.hologram.pickAt(this.player,tap.x,tap.y,this.canvas.getBoundingClientRect());this.inventoryClick(hit);this.hologram.pointer=null;
+   event.preventDefault();const hit=this.hologram.pickAt(this.player,tap.x,tap.y,this.canvas.getBoundingClientRect());
+   this.inventoryClick(hit);
+   this.holoLastTap=hit?.startsWith('item:')?{hit,x:tap.x,y:tap.y,time:performance.now()}:null;
+   this.hologram.pointer=null;
   });
   this.canvas.addEventListener('wheel',e=>{
    e.preventDefault();if(this.panel==='inventory'||this.uiOpen)return;
@@ -649,31 +683,70 @@ class Game{
  }
  renderContainer(){
   const target=this.openContainer,inventory=this.survivalInventory;
-  const deposit=this.storageView==='carried';
-  const items=deposit?inventory.items:inventory.containers.get(target.key);
-  const entries=Array.from(items??[]).sort(([a],[b])=>a-b);
-  const size=this.hologram.compact?5:6,total=Math.max(1,Math.ceil(entries.length/size));
+  const size=this.hologram.compact?4:8;
+  const carried=inventory.orderedIds(inventory.items.keys()).map(id=>[id,inventory.count(id)]);
+  const stored=[...(inventory.containers.get(target.key)||new Map())].sort(([a],[b])=>a-b);
+  const total=Math.max(1,Math.ceil(Math.max(carried.length,stored.length)/size));
   this.inventoryPage=Math.max(0,Math.min(total-1,this.inventoryPage));
-  const start=this.inventoryPage*size;
-  const page=entries.slice(start,start+size);
-  this.visibleItems=page.map(([id])=>id);
-  this.hologram.setInventory(deposit?'storage:carried':'storage:stored',
-   page.map(([id,count])=>({id,count,name:blockLabel(id)})),-1,'hand',{index:this.inventoryPage,total},
-   target.id===B.CRATE?'상자':'수납장');
+  const begin=this.inventoryPage*size;
+  const pageCarried=carried.slice(begin,begin+size),pageStored=stored.slice(begin,begin+size);
+  this.visibleCarried=pageCarried.map(([id])=>id);
+  this.visibleStored=pageStored.map(([id])=>id);
+  const mapItems=rows=>rows.map(([id,count])=>({id,count,name:blockLabel(id)}));
+  this.hologram.setInventory('storage:stored',[], -1,'hand',
+   {index:this.inventoryPage,total},'all',null,{
+    storage:{carried:mapItems(pageCarried),stored:mapItems(pageStored),label:target.id===B.CRATE?'상자':'수납장'},
+    quickSlots:inventory.quickSlots.map(id=>({blockId:id!==null&&inventory.has(id)?id:null,count:id===null?0:inventory.count(id)}))
+   });
  }
  containerClick(hit){
   if(!this.containerInReach()){this.requestGameFocus();return}
   if(hit==='storage:carried'||hit==='storage:stored'){
    this.storageView=hit.slice(8);
-   this.inventoryPage=0;
   }else if(hit==='page:prev'||hit==='page:next'){
-   this.inventoryPage+=hit==='page:next'?1:-1;
+   this.inspectedItem=null;this.inventoryPage+=hit==='page:next'?1:-1;
   }else if(hit.startsWith('item:')){
-   const id=this.visibleItems[Number(hit.slice(5))];
+   const m=/^item:(carried|stored):(\\d+)$/.exec(hit);
+   if(!m)return;
+   const id=(m[1]==='carried'?this.visibleCarried:this.visibleStored)[Number(m[2])];
    if(id===undefined)return;
-   this.inspectItem(id,this.storageView);return;
+   this.storageView=m[1];this.inspectItem(id,m[1]);return;
   }else return;
   this.updateHologram();
+ }
+ // Spatial drops operate on the existing ledger and shortcut API, not dummy DOM slots.
+ hologramDrop(from,to){
+  if(!from||!to||from===to)return false;
+  const src=/^item:(?:(carried|stored):)?(\\d+)$/.exec(from);
+  const dst=/^item:(?:(carried|stored):)?(\\d+)$/.exec(to);
+  if(!src||this.inventoryPalette==='craft'&&!this.openContainer)return false;
+  const sourceId=src[1]==='carried'?this.visibleCarried[Number(src[2])]:
+   src[1]==='stored'?this.visibleStored[Number(src[2])]:this.visibleItems[Number(src[2])];
+  if(sourceId===undefined)return false;
+  if(to.startsWith('quick:')&&src[1]!=='stored'){
+   const index=Number(to.slice(6));
+   if(!this.inventory.moveShortcut(sourceId,index))return false;
+   this.select(index,{toggle:false});this.renderHotbar();this.updateHologram();return true;
+  }
+  if(dst){
+   const destId=dst[1]==='carried'?this.visibleCarried[Number(dst[2])]:
+    dst[1]==='stored'?this.visibleStored[Number(dst[2])]:this.visibleItems[Number(dst[2])];
+   if(destId===undefined)return false;
+   if(this.openContainer&&src[1]!==dst[1]){
+    const deposit=src[1]==='carried';
+    if(!this.survivalInventory.transfer(this.openContainer.key,sourceId,deposit,1))return false;
+    this.inspectedItem=null;this.renderHotbar();this.updateHologram();return true;
+   }
+   if(src[1]==='stored')return false;
+   if(!this.inventory.reorder(sourceId,destId))return false;
+   this.inspectedItem=null;this.updateHologram();return true;
+  }
+  // A container title is also an accessible target for moving one item.
+  if(this.openContainer&&(to==='storage:carried'||to==='storage:stored')&&src[1]&&src[1]!==to.slice(8)){
+   if(!this.survivalInventory.transfer(this.openContainer.key,sourceId,src[1]==='carried',1))return false;
+   this.inspectedItem=null;this.renderHotbar();this.updateHologram();return true;
+  }
+  return false;
  }
  interaction(dt,input){
   if(this.uiOpen){this.target=null;this.mining.reset();this.showMining(0);return}
