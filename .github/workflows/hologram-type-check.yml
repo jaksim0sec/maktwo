@@ -13,3 +13,17 @@ jobs:
           node-version: '22'
       - name: Test hologram visuals and geometry
         run: node --test test/hologram-typography.test.mjs test/hologram.test.mjs test/hologram-workspace.test.mjs
+
+      - name: Full game regression suite
+        run: npm test
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Main regression baseline
+        run: npm test
