@@ -22,3 +22,9 @@ jobs:
       - name: Full regression audit (existing baseline failures reported separately)
         continue-on-error: true
         run: npm test
+      - name: Verify four remaining failures against original main
+        continue-on-error: true
+        run: |
+          git fetch --no-tags origin 1d7d09bae61884563d8cdeb5474d4e761db46d7a
+          git checkout --detach 1d7d09bae61884563d8cdeb5474d4e761db46d7a
+          node --test --test-name-pattern='the spawn interior|a player can walk from the test spawn|generated flights preserve|the light-volume budget retains' test/eternal-night-game.test.mjs test/eternal-night-stair-bridges.test.mjs test/lighting.test.mjs
