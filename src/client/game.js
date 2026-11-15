@@ -706,7 +706,7 @@ class Game{
   }else if(hit==='page:prev'||hit==='page:next'){
    this.inspectedItem=null;this.inventoryPage+=hit==='page:next'?1:-1;
   }else if(hit.startsWith('item:')){
-   const m=/^item:(carried|stored):(\\d+)$/.exec(hit);
+   const m=/^item:(carried|stored):(\d+)$/.exec(hit);
    if(!m)return;
    const id=(m[1]==='carried'?this.visibleCarried:this.visibleStored)[Number(m[2])];
    if(id===undefined)return;
@@ -717,8 +717,8 @@ class Game{
  // Spatial drops operate on the existing ledger and shortcut API, not dummy DOM slots.
  hologramDrop(from,to){
   if(!from||!to||from===to)return false;
-  const src=/^item:(?:(carried|stored):)?(\\d+)$/.exec(from);
-  const dst=/^item:(?:(carried|stored):)?(\\d+)$/.exec(to);
+  const src=/^item:(?:(carried|stored):)?(\d+)$/.exec(from);
+  const dst=/^item:(?:(carried|stored):)?(\d+)$/.exec(to);
   if(!src||this.inventoryPalette==='craft'&&!this.openContainer)return false;
   const sourceId=src[1]==='carried'?this.visibleCarried[Number(src[2])]:
    src[1]==='stored'?this.visibleStored[Number(src[2])]:this.visibleItems[Number(src[2])];
