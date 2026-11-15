@@ -53,13 +53,13 @@ try{
  if(!loaded)throw Error('actual observer mesh failed to load');
  const withActor=await draw();
  const present=await page.screenshot({path:'/tmp/observer-standing.png',animations:'disabled'});
- const afterDeath=await page.evaluate(()=>{
+ const afterDeath=await page.evaluate((id)=>{
   const g=window.__auditGame,pack=g.entities.observers;
-  for(let n=0;n<3;n++)pack.damage(info.target.actorId,'body',g.player);
+  for(let n=0;n<3;n++)pack.damage(id,'body',g.player);
   pack.clock+=1.8;pack.publish(g.player,48);
-  const member=pack.active.members.get(info.target.actorId);
+  const member=pack.active.members.get(id);
   return {dead:member?.dead,age:pack.clock-member?.hitAt,drawCount:pack.views.length};
- });
+ },info.target.actorId);
  if(!afterDeath.dead)throw Error('hit did not kill target for visual audit');
  await draw();
  const fallen=await page.screenshot({path:'/tmp/observer-fallen.png',animations:'disabled'});
@@ -90,7 +90,7 @@ try{
  console.log('OBSERVER_RENDER_VISIBILITY '+JSON.stringify({info,withActor,gState,errors,
   rect:{x0,y0,x1,y1},changedPixelsOver12:changed,changedPixelsOver40:largeDiff,
   maxChannelDelta:maxDiff,averageChannelDelta:+(sumDiff/((x1-x0)*(y1-y0))).toFixed(2),
-  screenshots:['observer-standing.png','observer-fallen.png','observer-absent.png'],corpse:{changedPixels:deadChanged,largePixels:deadLarge,box:deadBox},standingBox}}));
+  screenshots:['observer-standing.png','observer-fallen.png','observer-absent.png'],corpse:{changedPixels:deadChanged,largePixels:deadLarge,box:deadBox},standingBox}));
  if(changed<15)throw Error('Standing observer not visible');
  if(deadChanged<15)throw Error('Fallen observer disappeared from world-space renderer');
  if(deadBox.minY>deadBox.maxY||standingBox.minY>standingBox.maxY)throw Error('Missing silhouette bounds');
