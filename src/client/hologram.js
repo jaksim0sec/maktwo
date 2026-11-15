@@ -68,7 +68,7 @@ export function inspectionGeometry(view,compact=false){
  const cards=[],x=compact?0:.72,w=compact?.86:.81;
  const add=(id,name,xx,y,ww,h,role='control',extra={})=>cards.push({id,name,x:xx,y,w:ww,h,role,depth:-.058,...extra});
  add('inspect:back','‹ 뒤로',compact?-.27:.52,compact?-.35:.56,compact?.30:.37,compact?.11:.18);
- add('inspect:summary',view.name,x,compact?-.50:.14,w,compact?.14:.53,'summary',view);
+ add('inspect:summary',view.name,x,compact?-.50:.14,w,compact?.14:.58,'summary',view);
  if(view.step==='slots'){
   const step=compact?.20:.205,start=compact?-.30:.43;
   view.slots.forEach((slot,i)=>add('inspect:slot:'+i,String(i+1),start+(i%4)*step,
