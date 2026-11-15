@@ -409,9 +409,9 @@ class Game{
   // Clicking the world closes menus and captures the mouse in one gesture.
   this.canvas.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse')return;if(this.panel==='inventory'){
    if(event.button===0&&this.input.hologramOwnsPointer(event)){
-    event.preventDefault();this.input.ignoreMouseUntilUp=true;const rect=this.canvas.getBoundingClientRect();
-    const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect,{center:this.input.locked});
-    this.inventoryClick(hit);
+    event.preventDefault();this.input.ignoreMouseUntilUp=true;
+    this.input.hologramPointerDown(event);
+    try{this.canvas.setPointerCapture(event.pointerId)}catch{}
    }return;
   }if(this.uiOpen)this.requestGameFocus()});
   document.addEventListener('pointerlockchange',()=>{
@@ -421,10 +421,22 @@ class Game{
    this.updateControlHint();this.updateCameraButton();
   });
   this.canvas.addEventListener('pointermove',event=>{
+   if(event.pointerType==='mouse'&&this.panel==='inventory'&&this.holoDragging?.pointerId===event.pointerId)
+    this.input.hologramPointerMove(event);
    if(event.pointerType==='mouse'&&!this.uiOpen&&!this.input.locked){const crosshair=$('crosshair');if(crosshair){crosshair.style.left=event.clientX+'px';crosshair.style.top=event.clientY+'px'}const progress=$('mine-progress');if(progress){progress.style.left=event.clientX+'px';progress.style.top=(event.clientY+27)+'px'}}
    if(this.panel==='inventory'&&!this.input.locked&&event.pointerType==='mouse'){this.hologram.point(event.clientX,event.clientY,this.canvas.getBoundingClientRect());this.hologram.aim(this.player)}
   });
-  this.canvas.addEventListener('wheel',e=>{
+  this.canvas.addEventListener('pointerup',event=>{
+   if(event.pointerType!=='mouse'||event.button!==0||this.panel!=='inventory'||
+      this.holoDragging?.pointerId!==event.pointerId)return;
+   event.preventDefault();this.input.hologramPointerUp(event,false);
+   if(this.canvas.hasPointerCapture?.(event.pointerId))try{this.canvas.releasePointerCapture(event.pointerId)}catch{}
+  });
+  this.canvas.addEventListener('pointercancel',event=>{
+   if(event.pointerType==='mouse'&&this.holoDragging?.pointerId===event.pointerId)
+    this.input.hologramPointerUp(event,true);
+  });
+    this.canvas.addEventListener('wheel',e=>{
    e.preventDefault();if(this.panel==='inventory'||this.uiOpen)return;
    const occupied=this.paletteItems.map((id,i)=>id!==null&&this.inventory.count(id)>0?i:-1).filter(i=>i>=0);
    if(!occupied.length)return;
