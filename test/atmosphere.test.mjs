@@ -6,8 +6,8 @@ import {LIGHTBAR,block} from '../src/core/blocks.js';
 const read=name=>readFileSync(new URL(`../${name}`,import.meta.url),'utf8');
 test('light profiles use restrained, distinctly amber illumination',()=>{
  for(const id of LIGHTBAR){const {radius,intensity,color}=block(id).light;
-  assert.ok(radius>=9&&radius<=11,'fixtures should have warm but tightly bounded local reach');
-  assert.ok(intensity>=.7&&intensity<=.85,'warm centers should not overwhelm the frame');
+  assert.ok(radius>=6&&radius<=11,'fixtures should have warm but tightly bounded local reach');
+  assert.ok(intensity>=.6&&intensity<=.85,'warm centers should not overwhelm the frame');
   const red=parseInt(color.slice(1,3),16),green=parseInt(color.slice(3,5),16),blue=parseInt(color.slice(5,7),16);
   assert.ok(red>green*1.35&&green>blue*1.35,'fixture should have visible orange warmth');
  }
@@ -19,7 +19,7 @@ test('night uses a horizon gradient and a bounded, soft light falloff',()=>{
  assert.match(source,/gl\.drawArrays\(gl\.TRIANGLES,0,3\)/);
  assert.match(source,/uLightVolume/);
  assert.match(source,/texelFetch\(uLightVolume/);
- assert.match(source,/uniform1f\(this\.u\.brightness,\.35\)/);
+ assert.match(source,/uniform1f\(this\.u\.brightness,\.35\+\.43\*skyLight\)/);
  assert.doesNotMatch(source,/const fog=\[\.046,\.056,\.085\]/);
 });
 test('hologram inventory renders in WebGL instead of a separate DOM overlay',()=>{

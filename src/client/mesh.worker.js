@@ -1,5 +1,6 @@
 import {Chunk,SIZE} from '../core/chunk.js';
 import {meshChunkData} from './mesher.js';
+import {chunkMeshBounds} from './frustum.js';
 
 // Worker-side snapshots keep world generation and block edits owned by the main thread.
 self.onmessage=({data:job})=>{
@@ -21,6 +22,6 @@ self.onmessage=({data:job})=>{
   });
   const states=new Map(job.doorStates||[]);
   const mesh=meshChunkData(chunk,{neighbors,states,visualSeed:job.seed,yMin:job.yMin,yMax:job.yMax,detailY:job.detailY});
-  self.postMessage({key:job.key,revision:job.revision,token:job.token,opaque:mesh.opaque,transparent:mesh.transparent},[mesh.opaque.buffer,mesh.transparent.buffer]);
+  self.postMessage({key:job.key,revision:job.revision,token:job.token,bounds:chunkMeshBounds(mesh.opaque,mesh.transparent),opaque:mesh.opaque,transparent:mesh.transparent},[mesh.opaque.buffer,mesh.transparent.buffer]);
  }catch(err){self.postMessage({key:job.key,revision:job.revision,token:job.token,error:String(err.stack||err)})}
 };

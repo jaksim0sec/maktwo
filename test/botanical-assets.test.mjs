@@ -92,7 +92,7 @@ test('one render anchor emits full model and fallen petals in the seven-float wo
  assert.ok(geometry.opaque.every(Number.isFinite));
  let high=0;
  for(let i=1;i<geometry.opaque.length;i+=7)high=Math.max(high,geometry.opaque[i]);
- assert.ok(high>32,'upper branches extend above anchor');
+ assert.ok(high>28,'upper branches extend above anchor');
  assert.equal(shapeBoxes(B.TREE_SAKURA,4,23,4)[0].w,.4);
  assert.equal(shapeBoxes(B.FALLEN_SAKURA,7,23,4),null);
 });

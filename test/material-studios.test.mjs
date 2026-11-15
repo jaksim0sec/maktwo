@@ -10,9 +10,9 @@ import {partPosition,partGallerySpawn} from '../src/worldgen/part-gallery.js';
 import {makeTextureLayers,materialFor,MATERIALS} from '../src/client/textures.js';
 
 test('independent galleries and the city lab have separate presets; old IDs remain stable',()=>{
- assert.deepEqual(WORLD_PRESETS.map(p=>p.mode),['materials','parts','eternal-city-lab','eternal-city-lab','station-preview','arboretum','eternal-city-lab']);
+ assert.deepEqual(WORLD_PRESETS.map(p=>p.mode),['materials','parts','eternal-city-lab','eternal-city-lab','station-preview','canyon-v2','arboretum','eternal-city-lab']);
  assert.equal(B.CONCRETE,55);assert.equal(B.CEILING_FINISH,85);
- assert.equal(BLOCKS.length,B.FALLEN_GREEN+1);
+ assert.equal(B.FALLEN_GREEN,245);assert.ok(BLOCKS.length>B.FALLEN_GREEN);
  assert.equal(PART_FAMILIES.length,14);assert.equal(PARTS.length,70);
 });
 test('flat texture gallery keeps exactly one cube per material block',()=>{

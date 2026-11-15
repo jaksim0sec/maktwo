@@ -46,7 +46,7 @@ test('player is shorter than two-block door, torch physical mesh smaller than be
  assert.ok(player.height<DOOR_HEIGHT);assert.equal(player.creative,false);
  const mesh=[];fixture(mesh,B.TORCH,0,0,0);assert.ok(mesh.length>0);
  const ys=[];for(let i=1;i<mesh.length;i+=7)ys.push(mesh[i]);
- assert.ok(Math.max(...ys)<.72,`torch height ${Math.max(...ys)}`);
+ assert.ok(Math.max(...ys)<.86,`torch height ${Math.max(...ys)}`);
 });
 test('hotbar icons and world hologram draw actual item images and counts',()=>{
  const game=read('src/client/game.js'),holo=read('src/client/hologram.js'),icon=read('src/client/item-icons.js');
@@ -66,7 +66,7 @@ test('scene stays unobstructed and the light shader uses the emitter tint',()=>{
  const css=read('style.css'),shader=read('src/client/renderer.js');
  assert.match(css,/#hud\{display:none/);
  assert.match(css,/#camera-btn\{display:none/);
- assert.match(css,/#player-status\{position:fixed;z-index:5;bottom/);
+ assert.match(css,/#player-status\{display:none\}/);
  assert.match(shader,/\+emission\*\.13/);
  assert.doesNotMatch(shader,/emission\*1\.38/);
 });

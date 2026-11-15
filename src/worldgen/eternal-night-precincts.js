@@ -10,7 +10,7 @@ const CARDINAL=[[1,0],[-1,0],[0,1],[0,-1]];
 // One-storey shops and street-front commercial strips retain their low scale.
 export const DISTRICT_DOME_RATIO=1.75;
 export const DISTRICT_HEIGHT_SPREAD=.17;
-export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints=true},randomAt) {
+export function* populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints=true},randomAt) {
   const {size,step,left,top,luxury,noise,buildable}=grid;
   const {sections,labels,tangentX,tangentZ}=partitioned;
   const occupied=new Uint8Array(buildable.length),lanes=new Uint8Array(buildable.length);
@@ -23,6 +23,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,
   let ringCount=0;
   if(!buildingDensity)return {volumes,roofLinks,precincts,occupied};
   for(const section of sections) {
+    yield;
     const cells=section.cells.filter(i=>buildable[i]);
     if(!cells.length)continue;
     const cx=section.index%size,cz=Math.floor(section.index/size);
@@ -135,6 +136,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,
         if(v.floors[0].blueprint==='ring')ringCount++;
         if(landmark)landmarks.set(section.district,v);
       }
+      yield;
       if(v.y1>=layout.floorTop)continue;
       volumes.push(v);precinct.modules.push(v.id);used+=w*d;
       for(let dz=0;dz<d;dz++)for(let dx=0;dx<w;dx++)occupied[(b+dz)*size+a+dx]=1;
@@ -143,6 +145,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,
 
   // Roof workshops and small stores share the parent's stair exit and keep its shaft free.
   for(const host of [...volumes]) {
+    yield;
     if(host.floors.length<3||host.y1+6>=layout.floorTop)continue;
     const shaft=host.roof.holes[0],section=sections[host.section];
     const random=salt=>randomAt(layout.noiseSeed,host.id,salt);
@@ -150,6 +153,7 @@ export function populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,
     const x0=Math.min(...xs)+1.4,z0=Math.min(...zs)+1.4,x1=Math.max(...xs)-1.4,z1=Math.max(...zs)-1.4;
     const strips=[[x0,z0,shaft.x0-1.8,z1],[shaft.x1+1.8,z0,x1,z1],[x0,z0,x1,shaft.z0-1.8],[x0,shaft.z1+1.8,x1,z1]];
     for(let n=0;n<12;n++) {
+      yield;
       const [a,b,c,d]=strips[(n+Math.floor(random(52)*4))%4];
       const w=Math.min(c-a,unit*(3.4+random(54+n)*2)),h=Math.min(d-b,unit*(3.3+random(72+n)*2));
       if(w<4||h<4)continue;

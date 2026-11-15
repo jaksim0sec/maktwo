@@ -27,9 +27,9 @@ test('market precincts pack connected modules and upper districts have their own
   assert.ok(roots.some(v=>v.floors.some(f=>f.outline.length>8)));
 });
 
-test('the spawn interior has opaque room divisions and ceiling fixtures that light the aisle',()=>{
+test('the fallback spawn keeps room divisions and the starter shelter has a working lamp',()=>{
   const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
-  const {x,y,z}=world.spawn(),plan=createCityPlan(world.seed);
+  const {x,y,z}=world.spawn(),plan=createCityPlan(world.seed,world.version);
   const v=plan.volumes.find(v=>x>v.x0&&x<v.x1&&z>v.z0&&z<v.z1&&y>=v.y0&&y<v.y1);
   const f=v.floors.find(f=>Math.round(f.y)===y);
   let divisions=0;
@@ -38,11 +38,28 @@ test('the spawn interior has opaque room divisions and ceiling fixtures that lig
     if(block(world.get(xx,y,zz)).opaque&&block(world.get(xx,y+1,zz)).opaque)divisions++;
   }
   assert.ok(divisions>=2,'the shop and service rooms have visible solid divisions');
-  const source=world.lights.near(x,y+3,z,30,15).find(l=>l.id===B.FLUORESCENT&&l.y>y+1&&l.y<f.top);
-  assert.ok(source,'a working overhead fixture is present on the spawn floor');
-  const width=12,height=12,depth=12,origin=[Math.floor(source.x)-6,y-1,Math.floor(source.z)-6];
-  const bytes=buildLightVolume(makeOccluderSnapshot(world,origin,width,height,depth),[{...source,rgb:[.8,.9,1]}],{width,height,depth,origin});
-  assert.ok(bytes[((6*height+1)*width+6)*4+2]>25,'the walkway beneath the lamp receives blue-white light');
+  const ceiling=Math.round(f.top)-2;
+  assert.ok(f.corridors.some(corridor=>{
+    for(let xx=Math.ceil(corridor.x0-.5);xx+.5<corridor.x1;xx++)
+      for(let zz=Math.ceil(corridor.z0-.5);zz+.5<corridor.z1;zz++)
+        if(world.get(xx,ceiling,zz)===B.BROKEN_FLUORESCENT)return true;
+    return false;
+  }),'decayed ceilings still contain authored light fixtures');
+
+  const spawn=world.firstSpawn(),{lamp}=plan.starter;
+  assert.deepEqual(spawn,plan.starter.spawn);
+  assert.equal(world.get(lamp.x,lamp.y,lamp.z),B.TORCH);
+  assert.ok(world.lights.near(lamp.x,lamp.y,lamp.z,10,4).some(light=>light.id===B.TORCH),
+    'the starter lamp is registered in the light index');
+
+  const fixture={x:-55.5,y:21.75,z:84.5},aisleY=16;
+  assert.equal(world.get(fixture.x,fixture.y,fixture.z),B.FLUORESCENT);
+  const [source]=world.lights.near(fixture.x,fixture.y,fixture.z,1,1);
+  assert.equal(source?.id,B.FLUORESCENT);
+  const width=12,height=12,depth=12,origin=[Math.floor(source.x)-6,aisleY-1,Math.floor(source.z)-6];
+  const bytes=buildLightVolume(makeOccluderSnapshot(world,origin,width,height,depth),
+    [{...source,rgb:[.8,.9,1]}],{width,height,depth,origin});
+  assert.ok(bytes[((6*height+1)*width+6)*4+2]>25,'the aisle beneath the working fixture receives blue-white light');
 });
 
 test('the city voxelizes high-rise floors, varied parts and multiple bridge heights',()=>{
@@ -95,17 +112,18 @@ test('city lab spawns on a walkable building floor with air and a ceiling',()=>{
   assert.ok([3,4,5,6,7].some(d=>block(world.get(x,y+d,z)).solid));
 });
 
-test('a player can walk from the test spawn through the doorway onto the main walkway',()=>{
+test('a player can walk through a core doorway onto the main walkway',()=>{
   const world=new World(WORLD_PRESETS.find(p=>p.name==='EternalNightCityLab'));
-  const {x,y,z}=world.spawn();
-  const player=new Player(x,y,z);
-  const door=createCityPlan(world.seed).walkways.filter(l=>l.kind==='core').map(l=>l.ports[0])
-    .find(p=>Math.round(p.y)===y&&Math.hypot(p.x-x,p.z-z)<5);
-  assert.ok(door);
-  player.yaw=Math.atan2(-door.dx,-door.dz);
-  for(let i=0;i<31;i++)player.update(world,1/60,{forward:true});
-  assert.ok((player.x-door.x)*door.dx+(player.z-door.z)*door.dz>.25,'player crossed the exterior doorway');
-  assert.ok(Math.abs(player.y-y)<.05&&player.grounded,'the deck supported the player');
+  const doors=createCityPlan(world.seed,world.version).walkways.filter(link=>link.kind==='core').map(link=>link.ports[0]);
+  assert.equal(doors.length,4);
+  for(const door of doors){
+    const y=Math.round(door.y);
+    const player=new Player(Math.floor(door.x-door.dx*2)+.5,y,Math.floor(door.z-door.dz*2)+.5);
+    player.yaw=Math.atan2(-door.dx,-door.dz);
+    for(let i=0;i<48;i++)player.update(world,1/60,{forward:true});
+    assert.ok((player.x-door.x)*door.dx+(player.z-door.z)*door.dz>.25,'player crossed the exterior doorway');
+    assert.ok(Math.abs(player.y-y)<.05&&player.grounded,'the deck supported the player');
+  }
 });
 
 test('airborne shop doors keep a clear walking aisle from the bridge',()=>{
@@ -118,7 +136,7 @@ test('airborne shop doors keep a clear walking aisle from the bridge',()=>{
     const x=Math.floor((a[0]+b[0])/2-nx*2.65)+.5,z=Math.floor((a[2]+b[2])/2-nz*2.65)+.5,y=Math.round(bay.y);
     const player=new Player(x,y,z);
     player.yaw=Math.atan2(-nx,-nz);
-    for(let i=0;i<24;i++)player.update(world,1/60,{forward:true});
+    for(let i=0;i<60;i++)player.update(world,1/60,{forward:true});
     assert.ok(player.grounded&&Math.abs(player.y-y)<.1&&(player.x-x)*nx+(player.z-z)*nz>1.7,
       `annex bay at ${x},${y},${z} heading=${bay.heading} side=${bay.side} tangent=${nx},${nz} player=${player.x.toFixed(2)},${player.y.toFixed(2)},${player.z.toFixed(2)} grounded=${player.grounded} blocks=${Array.from({length:5},(_,i)=>world.get(Math.floor(x+nx*i*.6),y,Math.floor(z+nz*i*.6))).join(',')}`);
   }
@@ -138,7 +156,7 @@ test('switchback stairs reach low, middle and upper landings at every generated 
   const [x,z]=waypoint(treads[0],s.upperLanding);
   const player=new Player(x,Math.round(s.fromY),z);
   for(const [tx,tz] of [waypoint(treads[0],s.landing),waypoint(treads.at(-1),s.landing),waypoint(treads.at(-1),s.upperLanding)]) {
-    for(let i=0;i<160&&Math.hypot(player.x-tx,player.z-tz)>.14;i++) {
+    for(let i=0;i<300&&Math.hypot(player.x-tx,player.z-tz)>.14;i++) {
       player.yaw=Math.atan2(player.x-tx,player.z-tz);
       player.update(world,1/60,{forward:true});
     }

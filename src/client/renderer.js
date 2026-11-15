@@ -13,6 +13,7 @@ import {cityFarMesh} from './city-far.js';
 import {FAR_LOOK} from './far-look.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,makeDaylightSnapshot,buildLightVolume} from '../core/lightVolume.js';
 import {cameraEyeY,dampStepOffset,VERTICAL_FOV,FOV_TAN} from './camera.js';
+import {frustumPlanes,boxIntersectsFrustum,chunkMeshBounds} from './frustum.js';
 import {makeTextureLayers} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
 import {TRAIN,trainDoorMotion} from '../worldgen/station-train.js';
@@ -315,7 +316,7 @@ export class Renderer{
   this.distanceBlurUniforms={scene:gl.getUniformLocation(p,'uScene'),depth:gl.getUniformLocation(p,'uDepth'),pixel:gl.getUniformLocation(p,'uPixel'),clip:gl.getUniformLocation(p,'uClip')};
  }catch(error){console.warn('Far blur disabled: shader unavailable',error);this.distanceBlurEnabled=false}
  this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
- this.meshes=new Map();this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
+ this.meshes=new Map();this.chunkFrustum=new Float32Array(24);this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_LINEAR);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
@@ -421,7 +422,7 @@ export class Renderer{
    if(c)neighbors.push([dx,dz,c.data,c.forms,c.styles]);
   }
   const states=[...world.blockStates].filter(([pos])=>{const [x,,z]=pos.split(',').map(Number);return x>=chunk.cx*SIZE-1&&x<=(chunk.cx+1)*SIZE&&z>=chunk.cz*SIZE-1&&z<=(chunk.cz+1)*SIZE});
-  if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed,yMin,yMax,detailY});this.completed.push({task,data:{opaque:geo.opaque,transparent:geo.transparent}});return}
+  if(!this.worker){const geo=meshChunkData(chunk,{neighbors,states:new Map(states),visualSeed:world.seed,yMin,yMax,detailY});this.completed.push({task,data:{...geo,bounds:chunkMeshBounds(geo.opaque,geo.transparent)}});return}
   const buffers=[];
   const offset=Math.max(0,(yMin??0)-1)*SIZE*SIZE,end=Math.min(chunk.height,(yMax??chunk.height)+1)*SIZE*SIZE;
   const copy=(a)=>{const data=new Uint8Array(a.subarray(offset,end));buffers.push(data.buffer);return data.buffer};
@@ -508,7 +509,9 @@ export class Renderer{
   if(this.completed.length){const {task,data}=this.completed.shift();const current=world.chunks.get(task.key);
    if(task.world===world&&current===task.chunk){
     if(current.revision===task.revision&&task.yMin===yMin&&task.yMax===yMax&&task.detailY===detailFor(current)){
-     const old=this.meshes.get(task.key);this.meshes.set(task.key,{yMin,yMax,detailY:task.detailY,opaque:this.replace(old?.opaque,data.opaque),transparent:this.replace(old?.transparent,data.transparent)})
+     const old=this.meshes.get(task.key);
+     const bounds=data.bounds===undefined?chunkMeshBounds(data.opaque,data.transparent):data.bounds;
+     this.meshes.set(task.key,{yMin,yMax,detailY:task.detailY,bounds:bounds?.map(toMeters),opaque:this.replace(old?.opaque,data.opaque),transparent:this.replace(old?.transparent,data.transparent)})
     }
     else current.dirty=true;
    }
@@ -649,8 +652,18 @@ export class Renderer{
   gl.uniform1i(this.u.materials,2);
   gl.uniform3fv(this.u.lightOrigin,this.lightOrigin);
   gl.uniform3f(this.u.lightSize,LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH);
-  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);const maxDistance=this.maxDistance||88;const visible=[],coverage=new Int32Array(9);for(const [k,m] of this.meshes){const chunk=world.chunks.get(k);if(!chunk)continue;const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);if(dist>maxDistance)continue;if(dist>SIZE*2&&(dx*fx+dz*fz)<-dist*.65)continue;visible.push(m);
-   if(canyon&&m.yMin===this.nearYMin&&m.yMax===this.nearYMax){
+  const cx=player.x,cz=player.z,fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);
+  const maxDistance=this.maxDistance||88,visible=[],coverage=new Int32Array(9);
+  const planes=frustumPlanes(vp,this.chunkFrustum);
+  for(const [key,m] of this.meshes){
+   const chunk=world.chunks.get(key);
+   if(!chunk)continue;
+   const dx=(chunk.cx+.5)*SIZE-cx,dz=(chunk.cz+.5)*SIZE-cz,dist=Math.hypot(dx,dz);
+   if(dist>maxDistance)continue;
+   const inView=m.bounds&&boxIntersectsFrustum(planes,...m.bounds);
+   if(inView)visible.push(m);
+   const coversCanyon=inView||dist<=SIZE*2||(dx*fx+dz*fz)>=-dist*.65;
+   if(canyon&&coversCanyon&&m.yMin===this.nearYMin&&m.yMax===this.nearYMax){
     const row=chunk.cz-Math.floor(cz/SIZE)+4,col=chunk.cx-Math.floor(cx/SIZE)+4;
     if(row>=0&&row<9&&col>=0&&col<9)coverage[row]|=1<<col;
    }

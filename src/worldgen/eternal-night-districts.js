@@ -153,7 +153,7 @@ class Queue {
   }
 }
 
-function partition(layout, grid) {
+function* partition(layout, grid) {
   const {size, ids, luxury, noise} = grid;
   const labels = new Int32Array(ids.length).fill(-1);
   const distance = new Float64Array(ids.length).fill(Infinity);
@@ -176,6 +176,7 @@ function partition(layout, grid) {
   };
 
   for (let i = 0; i < ids.length; i++) {
+    if((i&511)===0)yield;
     if (ids[i] < 0) continue;
     // The minor axis of the local structure tensor follows the noise band.
     let xx = 0, zz = 0, xz = 0;
@@ -195,6 +196,7 @@ function partition(layout, grid) {
   }
 
   for (let district = 0; district < 4; district++) {
+    yield;
     const ranked = [];
     for (let i = 0; i < ids.length; i++) {
       if (ids[i] !== district) continue;
@@ -214,8 +216,10 @@ function partition(layout, grid) {
     }
   }
 
-  const expand = () => {
+  function* expand(){
+    let iteration=0;
     while (queue.entries.length) {
+      if((iteration++&511)===0)yield;
       const [cost, i] = queue.pop();
       if (cost !== distance[i]) continue;
       for (const [dx,dz] of NEIGHBORS) {
@@ -232,12 +236,12 @@ function partition(layout, grid) {
         queue.push([next, j]);
       }
     }
-  };
-  expand();
+  }
+  yield* expand();
   for (let i = 0; i < ids.length; i++) {
     if (ids[i] >= 0 && labels[i] < 0) {
       addCenter(i);
-      expand();
+      yield* expand();
     }
     if (labels[i] >= 0) {
       const section = centers[labels[i]];
@@ -254,7 +258,7 @@ function partition(layout, grid) {
 }
 
 
-function assignPrecinctLuxury(layout,volumes,walkways) {
+function* assignPrecinctLuxury(layout,volumes,walkways) {
   const stops=Array.from({length:volumes.length},()=>new Map());
   const adjacency=Array.from({length:volumes.length},()=>[]);
   const distance=new Float64Array(volumes.length).fill(Infinity),queue=new Queue();
@@ -286,22 +290,32 @@ function assignPrecinctLuxury(layout,volumes,walkways) {
       distance[next]=cost+length;queue.push([cost+length,next]);
     }
   }
-  for(const v of volumes)for(const f of v.floors) {
-    const relative=(f.y+v.storeyHeight*.5-layout.floorY)/layout.floorHeight;
-    const local=f.level/Math.max(1,v.floors.length-1);
-    const service=Math.exp(-distance[v.id]/(layout.width*.55));
-    let door=0;
-    for(const [level,weight] of stops[v.id])door=Math.max(door,weight*Math.exp(-Math.abs(level-f.level)*.29));
-    f.access=clamp(.34*service+.66*door,0,1);
-    const floorValue={market:.045,exchange:.105,court:.065,shops:.01,workshops:-.05,housing:-.015}[f.program]??0;
-    const scarcity=.16*Math.exp(-((relative-.42)**2)/.058)-.26*Math.max(0,(relative-.60)/.40)**1.3;
-    const cheapRoof=(v.support!==null?.10:0)+Math.max(0,local-.78)*.34;
-    const variation=(fract(layout.noiseSeed,v.id,30+Math.floor(f.level/5))-.5)*.055;
-    f.luxury=clamp(v.luxury*.62+f.access*.21+floorValue+scarcity-cheapRoof+variation,0,layout.districtLuxuryMax);
+  for(const v of volumes){
+    yield;
+    for(const f of v.floors){
+      const relative=(f.y+v.storeyHeight*.5-layout.floorY)/layout.floorHeight;
+      const local=f.level/Math.max(1,v.floors.length-1);
+      const service=Math.exp(-distance[v.id]/(layout.width*.55));
+      let door=0;
+      for(const [level,weight] of stops[v.id])door=Math.max(door,weight*Math.exp(-Math.abs(level-f.level)*.29));
+      f.access=clamp(.34*service+.66*door,0,1);
+      const floorValue={market:.045,exchange:.105,court:.065,shops:.01,workshops:-.05,housing:-.015}[f.program]??0;
+      const scarcity=.16*Math.exp(-((relative-.42)**2)/.058)-.26*Math.max(0,(relative-.60)/.40)**1.3;
+      const cheapRoof=(v.support!==null?.10:0)+Math.max(0,local-.78)*.34;
+      const variation=(fract(layout.noiseSeed,v.id,30+Math.floor(f.level/5))-.5)*.055;
+      f.luxury=clamp(v.luxury*.62+f.access*.21+floorValue+scarcity-cheapRoof+variation,0,layout.districtLuxuryMax);
+    }
   }
 }
 
-export function createDistrictPlan(layout, resolution = 128, options = {}) {
+export function createDistrictPlan(...args){
+  const steps=districtPlanSteps(...args);
+  let step;
+  do{step=steps.next()}while(!step.done);
+  return step.value;
+}
+
+export function* districtPlanSteps(layout, resolution = 128, options = {}) {
   if (!Number.isInteger(resolution) || resolution<16 || resolution>192) throw new RangeError('Invalid district resolution');
   const {unit=BUILDING_DEFAULTS.unit,buildingDensity=BUILDING_DEFAULTS.buildingDensity,highRise=false}=options;
   if (!Number.isFinite(unit)||unit<=0)throw new RangeError('Invalid building unit');
@@ -310,6 +324,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   const left=layout.centerX-layout.halfWidth, top=layout.centerZ-layout.halfWidth;
   const zones=new Uint8Array(cells), luxury=new Float32Array(cells), noise=new Float32Array(cells), ids=new Int8Array(cells).fill(-1);
   sampleFloorRect(layout,left+step/2,top+step/2,size,size,zones,luxury,step,noise);
+  yield;
   for (let i=0; i<cells; i++) if (zones[i]===CORE_ZONE.DISTRICT) {
     ids[i]=districtIdAt(layout,left+(i%size+.5)*step,top+(Math.floor(i/size)+.5)*step);
   }
@@ -319,6 +334,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
   const reserved=[[layout.centerX,layout.centerZ,layout.centerRadiusSq],
     ...layout.miniShaftCenters.map(([x,z])=>[x,z,layout.miniShaftRadiusSq])];
   for(let i=0;i<cells;i++){
+    if((i&511)===0)yield;
     if(ids[i]<0)continue;
     const x=left+(i%size)*step,z=top+Math.floor(i/size)*step;
     buildable[i]=[[0,0],[1,0],[0,1],[1,1]].every(([dx,dz])=>
@@ -328,12 +344,14 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
         (clamp(cx,x,x+step)-cx)**2 + (clamp(cz,z,z+step)-cz)**2>r2) ? 1 : 0;
   }
   const grid={size,step,left,top,zones,luxury,noise,ids,buildable,stations:stations.stations,stationHub:stations.hub};
-  const partitioned=partition(layout,grid);
+  const partitioned=yield* partition(layout,grid);
   const {volumes,occupied,roofLinks,precincts,lanes}=highRise?
-    populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints:options.cityBlueprints},fract):populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
-  const {walkways,links}=designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise,highRise&&options.cityBlueprints!==false);
+    yield* populatePrecincts(layout,grid,partitioned,{unit,buildingDensity,cityBlueprints:options.cityBlueprints},fract):populate(layout,grid,partitioned,{unit,buildingDensity,highRise});
+  const {walkways,links}=yield* designWalkways(layout,{...grid,sections:partitioned.sections},volumes,occupied,unit,highRise,highRise&&options.cityBlueprints!==false);
   for(const link of roofLinks){link.id=walkways.length;walkways.push(link);}
-  if(highRise)assignPrecinctLuxury(layout,volumes,walkways);
+  yield;
+  if(highRise)yield* assignPrecinctLuxury(layout,volumes,walkways);
+  yield;
   const columns=Array.from({length:cells},()=>[]);
   const pathColumns=Array.from({length:cells},()=>[]);
   for (const v of volumes) for (let z=Math.floor(v.gz); z<Math.ceil(v.gz+v.gd); z++) {
@@ -349,6 +367,7 @@ export function createDistrictPlan(layout, resolution = 128, options = {}) {
     for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)pathColumns[z*size+x].push(item);
   };
   for(const link of walkways) {
+    yield;
     for(const part of link.segments)indexPart(link,part);
     for(const part of link.landings)indexPart(link,part);
   }

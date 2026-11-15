@@ -13,7 +13,7 @@ const occupied=(f,x,z)=>insidePolygon(f.outline,x+.5,z+.5);
 const portNear=(f,x,z)=>f.doors.some(p=>Math.hypot(p.x-x-.5,p.z-z-.5)<p.width/2+1.5);
 const guard=(y,turn,post)=>[y,cityPart('passage',4),turn,true,CITY_STAIR_STYLE|(post?8:0)];
 
-export function designStreetDetails(plan,seed,ground){
+export function* designStreetDetails(plan,seed,ground){
  const columns=new Map(),examples={piloti:0,stairs:0,mirror:0};
  const {layout,left,top,step,size}=plan;
  const clear=(v,x,z,y0,y1)=>{
@@ -35,6 +35,7 @@ export function designStreetDetails(plan,seed,ground){
   examples[kind]++;
  };
  for(const v of plan.volumes){
+  yield;
   if(v.support!==null||Math.abs(v.y0-ground)>1)continue;
   const roll=hash(v.id,65,0,seed);
   const f=v.floors[0],upper=v.floors[1],y=Math.round(f.y),next=Math.round(upper?.y??f.top);

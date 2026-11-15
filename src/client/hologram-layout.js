@@ -61,13 +61,65 @@ function storageContent({storage,compact,page}){
   compact?-.66:-.64,compact?-.42:-.46,compact?.42:.46,compact?.13:.17,'page'));
  return result;
 }
+const landscapeHeight=.29;
+const cardIndex=card=>Number(card.id.slice(card.id.lastIndexOf(':')+1));
+const position=(card,x,y,w,h=landscapeHeight)=>({...card,x,y,w,h});
+export function inventoryPageSize(palette,{compact=false,landscape=false}={}){
+ if(palette.startsWith('storage:'))return landscape?6:compact?4:8;
+ if(landscape)return 8;
+ return compact?6:palette==='craft'?9:12;
+}
+function landscapeCards(cards,palette,storage){
+ let filterIndex=0;
+ return cards.flatMap(card=>{
+  const index=cardIndex(card);
+  switch(card.role){
+   case 'close':return position(card,1.34,.76,.36);
+   case 'view':return position(card,card.id==='view:inventory'?-1.20:-.67,.76,.48);
+   case 'filter':return position(card,-1.355+.332*filterIndex++,.44,.31);
+   case 'quick':return position(card,(index-3)*.39,-.82,.35);
+   case 'item':{
+    if(index>=inventoryPageSize(palette,{landscape:true}))return [];
+    const start=storage?(card.side==='carried'?-1.24:.40):-1.30;
+    const columns=storage?3:4,step=storage?.42:.39;
+    return position(card,start+index%columns*step,.12-Math.floor(index/columns)*.32,step-.03);
+   }
+   case 'page':return position(card,(storage?0:-.71)+(card.id==='page:prev'?-.27:.27),-.52,.49);
+   case 'empty':return position(card,-.72,.02,1.46);
+   case 'detail':return position(card,.90,.24,1.16,.40);
+   case 'action':return position(card,.90,-.14,1.16);
+  }
+  if(card.id==='hand')return position(card,.90,-.46,1.16);
+  if(card.id==='holo:title')return position(card,-1.02,.76,.93);
+  if(card.id.startsWith('storage:'))return position(card,card.id==='storage:carried'?-.82:.82,.44,1.23);
+  return card;
+ });
+}
+
+export function landscapeInspection(cards,storage){
+ if(storage)return cards.map(card=>{
+  const widths={'inspect:back':.34,'inspect:summary':1.44,'inspect:confirm':.61};
+  const centers={'inspect:back':-1.32,'inspect:summary':-.16,'inspect:minus':-.92,
+   'inspect:amount':-.56,'inspect:plus':-.20,'inspect:all':.22,'inspect:confirm':1.18};
+  return position(card,centers[card.id]??1.18,-.52,widths[card.id]??(card.role==='action'?.61:.33));
+ });
+ const controls=cards.filter(card=>card.id!=='inspect:back'&&card.id!=='inspect:summary'&&card.id!=='inspect:confirm');
+ return cards.map(card=>{
+  if(card.id==='inspect:back')return position(card,.46,.76,.44);
+  if(card.id==='inspect:summary')return position(card,.90,.23,1.21,.51);
+  if(card.id==='inspect:confirm')return position(card,.90,-.52,1.21);
+  const index=controls.indexOf(card),columns=Math.min(4,controls.length),step=1.30/columns;
+  return position(card,.90+(index%columns-(columns-1)/2)*step,-.20-Math.floor(index/columns)*.32,step-.025);
+ });
+}
+
 export const HOLOGRAM_PLUGINS=Object.freeze({
  inventory:bagContent,
  craft:bagContent,
  storage:storageContent
 });
 export function workspaceCards({palette='all',items=[],compact=false,page=null,craftFilter='all',
- quickSlots=[],storage=null,selectedId=null,moveMode=false}={}){
+ quickSlots=[],storage=null,selectedId=null,moveMode=false,landscape=false}={}){
  const isStorage=Boolean(storage)||palette.startsWith('storage:'),mode=isStorage?'storage':palette==='craft'?'craft':'inventory';
  const cards=[];
  if(isStorage)cards.push(make('holo:title',storage?.label||'보관함',compact?-.18:-.65,.81,compact?.55:.86,.21,'label'));
@@ -87,5 +139,5 @@ export function workspaceCards({palette='all',items=[],compact=false,page=null,c
  }
  cards.push(...quickBar(quickSlots,compact));
  if(cards.length>40)throw Error('Hologram atlas capacity exceeded: '+cards.length);
- return cards;
+ return landscape?landscapeCards(cards,palette,isStorage):cards;
 }
