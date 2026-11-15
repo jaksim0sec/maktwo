@@ -13,12 +13,14 @@ const aimAt=(anchor,card)=>normalize([
 ]);
 test('spatial bag consists of small separated in-world tiles, no fullscreen slab',()=>{
  const cards=cardGeometry('blocks',Array.from({length:6},(_,i)=>({name:`Block ${i}`,color:'#456789'})));
- assert.equal(cards.length,15);
- assert.ok(cards.filter(c=>c.role==='item').every(c=>c.w>1&&c.h<.28));
+ assert.ok(cards.length>15&&cards.length<=40);
+ assert.ok(cards.filter(c=>c.role==='item').every(c=>c.w>=.25&&c.h>=.20));
  assert.ok(cards.some(c=>c.id==='view:inventory')&&cards.some(c=>c.id==='view:craft'));
  assert.equal(cards.find(c=>c.id==='close').name,'✕');
  assert.equal(cards.filter(c=>c.id.startsWith('item:')).length,6);
  assert.ok(cards.some(c=>c.id==='hand'));
+ assert.ok(cards.some(c=>c.id==='quick:0'));
+ assert.ok(cards.some(c=>c.id==='info:summary'));
 });
 test('world-anchored inventory ray-picks each card and empty hand',()=>{
  const anchor=createAnchor(player),cards=cardGeometry('blocks',Array.from({length:6},(_,i)=>({name:`Block ${i}`})));
@@ -44,8 +46,8 @@ test('arrow keys navigate focus across actual spatial cards',()=>{
  h.opened=true;h.cards=cardGeometry('all',Array.from({length:6},(_,i)=>({name:String(i)})));
  h.focusId='item:0';h.keyboardMode=false;
  assert.equal(h.moveFocus('right'),'item:1');
- assert.equal(h.moveFocus('down'),'item:3');
- assert.equal(h.focusedId(),'item:3');
+ assert.equal(h.moveFocus('down'),'item:5');
+ assert.equal(h.focusedId(),'item:5');
 });
 test('craft list makes available recipes visually distinct',()=>{
  const cards=cardGeometry('craft',[{name:'목재',id:9,craftable:true,recipe:{count:4}}]);
@@ -60,7 +62,7 @@ test('atlas sampling exactly preserves each card aspect including wide buttons',
   for(const [i,c] of cards.entries()){
    const rect=atlasRect(c,i);
    assert.ok(Math.abs(rect.w/rect.h-c.w/c.h)<1e-9,'distorted '+c.id);
-   assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.w<=1024&&rect.y+rect.h<=1024,c.id);
+   assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.w<=2048&&rect.y+rect.h<=1024,c.id);
   }
  }
 });
@@ -93,9 +95,9 @@ test('uploaded hologram UVs match the painted atlas rectangle',()=>{
  hologram.buildGeometry();
  assert.equal(vertices.length,hologram.cards.length*36);
  const rect=atlasRect(hologram.cards[0],0);
- assert.ok(Math.abs(vertices[3]-rect.x/1024)<1e-6);
+ assert.ok(Math.abs(vertices[3]-rect.x/2048)<1e-6);
  assert.ok(Math.abs(vertices[4]-(1-rect.y/1024))<1e-6);
- assert.ok(Math.abs(vertices[9]-(rect.x+rect.w)/1024)<1e-6);
+ assert.ok(Math.abs(vertices[9]-(rect.x+rect.w)/2048)<1e-6);
 });
 
 

@@ -66,3 +66,25 @@ test('mobile inventory keeps dual-finger movement and camera; tap is not world p
   assert.equal(input.read().moveX,0);
  }finally{h.restore()}
 });
+
+test('double-tap inventory drag captures just that pointer without freezing other camera fingers',()=>{
+ const h=harness();try{
+  const input=new Input(h.canvas);input.setInventoryMode(true);
+  let captured=0,moves=0,releases=0;
+  input.hologramPointerDown=e=>{captured++;return e.pointerId===11};
+  input.hologramPointerMove=()=>moves++;
+  input.hologramPointerUp=()=>releases++;
+  const ev=(pointerId,x,y)=>({pointerId,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
+  h.canvas.emit('pointerdown',ev(11,810,330));
+  h.canvas.emit('pointermove',ev(11,855,340));
+  assert.equal(moves,1);
+  assert.deepEqual(input.consumeLook(),[0,0],'dragged item must not rotate camera');
+  h.canvas.emit('pointerdown',ev(12,820,460));
+  h.canvas.emit('pointermove',ev(12,860,445));
+  assert(input.consumeLook()[0]>0,'another pointer still rotates camera');
+  h.canvas.emit('pointerup',ev(11,855,340));
+  assert.equal(releases,1);
+  assert.equal(input.hologramCaptured.size,0);
+  h.canvas.emit('pointerup',ev(12,860,445));
+ }finally{h.restore()}
+});

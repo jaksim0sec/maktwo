@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=name=>readFileSync(new URL('../'+name,import.meta.url),'utf8');
 test('bag and crafting are distinct hologram views with available recipe filter',()=>{
- const game=read('src/client/game.js'),holo=read('src/client/hologram.js');
+ const game=read('src/client/game.js'),holo=read('src/client/hologram.js'),layout=read('src/client/hologram-layout.js');
  assert.match(game,/category==='all'\?CREATIVE_ITEMS\.filter/);
  assert.match(game,/knownRecipes\('bench'\)/);
  assert.match(game,/this\.inventory\.canCraft\(recipe,station\)/);
- assert.match(holo,/view:inventory/);assert.match(holo,/view:craft/);
- assert.match(holo,/filter:available/);
+ assert.match(holo,/workspaceCards/);assert.match(layout,/view:inventory/);assert.match(layout,/view:craft/);
+ assert.match(layout,/filter:available/);
 });
 test('arrow keys and enter navigate while C retains camera mode',()=>{
  const game=read('src/client/game.js'),input=read('src/client/input.js');

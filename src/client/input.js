@@ -3,7 +3,7 @@ const cap=v=>Math.max(-180,Math.min(180,v));
 export class Input{
  constructor(canvas){
   this.canvas=canvas;this.keys=new Set();this.held={};this.locked=false;this.uiMode=false;this.inventoryMode=false;
-  this.dx=0;this.dy=0;this.pointer={left:false,start:0,x:0,y:0};this.pendingTaps=0;this.tapPoint=null;this.mouseLook=false;this.lastMouse=null;this.gestures=new GestureState();
+  this.dx=0;this.dy=0;this.pointer={left:false,start:0,x:0,y:0};this.pendingTaps=0;this.tapPoint=null;this.mouseLook=false;this.lastMouse=null;this.gestures=new GestureState();this.hologramCaptured=new Set();
   document.addEventListener('keydown',e=>{
    if(this.uiMode||e.target?.matches?.('input,textarea,select,[contenteditable]'))return;
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',...Array.from({length:10},(_,i)=>`Digit${i}`)].includes(e.code))e.preventDefault();
@@ -43,7 +43,13 @@ export class Input{
   canvas.addEventListener('pointerdown',e=>{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
    if(this.uiMode)return;
-   e.preventDefault();const rect=canvas.getBoundingClientRect();
+   e.preventDefault();
+   if(this.inventoryMode&&this.hologramPointerDown?.(e)){
+    this.hologramCaptured.add(e.pointerId);
+    try{canvas.setPointerCapture(e.pointerId)}catch{}
+    return;
+   }
+   const rect=canvas.getBoundingClientRect();
    if(this.gestures.down(e.pointerId,e.clientX,e.clientY,rect.left+rect.width/2,performance.now(),rect.width)){
     try{canvas.setPointerCapture(e.pointerId)}catch{}
    }
@@ -51,17 +57,28 @@ export class Input{
   canvas.addEventListener('pointermove',e=>{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
    if(this.uiMode)return;
-   e.preventDefault();this.gestures.move(e.pointerId,e.clientX,e.clientY);
+   e.preventDefault();
+   if(this.hologramCaptured.has(e.pointerId)){this.hologramPointerMove?.(e);return}
+   this.gestures.move(e.pointerId,e.clientX,e.clientY);
   });
   const finish=(e,cancel=false)=>{
    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
-   e.preventDefault();this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),cancel);
+   e.preventDefault();
+   if(this.hologramCaptured.delete(e.pointerId)){
+    this.hologramPointerUp?.(e,cancel);
+    if(canvas.hasPointerCapture?.(e.pointerId))try{canvas.releasePointerCapture(e.pointerId)}catch{}
+    return;
+   }
+   this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),cancel);
    if(canvas.hasPointerCapture?.(e.pointerId))try{canvas.releasePointerCapture(e.pointerId)}catch{}
   };
   canvas.addEventListener('pointerup',e=>finish(e));
   canvas.addEventListener('pointercancel',e=>finish(e,true));
   canvas.addEventListener('lostpointercapture',e=>{
-   if(e.pointerType==='touch'||e.pointerType==='pen')this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),true);
+   if(e.pointerType==='touch'||e.pointerType==='pen'){
+    if(this.hologramCaptured.delete(e.pointerId))this.hologramPointerUp?.(e,true);
+    else this.gestures.up(e.pointerId,e.clientX,e.clientY,performance.now(),true);
+   }
   });
  }
  canvasCursor(){
@@ -70,9 +87,9 @@ export class Input{
   if(p.x<r.left||p.x>r.right||p.y<r.top||p.y>r.bottom)return null;
   return{x:p.x-r.left,y:p.y-r.top};
  }
- clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset()}
+ clear(){this.keys.clear();this.held={};this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.dx=0;this.dy=0;this.mouseLook=false;this.lastMouse=null;this.gestures.reset();this.hologramCaptured.clear();this.hologramPointerCancel?.()}
  setUiMode(open){const next=Boolean(open);if(this.uiMode===next)return;this.uiMode=next;if(next)this.clear()}
- setInventoryMode(open){const next=Boolean(open);if(this.inventoryMode===next)return;this.inventoryMode=next;this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.gestures.reset();this.dx=0;this.dy=0}
+ setInventoryMode(open){const next=Boolean(open);if(this.inventoryMode===next)return;this.inventoryMode=next;this.pointer.left=false;this.pendingTaps=0;this.tapPoint=null;this.gestures.reset();this.hologramCaptured.clear();this.hologramPointerCancel?.();this.dx=0;this.dy=0}
  toggleCameraMode(){
   if(document.pointerLockElement===this.canvas){document.exitPointerLock?.();return}
   try{const request=this.canvas.requestPointerLock?.();request?.catch?.(e=>console.warn('[MakTwo] Pointer lock unavailable',e))}catch(e){console.warn('[MakTwo] Pointer lock unavailable',e)}
