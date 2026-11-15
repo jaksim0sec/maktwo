@@ -1,5 +1,5 @@
 import {ObserverPack} from './observers.js';
-import {moveBody,collides,inWater,intersectAabb} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
+import {moveBody,collides,inWater,intersectAabb,raycast} from '../core/physics.js';import {dist2,hash} from '../util/math.js';
 import {toVoxels,toMeters} from '../core/scale.js';
 import {canyonCore} from '../worldgen/canyon-v2-core.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
@@ -52,7 +52,9 @@ export class Mob extends Entity{constructor(type,x,y,z){super(type,x,y,z);this.w
  super.tick(world,dt);if(this.y<0)this.dead=true;
  }}
 export class ItemDrop{
- constructor(itemId,x,y,z,count=1){this.id=NEXT++;this.type='drop';this.itemId=itemId;this.count=count;this.x=x;this.y=y;this.z=z;this.age=0;this.dead=false}
+ constructor(itemId,x,y,z,count=1,{vx=0,vy=1.25,vz=0,pickupDelay=.22}={}){
+  Object.assign(this,{id:NEXT++,type:'drop',itemId,count,x,y,z,vx,vy,vz,pickupDelay,age:0,dead:false,width:.24,height:.24});
+ }
 }
 export class SubwayTrain extends Entity{
  constructor(site){
@@ -179,7 +181,7 @@ export class EntityManager{
   this.observers=world.mode===CITY_MODE?new ObserverPack(world):null;
   world.trainColliders=this.entities.filter(e=>e.type==='train');
  }
- spawnDrop(itemId,x,y,z,count=1){const d=new ItemDrop(itemId,x,y,z,count);this.entities.push(d);return d}
+ spawnDrop(itemId,x,y,z,count=1,motion){const d=new ItemDrop(itemId,x,y,z,count,motion);this.entities.push(d);return d}
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null,renderRange=48,viewport){
   this.observers?.tick(dt,player,renderRange,viewport);
@@ -192,7 +194,17 @@ export class EntityManager{
   const LIMIT=6,SPAWN_INTERVAL=16,MIN_SEPARATION=10,MAX_RANGE=60;
   for(const e of this.entities)if(e.type==='drop'){
    e.age+=dt;
-   if(inventory&&e.age>.22&&Math.abs(e.y-player.y)<2&&dist2(e,player)<2.15*2.15){
+   if(dist2(e,player)<32**2&&Math.abs(e.y-player.y)<40){
+    moveBody(this.world,e,dt);
+    if(e.y<-10){e.dead=true;continue}
+    const drag=Math.exp(-dt*(e.grounded?9:1));
+    e.vx*=drag;e.vz*=drag;
+   }
+   const dx=e.x-player.x,dy=e.y+.12-player.y-.6,dz=e.z-player.z;
+   const distance=Math.hypot(dx,dy,dz);
+   if(inventory&&e.age>e.pickupDelay&&distance<1.15&&
+      (distance<.001||!raycast(this.world,{x:player.x,y:player.y+.6,z:player.z},
+       {x:dx/distance,y:dy/distance,z:dz/distance},distance,{solidOnly:true}))){
     const obtained=inventory.add(e.itemId,e.count);e.count-=obtained;
     if(obtained){inventory.assignQuickSlot(e.itemId);this.collected=true}
     if(!e.count)e.dead=true;

@@ -67,7 +67,7 @@ export function moveBody(world,e,dt){const w=e.width||.6,h=e.height||1.8;dt=clam
   }
  }
  if(!e.fly&&!e.grounded&&!collides(world,e.x,e.y-.06,e.z,w,h)){}else if(!e.fly&&e.vy===0)e.grounded=true;
- if(e.y<-10){e.x=0;e.y=45;e.z=0;e.vy=0}
+ if(e.y<-10&&e.type!=='drop'){e.x=0;e.y=45;e.z=0;e.vy=0}
  return e;
 }
 // Intersect an actual thin door slab so open doors are not targeted through

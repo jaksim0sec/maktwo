@@ -26,6 +26,19 @@ export function harvestDrop(id){
  if(id===B.AIR||id===B.BEDROCK||id===B.WATER||id===B.PORTAL)return null;
  return id===B.GRASS?B.DIRT:id===B.STONE?B.COBBLE:id===B.DOOR_TOP?B.DOOR:itemId(id);
 }
+// Move an existing shortcut, swapping with an occupied destination.
+function moveShortcut(inventory,id,index){
+ if(!inventory.has(id)||!Number.isInteger(index)||index<0||index>=HOTBAR_SIZE)return false;
+ const before=inventory.quickSlots,slots=[...before];
+ const from=slots.indexOf(id);
+ if(from===index)return true;
+ if(from>=0)slots[from]=slots[index];
+ slots[index]=id;
+ inventory.quickSlots=slots;
+ if(inventory.save()!==false)return true;
+ inventory.quickSlots=before;
+ return false;
+}
 export class SurvivalInventory{
  constructor(storage=null,world='Overworld'){
   this.storage=storage;this.world=world;this.items=new Map();this.containers=new Map();this.initializedContainers=new Set();this.checkpoint=null;this.seen=new Set();this.quickSlots=[...HOTBAR];this.load();
@@ -36,6 +49,7 @@ export class SurvivalInventory{
  knownRecipes(station='hand'){
   return RECIPES.filter(recipe=>(station==='bench'||recipe.station==='hand')&&Object.keys(recipe.needs).every(id=>this.discovered(id)));
  }
+ moveShortcut(id,index){return moveShortcut(this,id,index)}
  assignQuickSlot(id,index=null){
   id=itemId(Number(id));if(!this.discovered(id)||id<=0||id>=BLOCKS.length)return -1;
   const existing=this.quickSlots.indexOf(id);if(existing!==-1)return existing;
@@ -61,6 +75,15 @@ export class SurvivalInventory{
   this.items.set(id,this.count(id)+amount);this.seen.add(id);this.save();return amount;
  }
  remove(id,n=1){if(!Number.isSafeInteger(n)||n<1||!this.has(id,n))return false;id=itemId(id);const left=this.count(id)-n;if(left)this.items.set(id,left);else{this.items.delete(id);this.quickSlots=this.quickSlots.map(slot=>slot===id?null:slot)}this.save();return true}
+ discard(id,count){
+  if(!Number.isSafeInteger(count)||count<1||!this.has(id,count))return false;
+  const slots=this.quickSlots,original=this.count(id),left=original-count;
+  if(left)this.items.set(id,left);
+  else{this.items.delete(id);this.quickSlots=slots.map(slot=>slot===id?null:slot)}
+  if(this.save())return true;
+  this.items.set(id,original);this.quickSlots=slots;
+  return false;
+ }
  craft(recipe,station='hand'){if(!this.canCraft(recipe,station))return false;
   // Apply all ingredients and the output as a single ledger mutation.
   for(const [id,n] of Object.entries(recipe.needs)){
@@ -86,11 +109,12 @@ export class SurvivalInventory{
   if(existing)this.containers.set(key,existing);else this.containers.delete(key);
   return false;
  }
- transfer(key,id,deposit){
+ transfer(key,id,deposit,quantity=MAX_STACK){
+  if(!Number.isSafeInteger(quantity)||quantity<1)return false;
   const previous=this.containers.get(key),stored=new Map(previous);
   const from=deposit?this.items:stored,to=deposit?stored:this.items;
   const source=from.get(id)||0,destination=to.get(id)||0;
-  const count=Math.min(source,MAX_STACK-destination);
+  const count=Math.min(source,MAX_STACK-destination,quantity);
   if(count<=0)return false;
   const slots=this.quickSlots,known=this.seen.has(id);
   if(count===source)from.delete(id);else from.set(id,source-count);
@@ -165,6 +189,7 @@ export class CreativeInventory {
  craft(recipe){return this.canCraft(recipe)}
  remove(id){return this.has(id)}
  save(){}
+ moveShortcut(id,index){return moveShortcut(this,id,index)}
  assignQuickSlot(id,index=null){
   if(!this.has(id))return -1;
   const existing=this.quickSlots.indexOf(id);

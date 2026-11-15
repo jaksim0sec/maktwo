@@ -1,7 +1,7 @@
 import {Combat,weapons} from '../core/combat.js';
 import {WorldManager} from '../core/world.js';
 import {loadWorldSlots,addWorldSlot,deleteWorldSlot,ACTIVE_WORLD_KEY,savePlayerState,loadPlayerState} from '../core/world-slots.js';import {Player,EntityManager} from '../entities/entities.js';import {Effects} from '../core/effects.js';import {raycast,collides} from '../core/physics.js';import {block,blockLabel,BLOCK as B,isBed,isBedFoot,isContainer,bedDirection,itemId} from '../core/blocks.js';import {Renderer} from './renderer.js';import {applyCameraLook,cameraEyeY,FOV_TAN} from './camera.js';import {Hologram} from './hologram.js';import {Input} from './input.js';import {MiningProgress} from '../core/mining.js';
-import {SurvivalInventory,CreativeInventory,harvestDrop} from '../core/inventory.js';
+import {SurvivalInventory,CreativeInventory,MAX_STACK,harvestDrop} from '../core/inventory.js';
 import {itemIconURL} from './item-icons.js';
 import {registerPWA} from './pwa.js';
 import {WORLD_PRESETS,PALETTES,CREATIVE_ITEMS,paletteItems,worldLabel} from '../core/catalog.js';
@@ -130,7 +130,7 @@ class Game{
   const prior=this.panel;this.panel=name||null;
   if(this.panel)this.combat.cancel();
   if(this.panel!=='inventory')this.openContainer=null;
-  if(this.panel!=='inventory'){this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
+  if(this.panel!=='inventory'){this.inspectedItem=null;this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
   this.menuOpen=this.panel==='settings';this.helpOpen=this.panel==='help';
   $('toolbar')?.classList.toggle('hidden',!this.menuOpen);
   $('help')?.classList.toggle('hidden',!this.helpOpen);
@@ -155,7 +155,7 @@ class Game{
  }
  togglePanel(name){if(this.panel===name)this.requestGameFocus();else this.setPanel(name)}
  toggleMenu(){this.togglePanel('settings')}
- openCraft(){if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram()}
+ openCraft(){this.inspectedItem=null;if(this.panel!=='inventory')this.setPanel('inventory');this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram()}
  togglePalette(){this.openCraft()}
  activeStation(){
   if(this.player.creative)return 'bench';
@@ -163,6 +163,7 @@ class Game{
   return Math.hypot(p.x-(s.x+.5),p.y-(s.y+.5),p.z-(s.z+.5))<=5?'bench':'hand';
  }
  updateHologram(){
+  if(this.inspectedItem){this.renderInspection();return}
   if(this.openContainer){this.renderContainer();return}
   const category=this.inventoryPalette||'all',station=this.activeStation(),craft=category==='craft';
   // Bag content and craft output are different views. Bench recipes remain inspectable.
@@ -170,7 +171,7 @@ class Game{
    category==='all'?CREATIVE_ITEMS.filter(id=>this.inventory.count(id)>0):
     paletteItems(category).filter(id=>this.inventory.count(id)>0);
   const entries=craft&&this.craftFilter==='available'?catalog.filter(recipe=>this.inventory.canCraft(recipe,station)):catalog;
-  const pageSize=this.hologram.compact?6:10,total=Math.max(1,Math.ceil(entries.length/pageSize));
+  const pageSize=craft?(this.hologram.compact?6:10):(this.hologram.compact?5:6),total=Math.max(1,Math.ceil(entries.length/pageSize));
   this.inventoryPage=Math.min(total-1,Math.max(0,this.inventoryPage));
   const page=entries.slice(this.inventoryPage*pageSize,(this.inventoryPage+1)*pageSize);
   if(craft)this.visibleRecipes=page;else this.visibleItems=page;
@@ -186,6 +187,7 @@ class Game{
   if(!hit)return;
   if(hit==='close'){this.requestGameFocus();return}
   if(hit==='empty')return;
+  if(hit.startsWith('inspect:')){this.inspectAction(hit.slice(8));return}
   if(this.openContainer){this.containerClick(hit);return}
   if(hit==='view:inventory'){this.inventoryPalette='all';this.inventoryPage=0;this.updateHologram();return}
   if(hit==='view:craft'){this.inventoryPalette='craft';this.craftFilter='all';this.inventoryPage=0;this.updateHologram();return}
@@ -199,31 +201,84 @@ class Game{
    this.inventoryPalette=category;this.inventoryPage=0;this.updateHologram();return;
   }
   if(hit.startsWith('item:')){
-   const index=Number(hit.slice(5));if(!Number.isInteger(index)||index<0)return;
-   if((this.inventoryPalette||'blocks')==='craft'){
-    const recipe=this.visibleRecipes[index],station=this.activeStation();if(!recipe)return;
-    if(recipe.station==='bench'&&station!=='bench'){this.status('이 제작은 작업대 근처에서만 가능해요');return}
-    if(!this.inventory.canCraft(recipe,station)){
-      const missing=Object.entries(recipe.needs).reduce((sum,[id,count])=>sum+Math.max(0,count-this.inventory.count(Number(id))),0);
-      this.status(missing?`재료 ${missing}개 부족`:'제작할 수 없는 상태예요');return;
-     }
-     if(this.inventory.craft(recipe,station)){
-     const slot=this.inventory.assignQuickSlot(recipe.id,this.player.creative&&this.paletteItems.every(id=>id!==null)?Math.max(0,this.selected):null);
-     if(this.player.creative&&slot>=0){this.renderHotbar();this.select(slot,{toggle:false});this.requestGameFocus();return}
-     this.renderHotbar();this.status(`${recipe.label} 제작 완료`);this.updateHologram();
-    }else this.status('제작 재료가 부족해요');
-   }else{
-    const id=this.visibleItems[index];if(id===undefined||this.inventory.count(id)<=0)return;
-    let slot=this.inventory.assignQuickSlot(id);
-    if(slot<0){slot=this.inventory.assignQuickSlot(id,this.selected>=0?this.selected:0)}
-    if(slot>=0){this.renderHotbar();this.select(slot,{toggle:false});this.requestGameFocus()}
-   }
+   const index=Number(hit.slice(5));
+   const recipe=this.inventoryPalette==='craft'?this.visibleRecipes[index]:null;
+   const id=recipe?.id??this.visibleItems[index];
+   if(id!==undefined)this.inspectItem(id,recipe?'recipe':'bag',recipe);
   }
  }
+ inspectItem(id,source,recipe=null){
+  this.inspectedItem={id,source,recipe,step:'details',amount:1};
+  this.updateHologram();
+ }
+ renderInspection(){
+  const item=this.inspectedItem,{id,source,recipe,step}=item;
+  const inventory=this.inventory,definition=block(id),part=partById(id);
+  const stored=source==='stored',deposit=source==='carried',container=stored||deposit;
+  const count=container?(stored?this.survivalInventory.containers.get(this.openContainer.key)?.get(id):this.survivalInventory.count(id))||0:inventory.count(id);
+  if(!recipe&&!count){this.inspectedItem=null;this.updateHologram();return}
+  const actions=recipe?[['craft',inventory.canCraft(recipe,this.activeStation())?'제작하기':'제작 조건 확인']]:
+   container?[['quantity',stored?'꺼내기':'넣기']]:[['slots','빠른 슬롯'],...(!this.player.creative?[['quantity','버리기']]:[])];
+  const description=weapons[id]?'손에 장착해 공격에 사용':isContainer(id)?'아이템을 넣고 꺼낼 수 있는 수납품':
+   isBed(id)?'휴식과 부활 지점 저장':definition.light?'주변을 밝히는 광원':
+   part?(PART_FAMILIES.find(f=>f.key===part.family)?.label||'건축 부품'):definition.solid?'설치할 수 있는 건축재':'설치하거나 제작에 쓰는 아이템';
+  const ingredients=recipe?Object.entries(recipe.needs).map(([key,n])=>`${blockLabel(Number(key))} ${inventory.count(Number(key))}/${n}`):[];
+  const info=recipe?`제작 결과 ${recipe.count}개 · ${recipe.station==='bench'?'작업대':'맨손'}`:
+   `${count===Infinity?'무제한':count+'개'} · ${description}`;
+  const note=recipe?ingredients.join('  /  '):step==='slots'?'옮길 슬롯을 고르세요':step==='quantity'?'수량을 고른 후 확정하세요':
+   source==='bag'?'빠른 슬롯에 배치하거나 바닥에 버릴 수 있어요':null;
+  this.hologram.setInventory('inspection',[],-1,this.activeStation(),null,'all',{
+   name:recipe?.label??blockLabel(id),blockId:id,info,note,step,actions,amount:item.amount,
+   slots:inventory.quickSlots.map(slot=>({blockId:slot!==null&&inventory.has(slot)?slot:null})),
+   confirm:`${item.amount}개 ${stored?'꺼내기':deposit?'넣기':'버리기'}`
+  });
+ }
+ inspectAction(action){
+  const item=this.inspectedItem;
+  if(!item)return;
+  const {id,source,recipe,step}=item;
+  if(action==='back'){
+   if(step==='details')this.inspectedItem=null;else item.step='details';
+   this.updateHologram();return;
+  }
+  if(this.openContainer&&!this.containerInReach()){this.requestGameFocus();return}
+  const stored=source==='stored',deposit=source==='carried',inventory=this.inventory;
+  if(action==='slots'||action==='quantity'){item.step=action;item.amount=1}
+  else if(action.startsWith('slot:')&&step==='slots'){
+   const index=Number(action.slice(5));
+   if(!inventory.moveShortcut(id,index)){this.status('슬롯을 변경하지 못했어요');return}
+   item.step='details';this.select(index,{toggle:false});this.renderHotbar();
+  }else if(action==='craft'&&recipe){
+   if(!inventory.craft(recipe,this.activeStation())){this.status('제작 재료와 작업대 조건을 확인하세요');return}
+   inventory.assignQuickSlot(id);
+   this.renderHotbar();this.status(`${recipe.label} 제작 완료`);
+  }else if(step==='quantity'){
+   const carried=this.survivalInventory.count(id);
+   const inStorage=this.openContainer?this.survivalInventory.containers.get(this.openContainer.key)?.get(id)||0:0;
+   const count=stored?Math.min(inStorage,MAX_STACK-carried):deposit?Math.min(carried,MAX_STACK-inStorage):carried;
+   if(count<1){this.status('옮길 공간이 없어요');return}
+   if(action==='confirm'){
+    const ok=stored||deposit?this.survivalInventory.transfer(this.openContainer.key,id,deposit,item.amount):
+     this.dropCarried(id,item.amount);
+    if(!ok){this.status('공간 또는 수량을 확인하세요');return}
+    this.inspectedItem=null;this.renderHotbar();
+   }else if(action==='all'||action==='minus'||action==='plus'){
+    item.amount=action==='all'?count:Math.max(1,Math.min(count,item.amount+(action==='plus'?1:-1)));
+   }else return;
+  }
+  this.updateHologram();
+ }
+ dropCarried(id,count){
+  if(this.player.creative||id==null||!this.survivalInventory.discard(id,count))return false;
+  const p=this.player,dx=-Math.sin(p.yaw),dz=-Math.cos(p.yaw);
+  this.entities.spawnDrop(id,p.x,p.y+.8,p.z,count,{vx:dx*2.6,vy:2,vz:dz*2.6,pickupDelay:1.15});
+  return true;
+ }
+
  updateControlHint(){
   this.updateCameraButton();const el=$('control-hint');if(!el)return;
   el.classList.toggle('ui-active',this.uiOpen);
-  el.textContent=this.panel==='inventory'?'방향키 선택 · Enter 실행 · E 닫기 · C 시점 전환':
+  el.textContent=this.panel==='inventory'?'방향키 탐색 · Enter 선택 · E 닫기':
    this.uiOpen?'메뉴 조작 · E 가방 · M 설정 · 돌아가기로 복귀':
    this.selected<0?'길게 클릭해 채굴 · 우클릭 드래그 또는 C 시점 고정 · E 가방':
    '클릭 설치 · 길게 누르면 채굴 · 우클릭 드래그 / C 시점 고정 · E 가방';
@@ -346,7 +401,7 @@ class Game{
    const i=+e.key;
    if(e.code.startsWith('Digit')&&i>=1&&i<=7){const index=i-1;if(index<this.paletteItems.length)this.select(index)}
    if(e.code==='KeyL')this.togglePalette();
-   if(e.code==='KeyQ'){this.select(-1,{toggle:false});return}
+   if(e.code==='KeyQ'){if(this.dropCarried(this.paletteItems[this.selected],1))this.renderHotbar();return}
    if(e.code==='KeyX'){this.toggleOffhand();return}
    if(e.code==='KeyF')this.toggleFlight();
    if(e.code==='KeyR')this.changeForm();
@@ -573,6 +628,7 @@ class Game{
    this.status('상자 내용을 저장하지 못했어요');return;
   }
   this.openContainer={...target,world:this.world,key};
+  this.inspectedItem=null;
   this.storageView='stored';
   this.inventoryPage=0;
   this.setPanel('inventory');
@@ -587,7 +643,7 @@ class Game{
   const deposit=this.storageView==='carried';
   const items=deposit?inventory.items:inventory.containers.get(target.key);
   const entries=Array.from(items??[]).sort(([a],[b])=>a-b);
-  const size=this.hologram.compact?6:10,total=Math.max(1,Math.ceil(entries.length/size));
+  const size=this.hologram.compact?5:6,total=Math.max(1,Math.ceil(entries.length/size));
   this.inventoryPage=Math.max(0,Math.min(total-1,this.inventoryPage));
   const start=this.inventoryPage*size;
   const page=entries.slice(start,start+size);
@@ -606,11 +662,7 @@ class Game{
   }else if(hit.startsWith('item:')){
    const id=this.visibleItems[Number(hit.slice(5))];
    if(id===undefined)return;
-   if(!this.survivalInventory.transfer(this.openContainer.key,id,this.storageView==='carried')){
-    this.status('공간이 부족하거나 저장하지 못했어요');return;
-   }
-   this.renderHotbar();
-   return;
+   this.inspectItem(id,this.storageView);return;
   }else return;
   this.updateHologram();
  }

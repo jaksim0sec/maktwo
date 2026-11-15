@@ -2,7 +2,7 @@ import {FOV_TAN} from '../src/client/camera.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {cardGeometry,atlasRect,createAnchor,spatialHit,Hologram,PANEL_SCALE,PANEL_DISTANCE} from '../src/client/hologram.js';
+import {cardGeometry,inspectionGeometry,atlasRect,createAnchor,spatialHit,Hologram,PANEL_SCALE,PANEL_DISTANCE} from '../src/client/hologram.js';
 
 const player={x:2,y:35,z:4,eye:1.7,yaw:0,pitch:0,direction(){return{x:0,y:0,z:-1}}};
 const normalize=p=>{const n=Math.hypot(...p);return p.map(v=>v/n)};
@@ -12,16 +12,16 @@ const aimAt=(anchor,card)=>normalize([
  anchor.center[2]+anchor.right[2]*card.x*PANEL_SCALE+anchor.forward[2]*card.depth*PANEL_SCALE-player.z,
 ]);
 test('spatial bag consists of small separated in-world tiles, no fullscreen slab',()=>{
- const cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`Block ${i}`,color:'#456789'})));
- assert.equal(cards.length,19);
- assert.ok(cards.filter(c=>c.role==='item').every(c=>c.w<.52&&c.h<.48));
+ const cards=cardGeometry('blocks',Array.from({length:6},(_,i)=>({name:`Block ${i}`,color:'#456789'})));
+ assert.equal(cards.length,15);
+ assert.ok(cards.filter(c=>c.role==='item').every(c=>c.w>1&&c.h<.28));
  assert.ok(cards.some(c=>c.id==='view:inventory')&&cards.some(c=>c.id==='view:craft'));
  assert.equal(cards.find(c=>c.id==='close').name,'✕');
- assert.equal(cards.filter(c=>c.id.startsWith('item:')).length,10);
+ assert.equal(cards.filter(c=>c.id.startsWith('item:')).length,6);
  assert.ok(cards.some(c=>c.id==='hand'));
 });
 test('world-anchored inventory ray-picks each card and empty hand',()=>{
- const anchor=createAnchor(player),cards=cardGeometry('blocks',Array.from({length:10},(_,i)=>({name:`Block ${i}`})));
+ const anchor=createAnchor(player),cards=cardGeometry('blocks',Array.from({length:6},(_,i)=>({name:`Block ${i}`})));
  for(const card of cards){const ray=aimAt(anchor,card);assert.equal(spatialHit(anchor,cards,player,ray)?.id,card.id)}
  assert.equal(spatialHit(anchor,cards,player,[0,1,0]),null);
 });
@@ -41,11 +41,11 @@ test('world-space hologram stays interactive while preserving WebGL depth state'
 
 test('arrow keys navigate focus across actual spatial cards',()=>{
  const h=Object.create(Hologram.prototype);
- h.opened=true;h.cards=cardGeometry('all',Array.from({length:10},(_,i)=>({name:String(i)})));
+ h.opened=true;h.cards=cardGeometry('all',Array.from({length:6},(_,i)=>({name:String(i)})));
  h.focusId='item:0';h.keyboardMode=false;
  assert.equal(h.moveFocus('right'),'item:1');
- assert.equal(h.moveFocus('down'),'item:6');
- assert.equal(h.focusedId(),'item:6');
+ assert.equal(h.moveFocus('down'),'item:3');
+ assert.equal(h.focusedId(),'item:3');
 });
 test('craft list makes available recipes visually distinct',()=>{
  const cards=cardGeometry('craft',[{name:'목재',id:9,craftable:true,recipe:{count:4}}]);
@@ -56,7 +56,7 @@ test('craft list makes available recipes visually distinct',()=>{
 
 test('atlas sampling exactly preserves each card aspect including wide buttons',()=>{
  for(const compact of [false,true])for(const mode of ['all','craft']){
-  const cards=cardGeometry(mode,Array.from({length:compact?6:10},(_,i)=>({name:String(i)})),compact,{index:0,total:3});
+  const cards=cardGeometry(mode,Array.from({length:mode==='craft'?(compact?6:10):(compact?5:6)},(_,i)=>({name:String(i)})),compact,{index:0,total:3});
   for(const [i,c] of cards.entries()){
    const rect=atlasRect(c,i);
    assert.ok(Math.abs(rect.w/rect.h-c.w/c.h)<1e-9,'distorted '+c.id);
@@ -68,7 +68,7 @@ test('portrait inventory controls, pagination and item cards fit in the camera f
  const aspect=300/700,limitX=PANEL_DISTANCE*FOV_TAN*aspect;
  const limitY=PANEL_DISTANCE*FOV_TAN;
  const scale=Math.min(PANEL_SCALE,limitX*.90/.45);
- const cards=cardGeometry('all',Array.from({length:6},(_,i)=>({name:String(i)})),true,{index:0,total:3});
+ const cards=cardGeometry('all',Array.from({length:5},(_,i)=>({name:String(i)})),true,{index:0,total:3});
  const close=cards.find(c=>c.id==='close');
  assert.equal(close.w,close.h);
  const anchor=createAnchor(player),eye=[player.x,player.y+player.eye,player.z];
@@ -96,4 +96,17 @@ test('uploaded hologram UVs match the painted atlas rectangle',()=>{
  assert.ok(Math.abs(vertices[3]-rect.x/1024)<1e-6);
  assert.ok(Math.abs(vertices[4]-(1-rect.y/1024))<1e-6);
  assert.ok(Math.abs(vertices[9]-(rect.x+rect.w)/1024)<1e-6);
+});
+
+
+test('details, destination slots and quantity controls are ray-pickable',()=>{
+ const anchor=createAnchor(player);
+ for(const step of ['details','slots','quantity']){
+  const cards=inspectionGeometry({step,name:'콘크리트',blockId:55,amount:2,
+   actions:[['slots','빠른 슬롯'],['quantity','버리기']],slots:Array.from({length:7},()=>({blockId:null})),
+   confirm:'2개 버리기'},false);
+  for(const card of cards){
+   assert.equal(spatialHit(anchor,cards,player,aimAt(anchor,card))?.id,card.id);
+  }
+ }
 });
