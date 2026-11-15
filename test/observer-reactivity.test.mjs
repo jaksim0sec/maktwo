@@ -78,3 +78,15 @@ test('death collapse has smooth, bounded progress and a distinct grounded shader
  assert.match(render,/gl\.uniform1f\(u\.Collapse/,'renderer must set per-body collapse uniform');
  assert.match(render,/p\.y\s*=|p\.y\s*\+=/,'collapse needs vertex height change not yaw-only rotation');
 });
+
+test('a hit during a scripted glimpse retreats along the proven entry path',()=>{
+ const pack=spawn(),s=pack.active.stalkers.get(0);
+ const entry={x:s.x-4,y:s.y,z:s.z};
+ s.sighting={start:entry,seen:{x:s.x,y:s.y,z:s.z},phase:'watch',firstSeen:pack.clock,until:pack.clock+3};
+ s.target=null;
+ pack.damage(0,'body',player);
+ assert.equal(s.sighting.phase,'withdraw');
+ assert.deepEqual(s.target,entry,'impact must not discard the already walkable entry path');
+ pack.stepStalkers(player,.18);
+ assert(s.target,'startle may pause motion but must preserve escape waypoints');
+});
