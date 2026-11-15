@@ -33,6 +33,27 @@ const sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const add=(a,b,k)=>a.map((v,i)=>v+b[i]*k);
 const point=(center,right,up,x,y,depth,forward)=>add(add(add(center,right,x),up,y),forward,depth);
 const font=(size,heavy=false)=>`${heavy?'600':'450'} ${size}px system-ui,-apple-system,'Noto Sans KR',sans-serif`;
+// Shared atlas-pixel measurements, independent of world scale and device DPI.
+export function hologramTextLayout(role,w,h){
+ if(role==='grid')return{
+  iconTop:Math.max(6,h*.10),iconSize:Math.min(w*.43,h*.45),
+  titleY:h*.78,titleSize:21,statusY:h*.95,statusSize:16
+ };
+ if(role==='summary'){
+  if(h<75)return{compact:true,iconTop:0,iconSize:0,titleY:h*.5+7,titleSize:20};
+  return{compact:false,iconTop:8,iconSize:Math.min(44,h*.28),
+   titleY:h*.56,titleSize:24,infoY:h*.74,infoSize:17,noteY:h*.91,noteSize:16};
+ }
+ return null;
+}
+export function hologramControlFont(role,w,h){
+ if(role==='close')return Math.min(32,h*.46);
+ if(role==='view')return 24;
+ if(role==='filter')return 23;
+ if(role==='action')return 26;
+ if(role==='page')return 22;
+ return 21;
+}
 function rounded(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.lineWidth=2;ctx.strokeStyle=stroke;ctx.stroke()}}
 // Every card samples an atlas rectangle with its own world-space aspect ratio.
 // Using fixed-size images stretched all wide buttons and item cards.
@@ -294,8 +315,8 @@ export class Hologram{
     ctx.restore();return;
    }
    if(card.role==='label'){
-    ctx.font=font(22,true);ctx.textAlign='center';ctx.fillStyle='#d0e5e1';
-    ctx.fillText(fitLabel(card.name,w-8,22),cx,cy+7);
+    ctx.font=font(24,true);ctx.textAlign='center';ctx.fillStyle='#d0e5e1';
+    ctx.fillText(fitLabel(card.name,w-8,24),cx,cy+8);
     ctx.restore();return;
    }
    if(card.role==='quick'){
@@ -310,28 +331,58 @@ export class Hologram{
    if(card.role==='item'&&card.variant==='grid'){
     rounded(ctx,x+2,y+2,w-4,h-4,7,'#142c34b9',
      card.blockId===this.activeItemId?'#f0d19f':focused?'#e0c69e':'#669ba17a');
-    const icon=Math.min(w*.46,h*.57);
-    if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-icon/2,y+Math.max(6,h*.10),icon);
-    ctx.textAlign='center';ctx.font=font(23,true);ctx.fillStyle='#f0f4ef';
-    ctx.fillText(fitLabel(card.name,w-14,23),cx,y+h*.81);
-    ctx.font=font(19,true);ctx.fillStyle=ready?'#c5e5aa':'#c2d8d7';
+    const layout=hologramTextLayout('grid',w,h);
+    if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-layout.iconSize/2,y+layout.iconTop,layout.iconSize);
+    ctx.textAlign='center';ctx.font=font(layout.titleSize,true);ctx.fillStyle='#f0f4ef';
+    ctx.fillText(fitLabel(card.name,w-14,layout.titleSize),cx,y+layout.titleY);
+    ctx.font=font(layout.statusSize,true);ctx.fillStyle=ready?'#c5e5aa':'#c2d8d7';
     const count=mode==='craft'?(ready?'제작 가능':card.missing>0?'재료 부족':'제작 조건'):card.count===Infinity?'∞':String(card.count??'');
-    ctx.fillText(fitLabel(count,w-12,19),cx,y+h*.96);
+    ctx.fillText(fitLabel(count,w-12,layout.statusSize),cx,y+layout.statusY);
     ctx.restore();return;
    }
    if(card.role==='summary'||card.role==='slot'){
     const summary=card.role==='summary';
     rounded(ctx,x+2,y+2,w-4,h-4,10,summary?'#142b32bd':'#18323aa6',focused?'#eccfaa':'#7dacb585');
-    const icon=Math.min(summary?55:51,h*(summary?.39:.45));
-    if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-icon/2,y+9,icon);
-    ctx.textAlign='center';ctx.fillStyle='#edf8f5';
-    const lines=summary?[card.name,card.info,card.note]:[card.name,card.blockId==null?'비어 있음':''];
-    lines.forEach((line,i)=>{
-     if(!line)return;
-     const size=textFit(line,w-12,Math.min(i===0?26:18,h*.16));
-     ctx.font=font(size,i===0);ctx.fillStyle=i?'#b9d6d7':'#f2fbf8';
-     ctx.fillText(line,cx,y+h*(summary?.52+i*.17:.73+i*.17),w-12);
-    });
+    ctx.textAlign='center';
+    if(summary){
+     const layout=hologramTextLayout('summary',w,h);
+     if(layout.compact){
+      ctx.font=font(layout.titleSize,true);ctx.fillStyle='#edf8f5';
+      ctx.fillText(fitLabel(card.name,w-12,layout.titleSize),cx,y+layout.titleY);
+     }else{
+      if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-layout.iconSize/2,y+layout.iconTop,layout.iconSize);
+      ctx.font=font(layout.titleSize,true);ctx.fillStyle='#edf8f5';
+      ctx.fillText(fitLabel(card.name,w-14,layout.titleSize),cx,y+layout.titleY);
+      ctx.font=font(layout.infoSize);ctx.fillStyle='#c9e2e0';
+      const info=String(card.info||'');
+      if(card.note){
+       ctx.fillText(fitLabel(info,w-16,layout.infoSize),cx,y+layout.infoY);
+       ctx.font=font(layout.noteSize);ctx.fillStyle='#b7d1d0';
+       ctx.fillText(fitLabel(card.note,w-16,layout.noteSize),cx,y+layout.noteY);
+      }else if(info){
+       // Two lines for longer descriptions; never shrink fonts to unreadable sizes.
+       let split=info.length;
+       for(let j=1;j<=info.length;j++){
+        if(ctx.measureText(info.slice(0,j)).width>w-16){split=j-1;break}
+       }
+       ctx.fillText(info.slice(0,split),cx,y+layout.infoY);
+       if(split<info.length){
+        ctx.font=font(layout.noteSize);ctx.fillStyle='#b7d1d0';
+        ctx.fillText(fitLabel(info.slice(split).trimStart(),w-16,layout.noteSize),cx,y+layout.noteY);
+       }
+      }
+     }
+    }else{
+     const icon=Math.min(51,h*.45);
+     if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-icon/2,y+9,icon);
+     ctx.fillStyle='#edf8f5';
+     [card.name,card.blockId==null?'비어 있음':''].forEach((line,i)=>{
+      if(!line)return;
+      const size=textFit(line,w-12,Math.min(i===0?24:17,h*.16));
+      ctx.font=font(size,i===0);ctx.fillStyle=i?'#b9d6d7':'#f2fbf8';
+      ctx.fillText(line,cx,y+h*(.73+i*.17),w-12);
+     });
+    }
     ctx.restore();return;
    }
    if(card.role!=='item'){
@@ -341,7 +392,7 @@ export class Hologram{
      focused?'#eed7b1':active?'#b69b78':'#a0c8cb66');
     if(active){ctx.fillStyle='#d7bb91';ctx.fillRect(x+12,y+h-6,w-24,2)}
     ctx.fillStyle=active||focused?'#f4e8d2':close?'#c9bcb0':'#c9ccc7';
-    const fontsize=close?Math.min(32,h*.47):tab?20:18;
+    const fontsize=hologramControlFont(card.role,w,h);
     ctx.font=font(fontsize,active||tab);ctx.textAlign='center';
     ctx.fillText(fitLabel(card.name,w-14,fontsize),cx,cy+fontsize*.33);
     ctx.textAlign='left';ctx.restore();return;
