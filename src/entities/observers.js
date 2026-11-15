@@ -335,7 +335,10 @@ export class ObserverPack {
    track.startleUntil=this.clock+HIT_STARTLE;
    track.fearUntil=Math.max(track.fearUntil??0,this.clock+HIT_FEAR);
    track.focus=Math.max(track.focus,2.6);
-   track.retreat=true;track.fleeing=false;track.nextMove=this.clock;track.target=null;
+   track.retreat=true;track.fleeing=false;track.nextMove=this.clock;
+   // A scripted encounter already has a verified entrance path.
+   // Preserve it instead of relying on a new escape search in cramped V2 halls.
+   track.target=track.sighting?.start??null;
    if(track.sighting){track.sighting.phase='withdraw';track.sighting.nextEscape=0;}
   }
   if(member.hp<=0)this.kill(index,member);
@@ -553,7 +556,7 @@ export class ObserverPack {
      s.target=this.spot(player,occupied,lights,32,s);
     }else s.target=null;
    }
-   if(startled)s.target=null;
+   if(startled&&!s.sighting)s.target=null;
    const watchPause=!s.sighting&&visible&&s.focus>.22&&!s.retreat;
    if(!startled&&!watchPause&&s.target&&(!centered||s.retreat||s.sighting)){
     const length=distance(s,s.target);
