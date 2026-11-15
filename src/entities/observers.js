@@ -8,6 +8,7 @@ export const OBSERVER_NAME='소심한 관찰자';
 const HEIGHT=2.36, EYE=2.06, TICK=.18, FORGET=300, BODY_WIDTH=.90;
 const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
+const CORPSE_LIFETIME=120, HIT_STARTLE=.65, HIT_FEAR=11;
 const FACE_DISTANCE=16.5, FACE_CENTER=.56;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
@@ -319,7 +320,7 @@ export class ObserverPack {
   }
   return null;
  }
- damage(index,region){
+ damage(index,region,attacker=null){
   const group=this.active;
   if(!group)return;
   const member=group.members.get(index)??{hp:3,hitAt:-Infinity};
@@ -327,6 +328,16 @@ export class ObserverPack {
   member.phase??=group.phase;
   member.hp=region==='head'&&this.random()<.5?0:member.hp-1;
   member.region=region;member.hitAt=this.clock;
+  const track=group.stalkers?.get(index);
+  if(track&&member.hp>0){
+   track.lastThreat=attacker&&Number.isFinite(attacker.x)&&Number.isFinite(attacker.z)?
+    {x:attacker.x,y:attacker.y??track.y,z:attacker.z}:null;
+   track.startleUntil=this.clock+HIT_STARTLE;
+   track.fearUntil=Math.max(track.fearUntil??0,this.clock+HIT_FEAR);
+   track.focus=Math.max(track.focus,2.6);
+   track.retreat=true;track.fleeing=false;track.nextMove=this.clock;track.target=null;
+   if(track.sighting){track.sighting.phase='withdraw';track.sighting.nextEscape=0;}
+  }
   if(member.hp<=0)this.kill(index,member);
   group.members.set(index,member);
   // Getting hit makes them wary and more likely to herd, but still needs an edge.
@@ -339,6 +350,7 @@ export class ObserverPack {
   const track=g.stalkers?.get(index);
   member.yaw=track?.yaw??g.yaw;
   member.at=track?{x:track.x,y:track.y,z:track.z}:this.layout(g.point,g.yaw,g.size)[index];
+  member.fallSide=index%2===0?1:-1;
   g.members.set(index,member);this.count--;
  }
  canMove(from,to,yaw=this.active.yaw,previousYaw=yaw){
@@ -460,8 +472,9 @@ export class ObserverPack {
    const visible=dot>.20&&this.clear(eye,shifted(s,0,0,EYE));
    const centered=visible&&dot>.80;
    const scene=s.sighting,face=scene&&this.faceVisible(player,s);
-   // Do not count attention during the fog-bound approach.
-   s.focus=clamp(s.focus+((scene?(scene.phase==='watch'&&face):centered)?dt:-dt*.55),0,FOCUS_LIMIT);
+   // Peripheral gaze matters; center-only focus made exposed observers oblivious.
+   const noticed=scene?scene.phase==='watch'&&face:visible&&this.onScreen(player,s);
+   s.focus=clamp(s.focus+(noticed?dt*(centered?1.5:1.15):-dt*.55),0,FOCUS_LIMIT);
    s.walking=false;
    if(scene){
     const inView=this.onScreen(player,s);
@@ -516,7 +529,8 @@ export class ObserverPack {
    }
    // An observer stops presenting itself: it finds cover first, with a short
    // darkness fade only when the route to cover is obstructed.
-   s.retreat=d<9||s.focus>2.0||s.sighting?.phase==='withdraw';
+   const startled=(s.startleUntil??0)>this.clock,frightened=(s.fearUntil??0)>this.clock;
+   s.retreat=d<9||s.focus>1.1||frightened||s.sighting?.phase==='withdraw';
    if(!s.sighting&&s.retreat&&s.focus>.5&&
       !this.clear(eye,shifted(s,0,0,EYE))){
     s.hidden=true;s.hideUntil=this.clock+3.8;s.target=null;continue;
@@ -529,19 +543,23 @@ export class ObserverPack {
    if(!s.sighting&&(this.clock>=s.nextMove||!s.target)){
     s.nextMove=this.clock+(s.retreat?1.0:3.5+hash(s.id,4,Math.floor(this.clock/4),this.world.seed)*2);
     if(s.retreat){
+     const escape=this.escapeTarget(s,player);
      const awayX=(s.x-player.x)/(d||1),awayZ=(s.z-player.z)/(d||1);
      const side=s.id%2?1:-1;
-     s.target=shifted(s,(awayX+awayZ*side*.7)*4,(awayZ-awayX*side*.7)*4);
+     const short=this.footAt(shifted(s,(awayX+awayZ*side*.7)*3.5,(awayZ-awayX*side*.7)*3.5));
+     s.target=escape||(short&&this.walkClear(s,short,Math.atan2(short.x-s.x,short.z-s.z),true)?short:null);
     }else if(d>24||!visible){
      const occupied=[...g.stalkers.values()].filter(o=>o!==s&&!g.members.get(o.id)?.dead);
      s.target=this.spot(player,occupied,lights,32,s);
     }else s.target=null;
    }
-   if(s.target&&(!centered||s.retreat||s.sighting)){
+   if(startled)s.target=null;
+   const watchPause=!s.sighting&&visible&&s.focus>.22&&!s.retreat;
+   if(!startled&&!watchPause&&s.target&&(!centered||s.retreat||s.sighting)){
     const length=distance(s,s.target);
     if(length<.4){s.target=null;}else{
-     const sprinting=s.sighting?.phase==='withdraw';
-     const speed=sprinting?3.5:s.sighting?1.45:s.retreat?1.5:.72;
+     const sprinting=s.sighting?.phase==='withdraw'||frightened||s.retreat;
+     const speed=sprinting?3.5:s.sighting?1.45:.72;
      const step=Math.min(length,dt*speed);
      const dx=(s.target.x-s.x)/length,dz=(s.target.z-s.z)/length;
      const desiredYaw=s.sighting?.phase==='approach'
@@ -561,17 +579,20 @@ export class ObserverPack {
      }
     }
    }
-   // The torso faces travel; only the neck and lone eye quietly follow the player.
-   const gazeYaw=Math.atan2(player.x-s.x,player.z-s.z);
+   s.fleeing=Boolean(s.walking&&s.retreat);
+   const gaze=startled&&s.lastThreat?s.lastThreat:player;
+   const gazeYaw=Math.atan2(gaze.x-s.x,gaze.z-s.z);
    const relative=Math.atan2(Math.sin(gazeYaw-s.yaw),Math.cos(gazeYaw-s.yaw));
    const vertical=Math.atan2(eye.y-(s.y+EYE),Math.max(1,d));
    const ease=(value,target,rate)=>value+(target-value)*clamp(dt*rate,0,1);
-   s.headYaw=ease(s.headYaw,clamp(relative,-.53,.53),2.3);
+   if(startled)s.yaw+=clamp(relative,-dt*3.2,dt*3.2);
+   else if(!s.walking&&visible&&Math.abs(relative)>1.2&&s.focus<.9)
+    s.yaw+=clamp(relative,-dt*.65,dt*.65);
+   s.headYaw=ease(s.headYaw,clamp(relative,-.53,.53),startled?7:noticed?4.1:2.3);
    s.headPitch=ease(s.headPitch,clamp(vertical,-.22,.20),1.5);
-   s.eyeYaw=ease(s.eyeYaw,clamp(relative-s.headYaw+Math.sin(this.clock*1.65+s.id*2.8)*.025,-.32,.32),4.5);
+   s.eyeYaw=ease(s.eyeYaw,clamp(relative-s.headYaw+Math.sin(this.clock*1.65+s.id*2.8)*.025,-.32,.32),startled?9:4.5);
    s.eyePitch=ease(s.eyePitch,clamp(vertical-s.headPitch,-.16,.16),3.8);
-   if(!s.walking&&Math.abs(relative)>1.35&&s.focus<.3)
-    s.yaw+=clamp(relative,-dt*.18,dt*.18);
+   // Stationary torso turning is handled above, without double steering.
   }
   const living=[...g.stalkers.values()].filter(s=>!g.members.get(s.id)?.dead);
   if(living.length){
@@ -587,7 +608,7 @@ export class ObserverPack {
   if(this.clock<this.next)return;
   this.next=this.clock+TICK;
   const g=this.active;
-  if(g&&this.count===0&&[...g.members.values()].every(m=>this.clock-m.hitAt>10)){
+  if(g&&this.count===0&&[...g.members.values()].every(m=>this.clock-m.hitAt>CORPSE_LIFETIME)){
    this.active=null;this.views=[];return;
   }
   const livingNear=g?.stalkers&&[...g.stalkers.values()].some(s=>
@@ -644,7 +665,7 @@ export class ObserverPack {
    return {...(member?.dead?member.at:s),id:i,yaw:member?.yaw??s.yaw,
     group:g,member,track:s,previous};
   }).filter(view=>((!view.track.hidden&&!view.member?.dead)||
-    (view.member?.dead&&this.clock-view.member.hitAt<10))&&
+    (view.member?.dead&&this.clock-view.member.hitAt<CORPSE_LIFETIME))&&
     (!player||distance(view,player)<=range+2));
  }
  pick(origin,ray,limit,padding=0){
@@ -663,7 +684,7 @@ export class ObserverPack {
     const hit=intersectAabb(origin,ray,[center[0]-w,center[1]-height,center[2]-w],[center[0]+w,center[1]+height,center[2]+w]);
     if(hit&&hit.distance<limit){
      limit=hit.distance;
-     result={distance:limit,region,entity:{type:'observer',name:OBSERVER_NAME,x:view.x,y:view.y,z:view.z,height:HEIGHT,hurt:()=>this.damage(view.id,region)}};
+     result={distance:limit,region,entity:{type:'observer',name:OBSERVER_NAME,x:view.x,y:view.y,z:view.z,height:HEIGHT,hurt:(amount,attacker)=>this.damage(view.id,region,attacker)}};
     }
    }
   }
@@ -671,6 +692,10 @@ export class ObserverPack {
  }
 }
 
+export function observerCollapseProgress(time,hitAt){
+ const t=clamp((time-hitAt-.05)/1.30,0,1);
+ return t*t*(3-2*t);
+}
 export function observerPose(view,time){
  const {group:g,member,id}=view;
  if(member?.dead){
@@ -683,7 +708,7 @@ export function observerPose(view,time){
   return {from:'idle',to:member.region,blend:Math.sin(Math.PI*t)**.72};
  }
  if(view.track){
-  if(view.track.walking&&view.track.sighting?.phase==='withdraw'){
+  if(view.track.walking&&(view.track.sighting?.phase==='withdraw'||view.track.fleeing)){
    // Reuse the existing charge animation as a repeated fleeing run.
    const f=((view.track.phase%4)+4)%4,i=Math.floor(f);
    return {from:'charge'+(i+1),to:'charge'+((i+1)%4+1),blend:f-i};
