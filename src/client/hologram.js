@@ -287,11 +287,11 @@ export class Hologram{
      card.blockId===this.activeItemId?'#f0d19f':focused?'#e0c69e':'#669ba17a');
     const icon=Math.min(w*.46,h*.57);
     if(card.blockId!=null)drawItemIcon(ctx,card.blockId,cx-icon/2,y+Math.max(6,h*.10),icon);
-    ctx.textAlign='center';ctx.font=font(16,true);ctx.fillStyle='#f0f4ef';
-    ctx.fillText(fitLabel(card.name,w-14,16),cx,y+h*.81);
-    ctx.font=font(15,true);ctx.fillStyle=ready?'#c5e5aa':'#c2d8d7';
+    ctx.textAlign='center';ctx.font=font(23,true);ctx.fillStyle='#f0f4ef';
+    ctx.fillText(fitLabel(card.name,w-14,23),cx,y+h*.81);
+    ctx.font=font(19,true);ctx.fillStyle=ready?'#c5e5aa':'#c2d8d7';
     const count=mode==='craft'?(ready?'제작 가능':card.missing>0?'재료 부족':'제작 조건'):card.count===Infinity?'∞':String(card.count??'');
-    ctx.fillText(fitLabel(count,w-12,15),cx,y+h*.96);
+    ctx.fillText(fitLabel(count,w-12,19),cx,y+h*.96);
     ctx.restore();return;
    }
    if(card.role==='summary'||card.role==='slot'){
