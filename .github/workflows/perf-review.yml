@@ -19,3 +19,6 @@ jobs:
           node-version: '22'
       - name: Focused tests
         run: node --test test/fence-template.test.mjs test/frustum.test.mjs test/light-volume.test.mjs test/optimization.test.mjs test/performance.test.mjs
+      - name: Full regression audit (existing baseline failures reported separately)
+        continue-on-error: true
+        run: npm test
