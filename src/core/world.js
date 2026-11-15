@@ -14,7 +14,7 @@ import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CANYON_MODE?CANYON_HEIGHT:mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.yOrigin=0;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CANYON_MODE?CANYON_HEIGHT:mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.yOrigin=0;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.droppedItems=new Set();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
  getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false,this.yOrigin);this.chunks.set(k,c);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){if(idx<0||idx>=c.data.length)continue;c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
  if(forms){c.forms??=new Uint8Array(c.data.length);for(const [idx,form] of forms)if(idx>=0&&idx<c.data.length)c.forms[idx]=form}
  c.mounts=this.mounts.get(k);
@@ -255,7 +255,14 @@ export class World{
   this.save();
   return selected.length;
  }
- snapshot(){const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,...(this.mode===CANYON_MODE?{yOrigin:this.yOrigin}:{}),time:this.time,edits,states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
+ snapshot(){
+  const drops=[];
+  for(const drop of this.droppedItems){
+   if(drop.dead||drop.count<=0)continue;
+   const {itemId:id,count,x,y,z,vx,vy,vz,age,pickupDelay}=drop;
+   drops.push({id,count,x,y:y+this.yOrigin,z,vx,vy,vz,age,pickupDelay});
+  }
+  const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,...(this.mode===CANYON_MODE?{yOrigin:this.yOrigin}:{}),time:this.time,edits,...(drops.length?{drops}:{}),states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
  stream(x,z,radius=3,budget=2,{roundEdges=false}={}){this.streamRadius=radius;const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
  // Keep voxel buffers at a fixed height as the player traverses absolute canyon levels.
@@ -264,6 +271,7 @@ export class World{
   const shift=Math.floor((y-144)/CANYON_SHIFT)*CANYON_SHIFT;
   if(!shift)return 0;
   this.yOrigin+=shift;
+  for(const drop of this.droppedItems)drop.y-=shift;
   if(this.trainColliders?.length){
    for(const train of this.trainColliders)train.y-=shift;
    this.trainChunkRevision=(this.trainChunkRevision??0)+1;
@@ -324,6 +332,14 @@ export class World{
  save(){if(!this.storage)return false;this.storage.setItem('mcweb:'+this.saveKey,this.snapshot());return true}
  loadEdits(){if(!this.storage)return;try{const d=JSON.parse(this.storage.getItem('mcweb:'+this.saveKey)||'null');if(d&&d.seed===this.seed&&d.mode===this.mode){// Saved city edits and player positions refer to the old floor plans.
  if(this.mode===CANYON_MODE&&Number.isSafeInteger(d.yOrigin)&&d.yOrigin%CANYON_SHIFT===0)this.yOrigin=d.yOrigin;
+ if(Array.isArray(d.drops))for(const saved of d.drops){
+  if(!saved||!Number.isInteger(saved.id)||saved.id<=B.AIR||saved.id>=BLOCKS.length||
+     !Number.isSafeInteger(saved.count)||saved.count<1)continue;
+  const {x,y,z,vx,vy,vz,age,pickupDelay,count}=saved;
+  if(![x,y,z,vx,vy,vz,age,pickupDelay].every(Number.isFinite)||age<0||pickupDelay<0||
+     Math.max(Math.abs(vx),Math.abs(vy),Math.abs(vz))>40)continue;
+  this.droppedItems.add({itemId:itemId(saved.id),count,x,y:y-this.yOrigin,z,vx,vy,vz,age,pickupDelay});
+ }
  if(this.mode===CITY_MODE)this.version=d.generationVersion>=CITY_BLUEPRINT_VERSION?Math.min(d.generationVersion,CITY_BOTANICAL_VERSION):GENERATION_VERSION;
  if(d.generationVersion!==this.version){try{const backup='mcweb:'+this.saveKey+':before-generator-unification';if(!this.storage.getItem(backup))this.storage.setItem(backup,JSON.stringify(d))}catch{}}this.time=18000;for(const [k,arr] of Object.entries(d.edits||{}))this.edits.set(k,new Map(arr));for(const [k,state] of d.states||[])this.blockStates.set(k,state);
  for(const [k,arr] of d.forms||[])this.forms.set(k,new Map(arr.filter(([idx,form])=>FORMED[form]&&supportsForms(this.edits.get(k)?.get(idx)))));

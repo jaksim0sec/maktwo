@@ -415,6 +415,9 @@ class Game{
    if(e.code==='KeyP')this.saveGameState()
   });
   window.addEventListener('beforeunload',()=>{this.saveGameState()});
+  document.addEventListener('visibilitychange',()=>{
+   if(document.visibilityState==='hidden')this.saveGameState();
+  });
  }
  select(i,{toggle=true}={}){
   if(i!==-1&&(i<0||i>=this.paletteItems.length))return;
@@ -792,7 +795,7 @@ class Game{
   if(!shift)return;
   this.player.y-=shift;
   if(this.player.pushedFromY!==undefined)this.player.pushedFromY-=shift;
-  for(const entity of this.entities.entities)if(entity.type!=='train')entity.y-=shift;
+  for(const entity of this.entities.entities)if(entity.type!=='train'&&entity.type!=='drop')entity.y-=shift;
   for(const particle of this.effects.particles)particle.y-=shift;
   if(this.openContainer)this.openContainer.y-=shift;
   this.renderer.resetWorld(this.world);

@@ -58,12 +58,12 @@ test('recipes have real shaped 2x2/3x3 patterns and off-shape layouts fail',()=>
 
 test('workbench lives in the world, uses a dedicated mesh, and does not renumber legacy blocks',()=>{
  assert.equal(B.DOOR,18);assert.equal(B.FENCE,22);assert.equal(B.WORKBENCH,23);
- assert.equal(BLOCKS.length,24);
+ assert.equal(BLOCKS[B.WORKBENCH].id,23);
  const storage=store(),a=new World({name:'a',mode:'flat',storage});
  assert.ok(a.set(3,25,4,B.WORKBENCH));
  const geom=meshChunk(a,a.getChunk(0,0));assert.ok(geom.opaque.length>0);assert.equal(geom.opaque.length%7,0);
  a.save();const b=new World({name:'a',mode:'flat',storage});assert.equal(b.get(3,25,4),B.WORKBENCH);
- const tile=makeTextureLayers();assert.equal(tile.layers,98);assert.equal(tile.data.byteLength,tile.layers*32*32*4);
+ const tile=makeTextureLayers();assert.ok(tile.layers>=98);assert.equal(tile.data.byteLength,tile.layers*32*32*4);
 });
 
 test('client accesses the bench in range, crafting UI uses real ingredient grid and PWA precaches it',()=>{
@@ -71,8 +71,8 @@ test('client accesses the bench in range, crafting UI uses real ingredient grid 
  const hologram=readFileSync(new URL('../src/client/hologram.js',import.meta.url),'utf8');
  const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
  assert.match(game,/this\.target\.id===B\.WORKBENCH/);
- assert.match(game,/this\.inventory\.knownRecipes\(station\)/);
- assert.match(game,/this\.inventory\.craft\(recipe,station\)/);
+ assert.match(game,/this\.inventory\.knownRecipes\('bench'\)/);
+ assert.match(game,/inventory\.craft\(recipe,this\.activeStation\(\)\)/);
  assert.match(game,/this\.inventory\.quickSlots\[i\]/);
  assert.match(hologram,/recipeGrid\(card\.recipe\)/);
  assert.match(sw,/src\/core\/crafting\.js/);

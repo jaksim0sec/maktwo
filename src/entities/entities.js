@@ -167,6 +167,16 @@ export class SubwayTrain extends Entity{
 
 export class EntityManager{
  constructor(world){this.world=world;this.entities=[];this.spawnTimer=12;this.spawnSequence=0;
+  world.droppedItems??=new Set();
+  // A world already visited this session keeps its live objects. Disk records
+  // receive runtime IDs once so returning to a world does not spawn duplicates.
+  for(const saved of world.droppedItems){
+   if(saved instanceof ItemDrop){this.entities.push(saved);continue}
+   const drop=new ItemDrop(saved.itemId,saved.x,saved.y,saved.z,saved.count,saved);
+   drop.age=saved.age;
+   this.entities.push(drop);
+  }
+  world.droppedItems=new Set(this.entities);
   if(world.mode===STATION_PREVIEW_MODE)
    this.entities.push(new SubwayTrain(STATION_PREVIEW_SITE));
   if(world.mode===CITY_MODE&&world.version>=CITY_STATION_VERSION)
@@ -181,7 +191,11 @@ export class EntityManager{
   this.observers=world.mode===CITY_MODE?new ObserverPack(world):null;
   world.trainColliders=this.entities.filter(e=>e.type==='train');
  }
- spawnDrop(itemId,x,y,z,count=1,motion){const d=new ItemDrop(itemId,x,y,z,count,motion);this.entities.push(d);return d}
+ spawnDrop(itemId,x,y,z,count=1,motion){
+  const drop=new ItemDrop(itemId,x,y,z,count,motion);
+  this.entities.push(drop);this.world.droppedItems.add(drop);
+  return drop;
+ }
  spawn(type,x,y,z,{natural=false}={}){const m=new Mob(type,x,y,z);m.natural=natural;this.entities.push(m);return m}
  tick(dt,player,inventory=null,renderRange=48,viewport){
   this.observers?.tick(dt,player,renderRange,viewport);
@@ -194,9 +208,10 @@ export class EntityManager{
   const LIMIT=6,SPAWN_INTERVAL=16,MIN_SEPARATION=10,MAX_RANGE=60;
   for(const e of this.entities)if(e.type==='drop'){
    e.age+=dt;
+   if(e.age>=180){e.dead=true;this.world.droppedItems.delete(e);continue}
    if(dist2(e,player)<32**2&&Math.abs(e.y-player.y)<40){
     moveBody(this.world,e,dt);
-    if(e.y<-10){e.dead=true;continue}
+    if(e.y<-10){e.dead=true;this.world.droppedItems.delete(e);continue}
     const drag=Math.exp(-dt*(e.grounded?9:1));
     e.vx*=drag;e.vz*=drag;
    }
@@ -208,7 +223,7 @@ export class EntityManager{
     const obtained=inventory.add(e.itemId,e.count);e.count-=obtained;
     if(obtained){inventory.assignQuickSlot(e.itemId);this.collected=true}
     else e.pickupDelay=e.age+.5;
-    if(!e.count)e.dead=true;
+    if(!e.count){e.dead=true;this.world.droppedItems.delete(e);}
    }
   }
   this.entities=this.entities.filter(e=>e.type==='train'||!e.dead&&(e.type==='drop'?e.age<180:e.age<(e.natural?180:240))&&(!e.natural||dist2(e,player)<MAX_RANGE*MAX_RANGE));
