@@ -14,3 +14,18 @@ jobs:
           node-version: '22'
       - name: New hologram regression tests
         run: node --test test/hologram-hidpi-input.test.mjs test/camera-inventory.test.mjs test/hologram-workspace.test.mjs test/hologram.test.mjs test/input-gestures-regression.test.mjs
+      - name: All regression tests
+        run: npm test
+
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Main baseline regression tests
+        run: npm test
