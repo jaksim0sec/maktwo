@@ -292,7 +292,7 @@ export function hologramFrameSize(clientWidth,clientHeight,sceneScale,deviceRati
  return {width,height,worldWidth,worldHeight,split:opened&&(width>worldWidth||height>worldHeight)};
 }
 export class Renderer{
- constructor(canvas){this.canvas=canvas;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.observerRenderer=new ObserverRenderer(gl);this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','NearRing','CanyonCoverage','CoveredChunks[0]','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
+ constructor(canvas,terrainWorker){this.canvas=canvas;this.terrainWorker=terrainWorker;const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});if(!gl)throw Error('WebGL2 unavailable');this.gl=gl;this.observerRenderer=new ObserverRenderer(gl);this.program=program(gl);this.skyProgram=gl.createProgram();gl.attachShader(this.skyProgram,shader(gl,gl.VERTEX_SHADER,SKY_VERT));gl.attachShader(this.skyProgram,shader(gl,gl.FRAGMENT_SHADER,SKY_FRAG));gl.linkProgram(this.skyProgram);if(!gl.getProgramParameter(this.skyProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skyProgram));this.skyHorizon=gl.getUniformLocation(this.skyProgram,'uHorizon');this.skyClarity=gl.getUniformLocation(this.skyProgram,'uClarity');this.skyLight=gl.getUniformLocation(this.skyProgram,'uSkyBrightness');this.skyCity=gl.getUniformLocation(this.skyProgram,'uCitySky');this.skyGradient=gl.getUniformLocation(this.skyProgram,'uCityGradient');this.skyGround=gl.getUniformLocation(this.skyProgram,'uGroundView');this.citySkyTone=.55;this.cityGroundFade=.60;this.skyBrightness=0;this.skyVao=gl.createVertexArray();this.skylineProgram=gl.createProgram();gl.attachShader(this.skylineProgram,shader(gl,gl.VERTEX_SHADER,SKYLINE_VERT));gl.attachShader(this.skylineProgram,shader(gl,gl.FRAGMENT_SHADER,SKYLINE_FRAG));gl.linkProgram(this.skylineProgram);if(!gl.getProgramParameter(this.skylineProgram,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.skylineProgram));this.skylineTowers=gl.getUniformLocation(this.skylineProgram,'uTowers[0]');gl.useProgram(this.program);this.u={vp:gl.getUniformLocation(this.program,'uVP'),camera:gl.getUniformLocation(this.program,'uCamera'),entityOffset:gl.getUniformLocation(this.program,'uEntityOffset'),fog:gl.getUniformLocation(this.program,'uFog'),fogRange:gl.getUniformLocation(this.program,'uFogRange'),distant:gl.getUniformLocation(this.program,'uDistant'),centerChunk:gl.getUniformLocation(this.program,'uCenterChunk'),brightness:gl.getUniformLocation(this.program,'uBrightness'),alpha:gl.getUniformLocation(this.program,'uAlpha'),time:gl.getUniformLocation(this.program,'uTime'),lightVolume:gl.getUniformLocation(this.program,'uLightVolume'),lightOrigin:gl.getUniformLocation(this.program,'uLightOrigin'),lightSize:gl.getUniformLocation(this.program,'uLightSize'),materials:gl.getUniformLocation(this.program,'uMaterials')};for(const name of ['LodNear','FarPass','NearY','NearRing','CanyonCoverage','CoveredChunks[0]','CityDaylight','LowerFog'])this.u[name]=gl.getUniformLocation(this.program,'u'+name);
  this.dustProgram=gl.createProgram();
  gl.attachShader(this.dustProgram,shader(gl,gl.VERTEX_SHADER,DUST_VERT));
  gl.attachShader(this.dustProgram,shader(gl,gl.FRAGMENT_SHADER,DUST_FRAG));
@@ -315,7 +315,7 @@ export class Renderer{
   this.distanceBlurProgram=p;
   this.distanceBlurUniforms={scene:gl.getUniformLocation(p,'uScene'),depth:gl.getUniformLocation(p,'uDepth'),pixel:gl.getUniformLocation(p,'uPixel'),clip:gl.getUniformLocation(p,'uClip')};
  }catch(error){console.warn('Far blur disabled: shader unavailable',error);this.distanceBlurEnabled=false}
- this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
+ this.walkAmount=0;this.walkPhase=0;this.farMesh=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;
  this.meshes=new Map();this.chunkFrustum=new Float32Array(24);this.distanceMesh=null;this.distanceKey='';this.dynamic=null;this.dynamicCapacity=0;this.lastDrawnChunks=0;this.worker=null;this.inflight=new Map();this.completed=[];this.world=null;this.worldToken=0;this.renderScale=1;this.frameAverage=16.7;this.scaleCooldown=0;this.materialTexture=gl.createTexture();
  const t=makeTextureLayers();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.materialTexture);
  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST_MIPMAP_LINEAR);
@@ -411,7 +411,7 @@ export class Renderer{
  dispose(m){if(!m)return;this.gl.deleteBuffer(m.vbo);this.gl.deleteVertexArray(m.vao)}
  updateDynamic(data){const gl=this.gl;if(!this.dynamic){this.dynamic=this.upload(data);this.dynamicCapacity=data.byteLength;return}gl.bindBuffer(gl.ARRAY_BUFFER,this.dynamic.vbo);if(data.byteLength>this.dynamicCapacity){this.dynamicCapacity=Math.max(data.byteLength,Math.ceil(this.dynamicCapacity*1.5),4096);gl.bufferData(gl.ARRAY_BUFFER,this.dynamicCapacity,gl.DYNAMIC_DRAW)}if(data.byteLength)gl.bufferSubData(gl.ARRAY_BUFFER,0,data);this.dynamic.count=data.length/7}
  disableWorker(){this.worker?.terminate();this.worker=null;for(const task of this.inflight.values())task.chunk.dirty=true;this.inflight.clear();this.completed=[]}
- resetWorld(world){this.farWorker?.terminate();this.farWorker=null;this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){for(const name of ['opaque','transparent','doorSteel','doorGlass'])this.dispose(mesh[name]);for(const states of mesh.levers)for(const lever of states)this.dispose(lever);}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
+ resetWorld(world){this.farJob=null;this.farResult=null;this.middleCoverage=null;this.dispose(this.farMesh);this.farMesh=null;this.dispose(this.distanceMesh);this.distanceMesh=null;this.distanceKey='';for(const mesh of this.meshes.values()){this.dispose(mesh.opaque);this.dispose(mesh.transparent)}this.meshes.clear();for(const mesh of this.trainMeshes?.values()??[]){for(const name of ['opaque','transparent','doorSteel','doorGlass'])this.dispose(mesh[name]);for(const states of mesh.levers)for(const lever of states)this.dispose(lever);}this.trainMeshes?.clear();this.completed=[];this.inflight.clear();this.world=world;this.worldToken++;this.lightAppliedKey='';this.lightRequestedKey='';this.lightSerial++;this.lightBusy=false;this.lightHasSources=false;glClearLight(this.gl,this.lightTexture)}
  queueMesh(world,key,chunk,yMin,yMax,detailY){
   chunk.dirty=false;
   const revision=chunk.revision,token=this.worldToken;
@@ -455,23 +455,18 @@ export class Renderer{
    this.middleCoverage={radius:coveredRadius,x:(job.cx+.5)*SIZE,z:(job.cz+.5)*SIZE};
    this.distanceKey=job.key;
   }
+  const terrain=this.terrainWorker;
+  if(!terrain?.available)this.farJob=null;
   if(this.distanceKey===key||this.farJob)return;
-  if((canyon||this.farEnabled)&&typeof Worker!=='undefined'&&!this.farWorkerFailed){
-   try{
-    if(!this.farWorker){
-     this.farWorker=new Worker(new URL('./city-far.worker.js',import.meta.url),{type:'module'});
-     this.farWorker.onmessage=({data})=>{
-      if(data.token!==this.worldToken||!this.farJob)return;
-      if(data.error){this.failFarWorker(data.error);return}
-      this.farResult={...data,job:this.farJob};
-      this.farJob=null;
-     };
-     this.farWorker.onerror=event=>this.failFarWorker(event.message);
-    }
-    this.farJob={cx:ax,cz:az,key};
-    this.farWorker.postMessage({seed:world.seed,cityBlueprints:world.version>=CITY_BLUEPRINT_VERSION?world.version:false,cx:ax,cz:az,token:this.worldToken,includeFar:!this.farMesh,canyon});
-    return;
-   }catch(error){this.failFarWorker(error)}
+  if((canyon||this.farEnabled)&&terrain?.available){
+   const job={cx:ax,cz:az,key};
+   const cityBlueprints=world.version>=CITY_BLUEPRINT_VERSION?world.version:false;
+   if(terrain.request('distance',{seed:world.seed,cityBlueprints,cx:ax,cz:az,includeFar:!this.farMesh,canyon},data=>{
+    if(this.farJob!==job)return;
+    this.farResult={...data,job};
+    this.farJob=null;
+   }))this.farJob=job;
+   if(terrain.available)return;
   }
   if(canyon){
    this.distanceMesh=this.replace(this.distanceMesh,distantCanyonMesh(world.seed,ax,az,canyon.origin,canyon.y));
@@ -487,11 +482,6 @@ export class Renderer{
   }
   this.middleCoverage={radius:options.coveredRadius,x:(ax+.5)*SIZE,z:(az+.5)*SIZE};
   this.distanceKey=key;
- }
- failFarWorker(error){
-  console.warn('City mesh worker unavailable',error);
-  this.farWorker?.terminate();
-  this.farWorker=null;this.farJob=null;this.farWorkerFailed=true;
  }
  sync(world,player){
   if(this.world!==world)this.resetWorld(world);

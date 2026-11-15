@@ -1,4 +1,4 @@
-import {Chunk,SIZE,HEIGHT,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block,isBed,isBedFoot,bedDirection,itemId} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
+import {Chunk,SIZE,HEIGHT,inChunkStreamRange,TURN_STYLE,CITY_STAIR_STYLE,CITY_STAIR_LEVEL_MASK,MESH_NEIGHBORS} from './chunk.js';import {BLOCK as B,BLOCKS,block,isBed,isBedFoot,bedDirection,itemId} from './blocks.js';import {generateChunk,surfaceAt,SEA,GENERATION_VERSION} from '../worldgen/generators.js';import {key} from '../util/math.js';import {EventBus} from './events.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {STATION_PREVIEW_MODE,STATION_PREVIEW_SPAWN} from '../worldgen/station-preview.js';
 import {ARBORETUM_MODE,ARBORETUM_SPAWN} from '../worldgen/trees.js';
@@ -15,10 +15,37 @@ import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
  constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CANYON_MODE?CANYON_HEIGHT:mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.yOrigin=0;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.droppedItems=new Set();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
- getChunk(cx,cz,create=true){const k=key(cx,cz);let c=this.chunks.get(k);if(!c&&create){c=generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,this.version>=CITY_BLUEPRINT_VERSION?this.version:false,this.yOrigin);this.chunks.set(k,c);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;const saved=this.edits.get(k);if(saved)for(const [idx,id] of saved){if(idx<0||idx>=c.data.length)continue;c.data[idx]=id;if(c.styles)c.styles[idx]=0;if(c.forms)c.forms[idx]=0}const forms=this.forms.get(k);
- if(forms){c.forms??=new Uint8Array(c.data.length);for(const [idx,form] of forms)if(idx>=0&&idx<c.data.length)c.forms[idx]=form}
- c.mounts=this.mounts.get(k);
- c.dirty=true;this.lights.loadChunk(c);this.lightChunkRevision++;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);this.events.emit('chunk-load',c)}return c}
+ getChunk(cx,cz,create=true){
+  const chunk=this.chunks.get(key(cx,cz));
+  if(chunk||!create)return chunk;
+  const version=this.version>=CITY_BLUEPRINT_VERSION?this.version:false;
+  return this.registerChunk(generateChunk(new Chunk(cx,cz,this.height),this.seed,this.mode,version,this.yOrigin));
+ }
+ registerChunk(chunk){
+  const {cx,cz}=chunk,k=key(cx,cz),existing=this.chunks.get(k);
+  if(existing)return existing;
+  const saved=this.edits.get(k);
+  if(saved)for(const [idx,id] of saved){
+   if(idx<0||idx>=chunk.data.length)continue;
+   chunk.data[idx]=id;
+   if(chunk.styles)chunk.styles[idx]=0;
+   if(chunk.forms)chunk.forms[idx]=0;
+  }
+  const forms=this.forms.get(k);
+  if(forms){
+   chunk.forms??=new Uint8Array(chunk.data.length);
+   for(const [idx,form] of forms)if(idx>=0&&idx<chunk.data.length)chunk.forms[idx]=form;
+  }
+  chunk.mounts=this.mounts.get(k);
+  chunk.dirty=true;
+  this.chunks.set(k,chunk);
+  if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;
+  this.lights.loadChunk(chunk);
+  this.lightChunkRevision++;
+  for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(cx+dx,cz+dz);
+  this.events.emit('chunk-load',chunk);
+  return chunk;
+ }
  isLightBlocking(id,x,y,z,form=this.getForm(x,y,z)){return isDoor(id)?!this.getDoorState(x,y,z).open:Boolean(BLOCKS[id]?.opaque)&&!form}
  stateKey(x,y,z){return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`}
  // Authored edits mark placed or replaced containers, not original world-generated crates.
@@ -264,7 +291,31 @@ export class World{
   }
   const edits={};for(const [k,m] of this.edits)edits[k]=[...m];return JSON.stringify({seed:this.seed,mode:this.mode,generationVersion:this.version,...(this.mode===CANYON_MODE?{yOrigin:this.yOrigin}:{}),time:this.time,edits,...(drops.length?{drops}:{}),states:[...this.blockStates],forms:[...this.forms].map(([k,m])=>[k,[...m]]),mounts:[...this.mounts].map(([k,m])=>[k,[...m]])})}
 
- stream(x,z,radius=3,budget=2,{roundEdges=false}={}){this.streamRadius=radius;const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);let generated=0;outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==r||(roundEdges&&r===radius&&Math.abs(dx)+Math.abs(dz)>radius+1))continue;const tx=cx+dx,tz=cz+dz;if(this.chunks.has(key(tx,tz)))continue;this.getChunk(tx,tz);if(++generated>=budget)break outer}if(this.chunks.size>this.maxChunks){for(const k of this.chunks.keys()){const [a,b]=k.split(',').map(Number);if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){this.chunks.delete(k);if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);this.lights.unloadChunk(k);this.lightChunkRevision++;this.events.emit('chunk-unload',k)}if(this.chunks.size<=this.maxChunks)break}}}
+ stream(x,z,radius=3,budget=2,{roundEdges=false,loadChunk}={}){
+  this.streamRadius=radius;
+  const cx=Math.floor(x/SIZE),cz=Math.floor(z/SIZE);
+  let requested=0;
+  outer:for(let r=0;r<=radius;r++)for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){
+   if(Math.max(Math.abs(dx),Math.abs(dz))!==r||!inChunkStreamRange(dx,dz,radius,roundEdges))continue;
+   const tx=cx+dx,tz=cz+dz;
+   if(this.chunks.has(key(tx,tz)))continue;
+   if(loadChunk)loadChunk(tx,tz);
+   else this.getChunk(tx,tz);
+   if(++requested>=budget)break outer;
+  }
+  if(this.chunks.size>this.maxChunks)for(const k of this.chunks.keys()){
+   const [a,b]=k.split(',').map(Number);
+   if(Math.max(Math.abs(a-cx),Math.abs(b-cz))>radius+1){
+    this.chunks.delete(k);
+    if(this.trainColliders?.length)this.trainChunkRevision=(this.trainChunkRevision??0)+1;
+    for(const [dx,dz] of MESH_NEIGHBORS)this.markDirty(a+dx,b+dz);
+    this.lights.unloadChunk(k);
+    this.lightChunkRevision++;
+    this.events.emit('chunk-unload',k);
+   }
+   if(this.chunks.size<=this.maxChunks)break;
+  }
+ }
  // Keep voxel buffers at a fixed height as the player traverses absolute canyon levels.
  recenterCanyon(y){
   if(this.mode!==CANYON_MODE||y>=144&&y<624)return 0;

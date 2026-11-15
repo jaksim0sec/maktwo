@@ -12,6 +12,13 @@ const RADIUS=328;
 
 // Use the same outlines and span endpoints as the collision-bearing voxel plan.
 export function distantCanyonMesh(seed,cx,cz,origin,focusY){
+ const steps=distantCanyonMeshSteps(seed,cx,cz,origin,focusY);
+ let step;
+ do{step=steps.next()}while(!step.done);
+ return step.value;
+}
+
+export function* distantCanyonMeshSteps(seed,cx,cz,origin,focusY){
  const x=(cx+.5)*SIZE,z=(cz+.5)*SIZE,y=origin+focusY;
  const out=[];
  const visible=(bounds,y0,y1)=>{
@@ -56,6 +63,7 @@ export function distantCanyonMesh(seed,cx,cz,origin,focusY){
   }
  }
  for(const {terraces,buildings,routes:localRoutes} of canyonBays(seed,y-300,600,z-RADIUS,z+RADIUS)){
+  yield;
   routes.push(...localRoutes);
   for(const v of buildings){
    if(!visible(v,v.y0,v.y1))continue;
