@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import * as renderer from '../src/client/renderer.js';
 import {Hologram,cardGeometry,createAnchor} from '../src/client/hologram.js';
 import {Input} from '../src/client/input.js';
@@ -126,4 +127,11 @@ test('mouse dragging is limited to outside hologram and suppressed after UI dism
   h.doc.emit('mouseup',{button:0});
   assert.equal(input.read().use,false,'closing inventory must never place a block');
  }finally{h.restore()}
+});
+
+test('mouse starts and finishes the same item drag interaction as touch',()=>{
+ const game=readFileSync(new URL('../src/client/game.js',import.meta.url),'utf8');
+ assert.match(game,/this\\.input\\.hologramPointerDown\\(event\\)/);
+ assert.match(game,/this\\.input\\.hologramPointerMove\\(event\\)/);
+ assert.match(game,/this\\.input\\.hologramPointerUp\\(event,false\\)/);
 });
