@@ -350,7 +350,7 @@ export class ObserverPack {
   const track=g.stalkers?.get(index);
   member.yaw=track?.yaw??g.yaw;
   member.at=track?{x:track.x,y:track.y,z:track.z}:this.layout(g.point,g.yaw,g.size)[index];
-  member.fallSide=index%2===0?1:-1;
+  member.fallSide=index%2===0?-1:1;
   g.members.set(index,member);this.count--;
  }
  canMove(from,to,yaw=this.active.yaw,previousYaw=yaw){
