@@ -67,6 +67,25 @@ export function inspectionGeometry(view,compact=false){
  }
  return cards;
 }
+// Containers keep BOTH inventories visible; inspection occupies only their footer.
+export function storageInspectionGeometry(view,compact=false){
+ const cards=[],add=(id,name,x,y,w,h,role='control',extra={})=>
+  cards.push({id,name,x,y,w,h,role,depth:-.052,...extra});
+ const y=compact?-.64:-.65,h=compact?.15:.17;
+ add('inspect:back','‹',compact?-.34:-1.03,y,compact?.18:.18,h);
+ if(view.step==='quantity'){
+  const labels=[['minus','−'],['amount',String(view.amount)],['plus','+'],['all','전부']];
+  const start=compact?-.17:-.70,step=compact?.15:.30;
+  labels.forEach(([key,label],i)=>add('inspect:'+key,label,start+i*step,y,step-.012,h,key==='amount'?'empty':'control'));
+  add('inspect:confirm',view.confirm,compact?.34:.88,y,compact?.20:.47,h,'action');
+ }else{
+  add('inspect:summary',view.name+(view.info?' · '+view.info:''),compact?-.045:-.28,y,
+   compact?.38:1.34,h,'compact-summary');
+  const label=view.actions?.[0]?.[1]||'옮기기',key=view.actions?.[0]?.[0]||'quantity';
+  add('inspect:'+key,label,compact?.34:.86,y,compact?.19:.48,h,'action');
+ }
+ return cards;
+}
 function cardGeometry(palette,items,compact=false,page=null,craftFilter='all',options={}){
  return workspaceCards({palette,items,compact,page,craftFilter,...options});
 }
@@ -174,9 +193,10 @@ export class Hologram{
   }
   this.cards=inspection?[...(this.baseCards||[]).filter(card=>
     !card.id.startsWith('info:')&&card.id!=='hand'&&!card.id.startsWith('page:')&&
-    !(this.compact&&inspection.step!=='details'&&card.role==='quick')&&
-    !(this.compact&&this.basePalette?.startsWith('storage:')&&card.role==='item'&&card.y<-.14)),
-    ...inspectionGeometry(inspection,this.compact)]:this.baseCards;
+    !(this.compact&&inspection.step!=='details'&&!this.basePalette?.startsWith('storage:')&&card.role==='quick')&&
+    !(card.role==='filter'&&card.x>.27)),
+    ...(this.basePalette?.startsWith('storage:')?storageInspectionGeometry(inspection,this.compact):
+      inspectionGeometry(inspection,this.compact))]:this.baseCards;
   if(changed||!this.cards.some(c=>c.id===this.focusId))this.focusId=this.cards.find(c=>c.role==='item')?.id||(inspection?'inspect:back':palette.startsWith('storage:')?palette:palette==='craft'?'view:craft':'view:inventory');
   this.dirty=true;this.buildGeometry();
  }
@@ -242,6 +262,12 @@ export class Hologram{
    const focused=this.keyboardMode&&this.focusId===card.id;
    const ready=card.role==='item'&&mode==='craft'&&card.craftable;
    ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+   if(card.role==='compact-summary'){
+    rounded(ctx,x+2,y+2,w-4,h-4,7,'#16323acb','#689ba17a');
+    ctx.font=font(16,true);ctx.textAlign='center';ctx.fillStyle='#e8f1ed';
+    ctx.fillText(fitLabel(card.name,w-14,16),cx,cy+5);
+    ctx.restore();return;
+   }
    if(card.role==='label'){
     ctx.font=font(22,true);ctx.textAlign='center';ctx.fillStyle='#d0e5e1';
     ctx.fillText(fitLabel(card.name,w-8,22),cx,cy+7);
