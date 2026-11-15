@@ -19,7 +19,7 @@ const storedPercent=(key,fallback)=>{const value=Number(localStorage.getItem(key
 // Optional buttons can be absent when the page and module use different CDN cache versions.
 const bindClick=(id,handler)=>{const el=$(id);if(el)el.addEventListener('click',handler);else console.warn(`[MakTwo] Missing optional UI button #${id}`)};
 class Game{
- constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoLastTap=null;this.holoDragging=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
+ constructor(){this.canvas=$('screen');this.renderer=new Renderer(this.canvas);this.hologram=new Hologram(this.renderer.gl);this.renderer.hologram=this.hologram;this.input=new Input(this.canvas);this.manager=new WorldManager(localStorage);this.worldPresets=[...WORLD_PRESETS.filter(preset=>!preset.legacy||localStorage.getItem('mcweb:'+preset.name)),...loadWorldSlots(localStorage)];for(const preset of this.worldPresets)this.manager.add(preset.name,preset.seed,preset.mode);this.manager.active=this.manager.worlds.get(new URLSearchParams(location.search).get('world')||localStorage.getItem(ACTIVE_WORLD_KEY))||this.manager.worlds.get('EternalNightCityLab')||this.manager.active;this.world=this.manager.active;this.survivalInventory=new SurvivalInventory(localStorage,this.world.name);this.inventoryPalette=null;this.craftFilter='all';this.station=null;this.visibleRecipes=[];this.visibleItems=[];this.visibleCarried=[];this.visibleStored=[];this.holoLastTap=null;this.holoDragging=null;this.movePending=null;const start=loadPlayerState(localStorage,this.world.name,this.world.height,this.world.yOrigin)||this.world.firstSpawn();this.player=new Player(start.x,start.y,start.z);Object.assign(this.player,start);if(this.world.mode==='parts'&&start.yaw===undefined)this.player.yaw=0;this.creativeInventory=new CreativeInventory(CREATIVE_ITEMS);this.form=0;this.manualAngle=null;this.skyBrightness=0;this.inventoryPage=0;this.entities=new EntityManager(this.world);this.effects=new Effects();this.combat=new Combat();this.offWeapon=null;this.last=performance.now();this.acc=0;this.interactTimer=0;this.placeLatch=false;this.mining=new MiningProgress();this.frameCount=0;this.lastHud=0;this.portalCooldown=0;this.lastFrameMs=16;this.target=null;this.selected=-1;this.palette='blocks';this.menuOpen=false;this.helpOpen=false;this.panel=null;this.bindUI();this.world.stream(this.player.x,this.player.z,2,4);this.bindWorld();this.scheduleFrame()}
  get inventory(){return this.player.creative?this.creativeInventory:this.survivalInventory}
  applyGraphics(){
   const distance=localStorage.getItem('maktwo:render-distance')||'medium',resolution=localStorage.getItem('maktwo:render-resolution')||'medium';
@@ -127,7 +127,7 @@ class Game{
  get uiOpen(){return Boolean(this.panel)}
  setPanel(name){
   if(this.cinematic&&name!=='cinematic')return;
-  const prior=this.panel;this.panel=name||null;this.holoLastTap=null;this.holoDragging=null;
+  const prior=this.panel;this.panel=name||null;this.holoLastTap=null;this.holoDragging=null;this.movePending=null;
   if(this.panel)this.combat.cancel();
   if(this.panel!=='inventory')this.openContainer=null;
   if(this.panel!=='inventory'){this.inspectedItem=null;this.inventoryPalette=null;this.inventoryPage=0;this.station=null}
@@ -183,7 +183,8 @@ class Game{
      missing:Object.entries(entry.needs).reduce((sum,[key,num])=>sum+Math.max(0,num-this.inventory.count(Number(key))),0)}:{})};
   });
   this.hologram.setInventory(category,items,-1,station,{index:this.inventoryPage,total},this.craftFilter,null,{
-   quickSlots:this.inventory.quickSlots.map(id=>({blockId:id!==null&&this.inventory.has(id)?id:null,count:id===null?0:this.inventory.count(id)}))
+   quickSlots:this.inventory.quickSlots.map(id=>({blockId:id!==null&&this.inventory.has(id)?id:null,count:id===null?0:this.inventory.count(id)})),
+   selectedId:this.movePending,moveMode:this.movePending!==null
   });
  }
  inventoryClick(hit=this.hologram.click()){
@@ -193,6 +194,10 @@ class Game{
   if(hit==='info:shortcut'&&this.inspectedItem){this.inspectAction('slots');return}
   if(hit.startsWith('quick:')){
    const index=Number(hit.slice(6)),item=this.inspectedItem;
+   if(this.movePending!==null){
+    if(this.inventory.moveShortcut(this.movePending,index)){this.select(index,{toggle:false});this.renderHotbar()}
+    this.movePending=null;this.updateHologram();return;
+   }
    if(item&&item.source!=='stored'&&item.source!=='recipe'&&this.inventory.moveShortcut(item.id,index)){
     this.select(index,{toggle:false});this.renderHotbar();this.updateHologram();
    }return;
@@ -214,6 +219,10 @@ class Game{
    const index=Number(hit.slice(5));
    const recipe=this.inventoryPalette==='craft'?this.visibleRecipes[index]:null;
    const id=recipe?.id??this.visibleItems[index];
+   if(this.movePending!==null&&id!==undefined){
+    if(!this.inventory.reorder(this.movePending,id))this.status('아이템 순서를 변경하지 못했어요');
+    this.movePending=null;this.updateHologram();return;
+   }
    if(id!==undefined)this.inspectItem(id,recipe?'recipe':'bag',recipe);
   }
  }
@@ -229,7 +238,7 @@ class Game{
   if(!recipe&&!count){this.inspectedItem=null;this.updateHologram();return}
   if(step==='quantity')item.amount=Math.max(1,Math.min(item.amount,this.inspectionLimit(item)));
   const actions=recipe?[['craft',inventory.canCraft(recipe,this.activeStation())?'제작하기':'제작 조건 확인']]:
-   container?[['quantity',stored?'꺼내기':'넣기']]:[['slots','빠른 슬롯'],...(!this.player.creative?[['quantity','버리기']]:[])];
+   container?[['quantity',stored?'꺼내기':'넣기']]:[['slots','빠른 슬롯'],['move','슬롯 이동'],...(!this.player.creative?[['quantity','버리기']]:[])];
   const description=weapons[id]?'손에 장착해 공격에 사용':isContainer(id)?'아이템을 넣고 꺼낼 수 있는 수납품':
    isBed(id)?'휴식과 부활 지점 저장':definition.light?'주변을 밝히는 광원':
    part?(PART_FAMILIES.find(f=>f.key===part.family)?.label||'건축 부품'):definition.solid?'설치할 수 있는 건축재':'설치하거나 제작에 쓰는 아이템';
@@ -260,6 +269,9 @@ class Game{
   }
   if(this.openContainer&&!this.containerInReach()){this.requestGameFocus();return}
   const stored=source==='stored',deposit=source==='carried',inventory=this.inventory;
+  if(action==='move'&&source==='bag'){
+   this.movePending=id;this.inspectedItem=null;this.updateHologram();return;
+  }
   if(action==='slots'||action==='quantity'){item.step=action;item.amount=1}
   else if(action.startsWith('slot:')&&step==='slots'){
    const index=Number(action.slice(5));
