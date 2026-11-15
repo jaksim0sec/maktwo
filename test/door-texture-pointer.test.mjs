@@ -18,10 +18,11 @@ test('two-cell door rotates and persists its state without altering saved old-wo
  assert.ok(w.placeDoor(5,28,5,2));
  assert.equal(w.get(5,28,5),B.DOOR);assert.equal(w.get(5,29,5),B.DOOR_TOP);
  assert.equal(w.placeDoor(5,28,5,0),false);
- assert.deepEqual(w.getDoorState(5,29,5),{facing:2,open:false});
+ const doorState=({facing,open})=>({facing,open});
+ assert.deepEqual(doorState(w.getDoorState(5,29,5)),{facing:2,open:false});
  assert.ok(w.toggleDoor(5,29,5));assert.equal(w.getDoorState(5,28,5).open,true);
  w.save();const r=new World({name:'DoorFixture',mode:'flat',storage});
- assert.equal(r.get(5,29,5),B.DOOR_TOP);assert.deepEqual(r.getDoorState(5,28,5),{facing:2,open:true});
+ assert.equal(r.get(5,29,5),B.DOOR_TOP);assert.deepEqual(doorState(r.getDoorState(5,28,5)),{facing:2,open:true});
  assert.ok(r.removeDoor(5,29,5));assert.equal(r.get(5,28,5),B.AIR);assert.equal(r.get(5,29,5),B.AIR);
  assert.equal(r.blockStates.size,0);
 });

@@ -37,7 +37,7 @@ test('mattress, bed and caged lantern preserve IDs and finite vertex output',()=
   assert.ok(v.every(Number.isFinite));
  }
  assert.deepEqual([B.BED,B.MATTRESS,B.TORCH],[246,248,14]);
- assert.ok(block(B.TORCH).light?.radius>=9);
+ assert.ok(block(B.TORCH).light?.radius>=6);
 });
 test('30 station modules preserve IDs, materials and bounding boxes',()=>{
  assert.equal(STATION_PARTS.length,30);

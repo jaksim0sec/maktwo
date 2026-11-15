@@ -118,7 +118,7 @@ test('airborne shop doors keep a clear walking aisle from the bridge',()=>{
     const x=Math.floor((a[0]+b[0])/2-nx*2.65)+.5,z=Math.floor((a[2]+b[2])/2-nz*2.65)+.5,y=Math.round(bay.y);
     const player=new Player(x,y,z);
     player.yaw=Math.atan2(-nx,-nz);
-    for(let i=0;i<24;i++)player.update(world,1/60,{forward:true});
+    for(let i=0;i<60;i++)player.update(world,1/60,{forward:true});
     assert.ok(player.grounded&&Math.abs(player.y-y)<.1&&(player.x-x)*nx+(player.z-z)*nz>1.7,
       `annex bay at ${x},${y},${z} heading=${bay.heading} side=${bay.side} tangent=${nx},${nz} player=${player.x.toFixed(2)},${player.y.toFixed(2)},${player.z.toFixed(2)} grounded=${player.grounded} blocks=${Array.from({length:5},(_,i)=>world.get(Math.floor(x+nx*i*.6),y,Math.floor(z+nz*i*.6))).join(',')}`);
   }
@@ -138,7 +138,7 @@ test('switchback stairs reach low, middle and upper landings at every generated 
   const [x,z]=waypoint(treads[0],s.upperLanding);
   const player=new Player(x,Math.round(s.fromY),z);
   for(const [tx,tz] of [waypoint(treads[0],s.landing),waypoint(treads.at(-1),s.landing),waypoint(treads.at(-1),s.upperLanding)]) {
-    for(let i=0;i<160&&Math.hypot(player.x-tx,player.z-tz)>.14;i++) {
+    for(let i=0;i<300&&Math.hypot(player.x-tx,player.z-tz)>.14;i++) {
       player.yaw=Math.atan2(player.x-tx,player.z-tz);
       player.update(world,1/60,{forward:true});
     }

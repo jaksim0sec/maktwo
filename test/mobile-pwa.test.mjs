@@ -81,9 +81,9 @@ test('PWA manifest, icons and all offline app-shell dependencies exist',()=>{
 });
 test('WebGL rendering scales terrain and hologram vertices consistently',()=>{
  const renderer=source('src/client/renderer.js'),hologram=source('src/client/hologram.js');
- assert.match(renderer,/aPos\*\$\{BLOCK_SIZE\.toFixed\(2\)\}/);
+ assert.match(renderer,/worldPosition\*\$\{BLOCK_SIZE\.toFixed\(2\)\}/);
  assert.match(hologram,/aPosition\*\$\{BLOCK_SIZE\.toFixed\(2\)\}/);
- assert.match(renderer,/toMeters\(player\.x\)/);
+ assert.match(renderer,/eye\.map\(toMeters\)/);
 });
 
 test('offline worker activates and serves cached navigation, modules, and icons without network',async()=>{
