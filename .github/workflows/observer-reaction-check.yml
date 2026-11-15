@@ -1,0 +1,14 @@
+name: Observer reaction regression
+on:
+  push:
+    branches: [fix/observer-reactivity-death-persistence-20261115]
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Run observer regression suite
+        run: node --test test/observer-reactivity.test.mjs test/observer-pack.test.mjs test/observer-stealth.test.mjs test/canyon-v2-observer.test.mjs
