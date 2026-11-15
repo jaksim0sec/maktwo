@@ -72,15 +72,15 @@ export function storageInspectionGeometry(view,compact=false){
  const cards=[],add=(id,name,x,y,w,h,role='control',extra={})=>
   cards.push({id,name,x,y,w,h,role,depth:-.052,...extra});
  const y=compact?-.64:-.65,h=compact?.15:.17;
- add('inspect:back','‹',compact?-.34:-1.03,y,compact?.18:.18,h);
+ add('inspect:back','‹',compact?-.38:-1.03,y,compact?.13:.18,h);
  if(view.step==='quantity'){
   const labels=[['minus','−'],['amount',String(view.amount)],['plus','+'],['all','전부']];
-  const start=compact?-.17:-.70,step=compact?.15:.30;
+  const start=compact?-.225:-.70,step=compact?.15:.30;
   labels.forEach(([key,label],i)=>add('inspect:'+key,label,start+i*step,y,step-.012,h,key==='amount'?'empty':'control'));
-  add('inspect:confirm',view.confirm,compact?.34:.88,y,compact?.20:.47,h,'action');
+  add('inspect:confirm',view.confirm,compact?.38:.88,y,compact?.13:.47,h,'action');
  }else{
-  add('inspect:summary',view.name+(view.info?' · '+view.info:''),compact?-.045:-.28,y,
-   compact?.38:1.34,h,'compact-summary');
+  add('inspect:summary',view.name+(view.info?' · '+view.info:''),compact?-.045:-.25,y,
+   compact?.38:1.28,h,'compact-summary');
   const label=view.actions?.[0]?.[1]||'옮기기',key=view.actions?.[0]?.[0]||'quantity';
   add('inspect:'+key,label,compact?.34:.86,y,compact?.19:.48,h,'action');
  }
