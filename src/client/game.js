@@ -409,7 +409,7 @@ class Game{
   // Clicking the world closes menus and captures the mouse in one gesture.
   this.canvas.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse')return;if(this.panel==='inventory'){
    if(event.button===0&&this.input.hologramOwnsPointer(event)){
-    event.preventDefault();const rect=this.canvas.getBoundingClientRect();
+    event.preventDefault();this.input.ignoreMouseUntilUp=true;const rect=this.canvas.getBoundingClientRect();
     const hit=this.hologram.pickAt(this.player,event.clientX,event.clientY,rect,{center:this.input.locked});
     this.inventoryClick(hit);
    }return;
