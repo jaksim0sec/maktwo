@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {ObserverPack,observerPose,observerCollapseProgress} from '../src/entities/observers.js';
-import {observerMotion,observerHitRegions} from '../src/entities/observer-motion.js';
+import {observerMotion,observerHitRegions,observerEyeWarp} from '../src/entities/observer-motion.js';
+import {observerRig} from '../src/entities/observer-poses.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 const world={
  seed:123,height:120,trainColliders:[],lightRevision:0,
@@ -111,7 +112,7 @@ test('a blocked scripted exit is discarded and searched again before the runner 
  }});
  const exit={x:4,y:10,z:-6};
  let attempts=0;
- pack.walkClear=(from,to)=>to.x>from.x+.5;
+ pack.walkClear=(from,to)=>to.x>from.x&&Math.abs(to.z-from.z)<(to.x-from.x)*.45;
  pack.escapeTarget=()=>{attempts++;return exit};
  for(let i=0;i<10;i++){pack.clock+=.18;pack.stepStalkers(player,.18)}
  assert.ok(attempts>0);
@@ -169,4 +170,66 @@ test('a guarded observer starts falling from the visible crouch and settles on t
  assert.equal(end.overlay.to,'fall2');
  assert.equal(end.overlay.blend,1);
  assert.equal(end.ground,0);
+});
+
+test('a stationary observer turns to meet a player beside it even while trying to retreat',()=>{
+ const pack=spawn(),s=pack.active.stalkers.get(0);
+ const viewer={...player,x:1.8,z:0};
+ Object.assign(s,{x:0,y:10,z:0,yaw:-Math.PI/2,target:null,nextMove:Infinity});
+ pack.next=pack.clock+.18;pack.publish();
+ const start=s.yaw;
+ for(let i=0;i<36;i++)pack.tick(1/60,viewer,48);
+ const motion=observerMotion(pack.views[0],pack.clock,pack.sampleTime);
+ const gaze=motion.sample.yaw+motion.head[0]+motion.eyes[0];
+ assert.ok(s.retreat);
+ assert.ok(Math.cos(gaze-Math.PI/2)>.8,`still looking away after 600 ms (body ${start} → ${s.yaw})`);
+});
+
+test('a nearby eye moves toward the player before the next navigation decision',()=>{
+ const pack=spawn(),s=pack.active.stalkers.get(0);
+ Object.assign(s,{x:0,y:10,z:0,yaw:0,headYaw:0,eyeYaw:0});
+ pack.next=pack.clock+.18;pack.publish();
+ const viewer={...player,x:1.45,z:1.45};
+ for(let i=0;i<5;i++)pack.tick(1/60,viewer,48);
+ assert.ok(observerMotion(pack.views[0],pack.clock,pack.sampleTime).eyes[0]>.16);
+ assert.equal(s.yaw,0,'body movement still follows the navigation cadence');
+});
+
+test('an unhurt runner glances back when the player catches up beside it',()=>{
+ const pack=spawn(),s=pack.active.stalkers.get(0),viewer={...player,x:1.8,z:0};
+ Object.assign(s,{x:0,y:10,z:0,yaw:-Math.PI/2,target:{x:-8,y:10,z:0},nextMove:Infinity,
+  speed:3.5,walking:true,fleeing:true,retreat:true});
+ pack.next=pack.clock;pack.publish();
+ let eyeContact=-1;
+ for(let i=0;i<57;i++){
+  pack.tick(1/60,viewer,48);
+  const {sample,head,eyes}=pack.motion(pack.views[0]);
+  eyeContact=Math.max(eyeContact,Math.cos(sample.yaw+head[0]+eyes[0]-Math.PI/2));
+ }
+ assert.ok(eyeContact>.8,'still needs to acknowledge a newly close player while retreating');
+ assert.ok(s.x<-.15,'resumes the escape after the glance');
+});
+
+test('the midpoint of a steep pose blend preserves the radius of the shipped eyeball',()=>{
+ const mesh=readFileSync(new URL('../assets/observer.mesh',import.meta.url));
+ const count=mesh.readUInt32LE();
+ let offset=4+count*4;
+ const parts=Array.from({length:count},(_,i)=>{
+  const size=mesh.readUInt32LE(4+i*4),part=mesh.subarray(offset,offset+size);
+  offset+=size;return part;
+ });
+ const meta=JSON.parse(parts[0]);
+ const point=name=>{
+  const pose=parts[3+meta.names.indexOf(name)];
+  return observerRig[name][0].map((center,i)=>pose.readInt16LE(meta.eyeFrom*6+i*2)/4096-center);
+ };
+ const rest=point('idle'),fallen=point('fall2');
+ const motion=observerMotion({member:{dead:true,hitAt:0}},1);
+ motion.overlay={from:'idle',to:'fall2',blend:.5};
+ const warp=observerEyeWarp(motion);
+ const raw=rest.map((value,i)=>(value+fallen[i])*.5);
+ const corrected=raw.map((value,i)=>value+rest.reduce((sum,coordinate,axis)=>sum+coordinate*warp[i+axis*3],0));
+ const radius=Math.hypot(...rest);
+ assert.ok(Math.hypot(...raw)<radius*.9,'fixture must reproduce the globe collapsing');
+ assert.ok(Math.abs(Math.hypot(...corrected)-radius)<.001);
 });
