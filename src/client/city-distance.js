@@ -5,6 +5,7 @@ import {hash} from '../util/math.js';
 import {libraryRoofHeight} from '../worldgen/eternal-night-library.js';
 import {FAR_LOOK} from './far-look.js';
 import {quad,rgb} from './mesher.js';
+import {materialFor} from './textures.js';
 
 const NEAR=44, FAR=256, MAX_BUILDINGS=96;
 export const DISTANCE_SECTORS=8;
@@ -200,7 +201,7 @@ function legacyVertexCount(plan,volume){
  return count;
 }
 
-export function buildingSilhouette(plan,v,enhanced){
+export function buildingSilhouette(plan,v,enhanced,facadeMaterials=false){
  const mesh=[];
  let first=0;
  while(first<v.floors.length){
@@ -208,12 +209,14 @@ export function buildingSilhouette(plan,v,enhanced){
   let end=first+1;
   while(sameSilhouetteTier(floor,v.floors[end]))end++;
   const outline=floor.outline,bottom=floor.y,top=v.floors[end-1].top;
-  const color=rgb(block(plan.details[v.id].kits[first].body).color);
+  const body=plan.details[v.id].kits[first].body;
+  const color=rgb(block(body).color);
   for(let edge=0;edge<outline.length;edge++){
    const [ax,az]=outline[edge],[bx,bz]=outline[(edge+1)%outline.length];
    const wall=[[ax,bottom,az],[ax,top,az],[bx,top,bz],[bx,bottom,bz]];
    if(enhanced){shadedWall(mesh,wall,color);continue}
-   quad(mesh,wall,color,.76);
+   const material=facadeMaterials?materialFor(body,Math.abs(bz-az)>Math.abs(bx-ax)?0:4):0;
+   quad(mesh,wall,color,.76+4*material);
    const length=Math.hypot(bx-ax,bz-az);
    if(!hasLegacyWindow(plan,v,floor,first,edge,length,top-bottom))continue;
    // A few emissive apertures sell the scale without adding light sources.

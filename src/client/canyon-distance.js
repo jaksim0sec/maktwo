@@ -69,7 +69,7 @@ export function* distantCanyonMeshSteps(seed,cx,cz,origin,focusY){
    if(!visible(v,v.y0,v.y1))continue;
    let mesh=skins.get(v);
    if(!mesh){
-    mesh=buildingSilhouette({layout:{seed},details:{[v.id]:v.detail}},v,false);
+    mesh=buildingSilhouette({layout:{seed},details:{[v.id]:v.detail}},v,false,true);
     skins.set(v,mesh);
    }
    copy(mesh);

@@ -8,8 +8,22 @@ import {CANYON_MODE,canyonBay,canyonShelter} from '../src/worldgen/canyon-v2-pla
 
 import {canyonCore,coreApproaches} from '../src/worldgen/canyon-v2-core.js';
 import {libraryRoofHeight} from '../src/worldgen/eternal-night-library.js';
+import {buildingSilhouette} from '../src/client/city-distance.js';
 
 const seed=9999;
+test('V2 far facades retain authored material without adding geometry',()=>{
+ const building=canyonBay(seed,5,1).buildings[0];
+ const plan={layout:{seed},details:{[building.id]:building.detail}};
+ const plain=buildingSilhouette(plan,building,false),textured=buildingSilhouette(plan,building,false,true);
+ assert.ok(plain.length>0);
+ assert.equal(textured.length,plain.length);
+ let texturedFaces=0;
+ for(let i=0;i<textured.length;i++){
+  if(i%7===6&&textured[i]>=4){texturedFaces++;continue;}
+  assert.equal(textured[i],plain[i]);
+ }
+ assert.ok(texturedFaces>0);
+});
 test('V2 starts on a clear aisle facing a paired bed',()=>{
  const world=new World({mode:CANYON_MODE,seed});
  const spawn=world.firstSpawn();

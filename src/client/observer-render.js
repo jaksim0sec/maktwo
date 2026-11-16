@@ -20,7 +20,7 @@ uniform mat3 uEyeWarp;
 uniform float uCloud,uBreath,uCollapse,uGuard;
 uniform vec2 uNeck,uEyeAim;
 uniform int uEyeFrom;
-out vec3 vColor,vPos,vEyeNormal;
+out vec3 vColor,vPos,vEyeNormal,vEyeLocal;
 vec3 rotateJoint(vec3 point,vec3 center,vec2 angles){
  vec3 local=point-center;
  float cy=cos(angles.x),sy=sin(angles.x),cp=cos(angles.y),sp=sin(angles.y);
@@ -39,6 +39,7 @@ void main(){
  // The neutral rig defines the neck influence through every authored pose.
  // The eyeball rotates inside its socket, then moves with the whole head.
  bool eye=gl_VertexID>=uEyeFrom;
+ vEyeLocal=eye?aIdle-vec3(${observerRig.idle[0].map(n=>n.toFixed(4)).join(',')}):vec3(0.);
  if(eye)p=rotateJoint(p,uEyePivot,uEyeAim);
  float neck=smoothstep(1.36,1.84,aIdle.y);
  if(neck>0.)p=mix(p,rotateJoint(p,uNeckPivot,uNeck),neck);
@@ -53,10 +54,10 @@ void main(){
 }`;
 const FRAG=`#version 300 es
 precision highp float;
-in vec3 vColor,vPos,vEyeNormal;
+in vec3 vColor,vPos,vEyeNormal,vEyeLocal;
 uniform vec3 uEye,uFog;
 uniform vec2 uFogRange;
-uniform float uPresence;
+uniform float uPresence,uCloud;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin,uLightSize;
 out vec4 frag;
 ${HELD_LIGHT_SHADER}
@@ -73,10 +74,25 @@ void main(){
  if(all(greaterThanEqual(pos,vec3(0.)))&&all(lessThan(pos,uLightSize)))
   light=texture(uLightVolume,pos/uLightSize);
  float facing=max(0.,dot(n,normalize(vec3(-.38,.71,.57))));
- vec3 ambient=vec3(.105,.112,.116)+vec3(.24,.29,.28)*light.a;
+ vec3 ambient=vec3(.128,.138,.153)+vec3(.24,.29,.28)*light.a;
  vec3 emit=max(light.rgb,heldLightAt(vPos/${BLOCK_SIZE.toFixed(2)}+n*.02,n));
- vec3 color=vColor*(ambient+emit*.85)*(.72+.28*facing);
- float fog=clamp((distance(vPos,uEye)-uFogRange.x)/uFogRange.y,0.,1.);
+ float reach=distance(vPos,uEye);
+ vec3 pigment=vColor;
+ float glint=0.;
+ if(dot(vEyeNormal,vEyeNormal)>.25&&reach<5.){
+  float detail=1.-smoothstep(2.15,5.,reach);
+  // Local coordinates keep the fine fibers attached to the rotating iris.
+  vec2 iris=vEyeLocal.xy+vec2(0.,.013);
+  float r=length(iris),angle=atan(iris.y,iris.x+.0001);
+  float irisBand=smoothstep(.038,.054,r)*(1.-smoothstep(.077,.092,r))*smoothstep(.07,.11,vEyeLocal.z);
+  float fiber=sin(angle*58.+r*150.)*sin(angle*31.-r*238.);
+  float fiberFade=1.-smoothstep(.23,.7,fwidth(angle)*21.);
+  pigment+=vec3(1.,.63,.46)*fiber*fiberFade*irisBand*detail*(1.-uCloud)*.052;
+  vec3 glintDirection=normalize(normalize(uEye-vPos)+normalize(vec3(-.32,.75,.58)));
+  glint=pow(max(0.,dot(n,glintDirection)),44.)*detail*(1.-.72*uCloud)*(.012+.047*light.a+.065*max(emit.r,emit.b));
+ }
+ vec3 color=max(pigment,vec3(0.))*(ambient+emit*.85)*(.72+.28*facing)+glint;
+ float fog=clamp((reach-uFogRange.x)/uFogRange.y,0.,1.);
  frag=vec4(mix(color,uFog,fog*.91),1.);
 }`;
 
