@@ -1,7 +1,7 @@
 import {collides, intersectAabb, raycast, GRAVITY} from '../core/physics.js';
 import {SIZE} from '../core/chunk.js';
 import {hash} from '../util/math.js';
-import {OBSERVER_STEP,angleDelta,observerMotion,observerHitRegions} from './observer-motion.js';
+import {OBSERVER_STEP,angleDelta,glanceYaw,observerMotion,observerHitRegions} from './observer-motion.js';
 
 // 소심한 관찰자: distant, solitary sightings; the gaze moves before the feet.
 export const OBSERVER_NAME='소심한 관찰자';
@@ -10,6 +10,7 @@ const FOCUS_LIMIT=4.8, MIN_SEPARATION=7.5;
 const SIGHTING_MIN_INTERVAL=29, SIGHTING_MAX_DURATION=4.7;
 const CORPSE_LIFETIME=120, HIT_STARTLE=.28, HIT_FEAR=11;
 const FACE_DISTANCE=16.5, FACE_CENTER=.56;
+const CLOSE_GAZE_RANGE=4.2;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -29,6 +30,7 @@ export class ObserverPack {
   this.random=random;
   this.serial=0;
   this.clock=0;
+  this.sampleDuration=TICK;
   this.active=null;
   this.views=[];
   this.sleep=null;
@@ -51,7 +53,7 @@ export class ObserverPack {
   if(g){
    rebase(g.point);rebase(g.at);
    for(const s of g.stalkers?.values()??[]){
-    rebase(s);rebase(s.target);rebase(s.lastThreat);rebase(s.gazeTarget);
+    rebase(s);rebase(s.target);rebase(s.lastThreat);rebase(s.gazeTarget);rebase(s.closeLook);
     rebase(s.sighting?.start);rebase(s.sighting?.seen);
    }
    for(const member of g.members.values())rebase(member.at);
@@ -259,7 +261,7 @@ export class ObserverPack {
  }
  beginGlimpse(s,site,player){
   Object.assign(s,{x:site.start.x,y:site.start.y,z:site.start.z,hidden:false,presence:1,focus:0,
-   walking:false,retreat:false,target:site.seen,nextMove:Infinity,
+   walking:false,retreat:false,target:site.seen,nextMove:Infinity,closeLook:null,wasClose:false,faceUntil:0,
    sighting:{start:site.start,seen:site.seen,entry:site.entry,phase:'approach',
     firstSeen:null,until:0,deadline:this.clock+14}});
   s.yaw=Math.atan2(player.x-s.x,player.z-s.z);
@@ -363,7 +365,7 @@ export class ObserverPack {
   const g=this.active;
   const track=g.stalkers?.get(index);
   const view=this.views.find(actor=>actor.id===index);
-  const motion=view&&observerMotion(view,this.clock,this.sampleTime);
+  const motion=view&&this.motion(view);
   const at=motion?.sample??track??this.layout(g.point,g.yaw,g.size)[index];
   member.hp=0;member.dead=true;member.hitAt=this.clock;
   member.yaw=motion?.sample.yaw??track?.yaw??g.yaw;
@@ -477,7 +479,7 @@ export class ObserverPack {
    if(this.canMove(p,p,yaw,g.yaw))g.yaw=yaw;
   }
  }
- updateGaze(s,player,visible,noticed,startled,dt){
+ updateGaze(s,player,visible,noticed,startled,dt,faceNearby=false){
   const eye={x:player.x,y:player.y+player.eye,z:player.z};
   if(visible){s.gazeTarget=eye;s.gazeUntil=this.clock+.65;}
   const threat=startled&&s.lastThreat;
@@ -487,8 +489,8 @@ export class ObserverPack {
   let yaw=0,pitch=0;
   if(target){
    const bearing=Math.atan2(target.x-s.x,target.z-s.z),turn=angleDelta(s.yaw,bearing);
-   if(startled||s.guarding||!s.walking&&visible&&!s.retreat&&Math.abs(turn)>.85){
-    const turnRate=startled?2.7:s.guarding?1.55:.95;
+   if(startled||faceNearby||s.guarding||!s.walking&&visible&&!s.retreat&&Math.abs(turn)>.85){
+    const turnRate=faceNearby?5.2:startled?2.7:s.guarding?1.55:.95;
     s.yaw+=clamp(turn,-dt*turnRate,dt*turnRate);
    }
    yaw=angleDelta(s.yaw,bearing);
@@ -500,6 +502,7 @@ export class ObserverPack {
     yaw*=recentHit ? .63 : .20;
     pitch*=.45;
    }
+   yaw=glanceYaw(yaw);
   }
   const scan=target?0:Math.sin(this.clock*.95+s.id*1.9)*.075;
   const nextHead=clamp(yaw+scan,-.74,.74);
@@ -511,6 +514,32 @@ export class ObserverPack {
   s.eyePitch=ease(s.eyePitch,clamp(pitch-mix(oldPitch,s.headPitch,.62),-.30,.30),13);
  }
 
+ updateCloseLook(player,dt){
+  const eye=shifted(player,0,0,player.eye+(player.visualStepOffset??0));
+  for(const view of this.views){
+   const s=view.track;
+   if(!s||view.member?.dead)continue;
+   let aim=s.closeLook;
+   const nearby=distance(view,player)<CLOSE_GAZE_RANGE&&Math.abs(view.y-player.y)<2.6;
+   if(nearby&&!aim)s.closeLook=aim={...eye,weight:0,nextCheck:0,visible:false};
+   if(!aim)continue;
+   if(nearby&&this.clock>=aim.nextCheck){
+    const [,[x,y,z]]=observerHitRegions(this.motion(view))[0];
+    aim.visible=this.clear(eye,{x,y,z});
+    aim.nextCheck=this.clock+.07;
+   }
+   const active=nearby&&aim.visible&&!(s.startleUntil>this.clock);
+   const follow=1-Math.exp(-dt*20);
+   aim.weight=mix(aim.weight,Number(active),follow);
+   if(active){aim.x=mix(aim.x,eye.x,follow);aim.y=mix(aim.y,eye.y,follow);aim.z=mix(aim.z,eye.z,follow);}
+   if(!nearby&&aim.weight<.005)s.closeLook=null;
+  }
+ }
+
+ motion(view,offset=0){
+  return observerMotion(view,this.clock+offset,this.sampleTime,this.sampleDuration);
+ }
+
  // Individual stalking replaces synchronized group translation in normal gameplay.
  stepStalkers(player,dt){
   const g=this.active,eye=shifted(player,0,0,player.eye),look=player.direction();
@@ -518,6 +547,7 @@ export class ObserverPack {
   g.age+=dt;
   for(const s of g.stalkers.values()){
    if(g.members.get(s.id)?.dead)continue;
+   const previousSpeed=s.speed??0;
    // Never retain a stale run pose across hidden/repositioned frames.
    s.walking=false;s.fleeing=false;s.guarding=false;s.speed=0;
    const d=distance(s,player);
@@ -593,7 +623,8 @@ export class ObserverPack {
      const p=this.spot(player,occupied,lights,Math.min(36,Math.max(16,d+5)));
      if(p){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,presence:1,
-       focus:0,target:null,retreat:false,nextMove:this.clock+1.6,appearance:(s.appearance??0)+1});
+       focus:0,target:null,retreat:false,nextMove:this.clock+1.6,appearance:(s.appearance??0)+1,
+       closeLook:null,wasClose:false,faceUntil:0});
       s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(s.id%2?-.58:.58);
      }else s.hideUntil=this.clock+3;
     }
@@ -601,6 +632,11 @@ export class ObserverPack {
    }
    // Retreat remains physical until the whole body is behind cover.
    const startled=(s.startleUntil??0)>this.clock,frightened=(s.fearUntil??0)>this.clock;
+   const close=visible&&d<CLOSE_GAZE_RANGE&&Math.abs(s.y-player.y)<2.6;
+   if(close&&!s.wasClose&&!frightened)s.faceUntil=this.clock+.32;
+   if(close)s.wasClose=true;
+   else if(d>CLOSE_GAZE_RANGE+1||Math.abs(s.y-player.y)>=2.6)s.wasClose=false;
+   const facePause=close&&!frightened&&this.clock<(s.faceUntil??0);
    s.retreat=d<9||s.focus>1.1||frightened||s.sighting?.phase==='withdraw';
    if(!s.sighting&&s.retreat&&s.focus>.5&&inCover()){
     s.hidden=true;s.hideUntil=this.clock+3.8;s.target=null;continue;
@@ -625,12 +661,13 @@ export class ObserverPack {
    }
    if(startled&&!s.sighting)s.target=null;
    const watchPause=!s.sighting&&onScreen&&s.focus>.16&&!s.retreat;
-   if(!startled&&!watchPause&&s.target&&(!centered||s.retreat||s.sighting)){
+   if(!startled&&!facePause&&!watchPause&&s.target&&(!centered||s.retreat||s.sighting)){
     const length=distance(s,s.target);
     if(length<.4){s.target=null;}else{
      const escaping=s.sighting?.phase==='withdraw'||frightened||s.retreat;
      const sprinting=escaping&&!s.target.slow;
-     const speed=sprinting?3.5:escaping?1.55:s.sighting?1.45:.78;
+     const pace=sprinting?3.5:escaping?1.55:s.sighting?1.45:.78;
+     const speed=Math.min(pace,previousSpeed+dt*10);
      const step=Math.min(length,dt*speed);
      const dx=(s.target.x-s.x)/length,dz=(s.target.z-s.z)/length;
      const desiredYaw=s.sighting?.phase==='approach'
@@ -665,7 +702,7 @@ export class ObserverPack {
    s.fleeing=Boolean(s.walking&&s.retreat);
    s.guarding=frightened&&!startled&&!s.walking&&!s.target&&visible&&d<6;
    s.guardWeight=mix(s.guardWeight??0,Number(s.guarding),1-Math.exp(-dt*7));
-   this.updateGaze(s,player,visible,noticed,startled,dt);
+   this.updateGaze(s,player,visible,noticed,startled,dt,close&&(facePause||!s.target)&&!s.walking);
   }
   const living=[...g.stalkers.values()].filter(s=>!g.members.get(s.id)?.dead);
   if(living.length){
@@ -678,8 +715,10 @@ export class ObserverPack {
   this.renderRange=range;
   this.viewport=viewport;
   this.clock+=dt;
-  if(this.clock<this.next)return;
-  this.next=this.clock+TICK;
+  if(this.clock+1e-8<this.next){this.updateCloseLook(player,dt);return;}
+  // Navigation fires on a physics tick. Interpolate to that exact next tick.
+  this.sampleDuration=dt>0&&dt<TICK?Math.ceil(TICK/dt)*dt:TICK;
+  this.next=this.clock+this.sampleDuration;
   const g=this.active;
   if(g&&this.count===0&&[...g.members.values()].every(m=>this.clock-m.hitAt>CORPSE_LIFETIME)){
    this.active=null;this.views=[];return;
@@ -709,7 +748,7 @@ export class ObserverPack {
     if(moves.length){
      for(const [s,p] of moves){
       Object.assign(s,{x:p.x,y:p.y,z:p.z,shade:p.shade,hidden:false,focus:0,
-       presence:1,retreat:false,target:null,sighting:null,nextMove:this.clock+1.5});
+       presence:1,retreat:false,target:null,sighting:null,nextMove:this.clock+1.5,closeLook:null,wasClose:false,faceUntil:0});
       s.yaw=Math.atan2(player.x-s.x,player.z-s.z)+(s.id%2?-.58:.58);
      }
      for(const s of g.stalkers.values())if(!moves.some(([o])=>o===s))s.hidden=true;
@@ -726,10 +765,11 @@ export class ObserverPack {
     if(!this.active)this.next=this.clock+2.5;
    }
   }else if(this.count>0){
-   this.previous=this.views;this.sampleTime=this.clock;this.stepStalkers(player,TICK);
+   this.previous=this.views;this.sampleTime=this.clock;this.stepStalkers(player,this.sampleDuration);
    this.scheduleGlimpse(player,range);
   }
   this.publish(player,range);
+  this.updateCloseLook(player,dt);
  }
  publish(player=null,range=this.renderRange){
   const g=this.active;
@@ -753,7 +793,7 @@ export class ObserverPack {
   let result=null;
   for(const view of this.views){
    if(view.member?.dead||view.track?.presence<.2||distance(view,origin)>limit+2)continue;
-   const motion=observerMotion(view,this.clock,this.sampleTime);
+   const motion=this.motion(view);
    for(const [region,center,width,height] of observerHitRegions(motion)){
     const w=width+padding*.45;
     const hit=intersectAabb(origin,ray,[center[0]-w,center[1]-height,center[2]-w],[center[0]+w,center[1]+height,center[2]+w]);

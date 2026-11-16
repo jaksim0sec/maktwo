@@ -578,7 +578,7 @@ export class Renderer{
   for(const p of effects.particles)cube(arr,p.x-.045,p.y-.045,p.z-.045,.09,.09,.09,rgb(p.color),1);
   return new Float32Array(arr)
  }
- frame(world,player,entities,effects,dt=1/60,combat=null,observers=null,heldLamp=null){
+ frame(world,player,entities,effects,dt=1/60,combat=null,observers=null,heldLamp=null,frameOffset=0){
   const gl=this.gl,canvas=this.canvas;
   const pixels=hologramFrameSize(canvas.clientWidth,canvas.clientHeight,this.maxPixelRatio*this.renderScale,
    typeof devicePixelRatio==='number'?devicePixelRatio:1,Boolean(this.hologram?.opened));
@@ -778,7 +778,7 @@ export class Renderer{
    if(lamp)data.set(lamp,scene.length+(weapons?.length??0));
   }
   this.updateDynamic(data);gl.disable(gl.CULL_FACE);this.drawMesh(this.dynamic);gl.enable(gl.CULL_FACE);
-  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62],this.lightOrigin,[LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH],this.heldLight,frameTime);
+  this.lastDrawCalls+=this.observerRenderer.draw(observers,vp,[camX,camY,camZ],fog,[24,62],this.lightOrigin,[LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH],this.heldLight,frameTime,frameOffset);
   gl.useProgram(this.program);
   gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);gl.uniform1f(this.u.alpha,.57);
