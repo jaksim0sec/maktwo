@@ -2,6 +2,7 @@ import {observerEyeWarp} from '../entities/observer-motion.js';
 import {observerRig} from '../entities/observer-poses.js';
 import {BLOCK_SIZE} from '../core/scale.js';
 import {HELD_LIGHT_SHADER,heldLightUniforms} from './held-light.js';
+import {ObserverHeadDetail} from './observer-head-detail.js';
 
 const VERT=`#version 300 es
 precision highp float;
@@ -18,9 +19,11 @@ uniform vec4 uPlace;
 uniform vec3 uClipBlend,uClipWeight,uNeckPivot,uEyePivot,uHeadOffset;
 uniform mat3 uEyeWarp;
 uniform float uCloud,uBreath,uCollapse,uGuard;
+uniform float uDetailedHead;
 uniform vec2 uNeck,uEyeAim;
 uniform int uEyeFrom;
 out vec3 vColor,vPos,vEyeNormal,vEyeLocal;
+out float vHeadSourceY;
 vec3 rotateJoint(vec3 point,vec3 center,vec2 angles){
  vec3 local=point-center;
  float cy=cos(angles.x),sy=sin(angles.x),cp=cos(angles.y),sp=sin(angles.y);
@@ -28,6 +31,7 @@ vec3 rotateJoint(vec3 point,vec3 center,vec2 angles){
  return center+vec3(local.x*cy+z*sy,local.y*cp+local.z*sp,-local.x*sy+z*cy);
 }
 void main(){
+ vHeadSourceY=aIdle.y;
  float upper=smoothstep(.68,1.57,aIdle.y)*.76;
  vec3 walk=mix(mix(aWalkFrom,aWalkTo,uClipBlend.x),aIdle,upper);
  vec3 run=mix(aRunFrom,aRunTo,uClipBlend.y);
@@ -55,13 +59,19 @@ void main(){
 const FRAG=`#version 300 es
 precision highp float;
 in vec3 vColor,vPos,vEyeNormal,vEyeLocal;
+in float vHeadSourceY;
 uniform vec3 uEye,uFog;
 uniform vec2 uFogRange;
 uniform float uPresence,uCloud;
+uniform float uDetailedHead;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin,uLightSize;
 out vec4 frag;
 ${HELD_LIGHT_SHADER}
 void main(){
+ if(uDetailedHead>0.&&(vHeadSourceY>1.94||dot(vEyeNormal,vEyeNormal)>.25)){
+  float grain=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453);
+  if(grain<uDetailedHead)discard;
+ }
  vec3 face=cross(dFdx(vPos),dFdy(vPos));
  vec3 n=normalize(dot(vEyeNormal,vEyeNormal)>.25?vEyeNormal:face);
  if(uPresence<=0.)discard;
@@ -100,6 +110,7 @@ export class ObserverRenderer {
  constructor(gl){
   this.gl=gl;
   this.ready=false;
+  this.detail=new ObserverHeadDetail(gl);
  }
  async load(){
   const response=await fetch(new URL('../../assets/observer.mesh',import.meta.url));
@@ -125,7 +136,7 @@ export class ObserverRenderer {
   };
   this.program=p;
   this.u=Object.fromEntries(['VP','Place','ClipBlend','ClipWeight','Cloud','EyeFrom','Eye','Fog','FogRange',
-   'Neck','EyeAim','NeckPivot','EyePivot','EyeWarp','HeadOffset','Breath','Presence','Collapse','Guard','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
+   'Neck','EyeAim','NeckPivot','EyePivot','EyeWarp','HeadOffset','Breath','Presence','Collapse','Guard','DetailedHead','LightVolume','LightOrigin','LightSize'].map(n=>[n,gl.getUniformLocation(p,'u'+n)]));
   this.heldLightUniforms=heldLightUniforms(gl,p);
   this.lightSampler=gl.createSampler();
   gl.samplerParameteri(this.lightSampler,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
@@ -162,6 +173,8 @@ export class ObserverRenderer {
   else gl.uniform4f(this.heldLightUniforms.Current,0,0,0,-1);
   gl.disable(gl.CULL_FACE);
   let calls=0;
+  const detailed=[];
+  if(!this.detail.ready)this.detail.ensureLoaded();
   for(const e of pack.views){
    const motion=pack.motion(e,frameOffset);
    const {sample,base,overlay,overlayWeight}=motion;
@@ -190,8 +203,17 @@ export class ObserverRenderer {
    gl.uniform1f(u.Collapse,motion.ground);
    gl.uniform1f(u.Guard,motion.guard);
    gl.uniform1f(u.Presence,e.member?.dead?1:e.track?.presence??1);
+   const distance=Math.hypot((sample.x-eye[0]/BLOCK_SIZE)*BLOCK_SIZE,
+    (sample.y+motion.eye[1]-eye[1]/BLOCK_SIZE)*BLOCK_SIZE,
+    (sample.z-eye[2]/BLOCK_SIZE)*BLOCK_SIZE);
+   const blend=this.detail.ready?Math.max(0,Math.min(1,(5.5-distance)/1.0)):0;
+   gl.uniform1f(u.DetailedHead,blend);
    gl.drawElements(gl.TRIANGLES,this.indexCount,gl.UNSIGNED_SHORT,0);calls++;
+   if(blend)detailed.push({motion,blend,cloud:e.member?.dead?Math.min(1,(pack.clock+frameOffset-e.member.hitAt)/1.3):0,
+    presence:e.member?.dead?1:e.track?.presence??1});
   }
+  for(const {motion,blend,cloud,presence} of detailed)
+   this.detail.draw(motion,vp,eye,fog,fogRange,lightOrigin,lightSize,cloud,presence,blend,heldLight,now);
   gl.enable(gl.CULL_FACE);gl.bindSampler(0,null);gl.bindVertexArray(null);
   return calls;
  }
