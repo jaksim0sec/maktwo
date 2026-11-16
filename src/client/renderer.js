@@ -31,7 +31,7 @@ in vec3 vColor;in float vFog;in vec3 vPos;in vec3 vMaterialPos;in float vEmissio
 uniform vec3 uFog;uniform vec3 uLowerFog;uniform float uBrightness;uniform float uAlpha;uniform bool uCityDaylight;
 uniform highp sampler3D uLightVolume;uniform vec3 uLightOrigin;uniform vec3 uLightSize;
 uniform float uTime;uniform highp sampler2DArray uMaterials;uniform bool uDistant;uniform vec2 uCenterChunk;
-uniform vec3 uCamera;
+uniform vec3 uCamera;uniform vec2 uFogRange;
 uniform float uLodNear;uniform float uNearRing;
 uniform bool uCanyonCoverage;uniform int uCoveredChunks[9];uniform bool uFarPass;uniform vec2 uNearY;
 out vec4 frag;
@@ -56,8 +56,12 @@ void main(){
  }
  // The lighting volume contains ONLY reachable open-air cells. A wall cannot
  // illuminate its far side. Sample the air just outside the fragment's face.
+ bool canyonFar=uDistant&&uCanyonCoverage;
+ // Long silhouette walls span many floors. Vertex fog makes their interiors
+ // inherit the distance of the corners even when the surface is much nearer.
+ float surfaceFog=canyonFar?clamp((length(vPos*${BLOCK_SIZE.toFixed(2)}-uCamera)-uFogRange.x)/uFogRange.y,0.,1.):vFog;
  vec3 normal=vec3(0.,1.,0.);
- if(!uDistant)normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
+ if(!uDistant||canyonFar)normal=normalize(cross(dFdx(vPos),dFdy(vPos)));
  vec3 emission=vec3(0.);
  float daylight=.025;
  if(!uDistant&&vEmission<.5&&vFog<.99){
@@ -99,11 +103,18 @@ void main(){
   // Broad fluorescent spill stays visible without washing out concrete.
   emission*=mix(.68,.88,outdoorHeight);
   ambient+=vec3(.14,.15,.14)*max(0.,uBrightness-.35);
-  if(uDistant)ambient=vec3(.312,.365,.414);
+  if(uDistant){
+   ambient=vec3(.312,.365,.414);
+   if(canyonFar){
+    vec3 coolShade=vec3(.28,.32,.39);
+    vec3 lit=vec3(.42,.43,.44);
+    ambient=mix(coolShade,lit,.24+.52*facing+.24*hemisphere);
+   }
+  }
  }
  // Keep authored block colors unchanged; light range is controlled by each source.
  vec3 tinted=vColor;
- if(vMaterial>0){
+ if(vMaterial>0&&(!canyonFar||surfaceFog<.82)){
   vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vMaterialPos.xz:(axis.x>axis.z?vMaterialPos.zy:vMaterialPos.xy);
   // D4 symmetry with turn/reflection bits already packed in aShade.
   int quarter=vTurns&3;
@@ -111,7 +122,9 @@ void main(){
   uv*=vec2(1.-2.*float(quarter==1||quarter==2),1.-2.*float(quarter>=2));
   uv.x*=1.-2.*float((vTurns>>2)&1);
   if(vMaterial>=95&&vMaterial<=98)uv*=vMaterial==95?1.45:(vMaterial==98?2.75:1.05); // wider fabric weave, fine iron marks
-  tinted*=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
+  vec3 materialColor=texture(uMaterials,vec3(uv,float(vMaterial-1))).rgb;
+  float detail=canyonFar?1.-smoothstep(.34,.82,surfaceFog):1.;
+  tinted*=mix(vec3(1.),materialColor,detail);
  }
  // Use the source spectrum: fluorescent tubes stay cool and torches stay warm.
  vec3 c=vEmission>.5?min(tinted,vec3(1.)):tinted*(ambient+emission*.88)+emission*.13;
@@ -126,9 +139,19 @@ void main(){
   float knee=vEmission>.5?.60:.39;
   c/=1.+max(0.,peak-knee)*.78;
   // Lift the deepest non-emissive tones without flattening lit surfaces.
-  if(vEmission<.5)c+=.014*(1.-smoothstep(.025,.16,peak));
+  if(vEmission<.5){
+   float lift=uDistant?.014:.031;
+   c+=vec3(.80,.89,1.)*lift*(1.-smoothstep(.025,.19,peak));
+  }
   float lowAir=1.-smoothstep(${(CITY_BASE_Y+4).toFixed(1)},${(CITY_BASE_Y+42).toFixed(1)},vPos.y);
-  c=mix(c,mix(uFog,uLowerFog,lowAir),smoothstep(.13,1.,vFog));
+  if(canyonFar){
+   // Use depth beneath the camera so fog stays continuous across a world rebase.
+   float below=uCamera.y-vPos.y*${BLOCK_SIZE.toFixed(2)};
+   lowAir=smoothstep(12.,152.,below);
+  }
+  vec3 fogColor=mix(uFog,canyonFar?vec3(.086,.171,.177):uLowerFog,lowAir);
+  float fogAmount=smoothstep(.13,1.,surfaceFog);
+  c=mix(c,fogColor,canyonFar?fogAmount*.88:fogAmount);
  }else{
   c/=1.+max(0.,peak-1.)*.6;
   c=mix(c,uFog,vFog);
