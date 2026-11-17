@@ -31,8 +31,20 @@ const entryFootprint=(x,z)=>rect(x,z,-8,8,-49,-43);
 const outsideBrick=style=>(style&1)?B.ARCH_BRICK_RENDERED:B.ARCH_BRICK_RED;
 const facade=(dy,style)=>dy===1||dy===4?B.ARCH_TILE_LARGE_PORCELAIN:outsideBrick(style);
 const plaster=B.ARCH_CONCRETE_SMOOTH_PLASTER;
-const corridorFloor=(x,z)=>z===-54||z===-51?B.TERRACOTTA:mod(x,14)===0&&z===-52?B.ARCH_STONE_PINK_GRANITE:B.ARCH_TILE_LARGE_PORCELAIN;
-const schoolWall=dy=>dy===1?B.ARCH_TILE_MOSAIC:dy===2?B.ARCH_CONCRETE_PEBBLE_PAINT:plaster;
+// School interior: matte paint, light wainscoting and terrazzo.
+// Exterior red masonry is deliberately a separate surface decision.
+const schoolWall=(dy,style=0)=>dy===1?(style&1?B.STATION_TRAIN_ENAMEL:B.ARCH_CONCRETE_PEBBLE_PAINT):B.CITY_PAINT_WHITE;
+const schoolCeiling=B.CITY_PAINT_WHITE;
+const corridorFloor=(x,z)=>z===-54&&mod(x+60,12)===2?B.ARCH_STONE_PINK_GRANITE:B.ARCH_STONE_TERRAZZO;
+const classroomFloor=B.ARCH_STONE_TERRAZZO;
+const hallwayWindow=B.PART_WINDOW_4; // slim silver aluminum glazing
+function corridorDetails(x,y,z,base){
+ const bay=mod(x+60,12);
+ if(z===-54&&y===base+3&&bay===4)return B.PART_SIGN_2;
+ if(z===-51&&y===base+1&&mod(x+60,24)===11)return B.PART_INTERIOR_1;
+ if(z===-51&&y===base+1&&mod(x+60,48)===35)return B.PART_INTERIOR_4;
+ return null;
+}
 
 // Two U-shaped stair flights, 0.5-voxel risers, a real middle landing.
 // First lane climbs north, second returns south to the next-floor hallway.
@@ -88,10 +100,9 @@ function classFurniture(x,y,z,level,base){
   if([3,8].includes(bay)&&[-62,-58].includes(z))return B.PART_INTERIOR_2;
   return B.AIR;
  }
- if(bay===11&&z===-64)return B.PART_INTERIOR_1; // locker/storage
- if(bay===10&&z===-64)return B.PART_INTERIOR_2; // teacher's desk
- if([2,4,6,8,10].includes(bay)&&[-63,-61,-59,-57].includes(z))
-  return B.PART_INTERIOR_2;
+ if(bay===11&&z===-64)return B.PART_INTERIOR_1;
+ if(bay===6&&z===-57)return B.PART_INTERIOR_2;
+ if([2,4,6,8,10].includes(bay)&&[-63,-62,-61,-60,-59,-58].includes(z))return B.PART_INTERIOR_2;
  return B.AIR;
 }
 function mainFacade(x,z,dy,level,style){
@@ -99,10 +110,12 @@ function mainFacade(x,z,dy,level,style){
  if(a===75&&z===-54&&dy===2)return B.CITY_STAIR_MARKER;
  if(z===-50&&level===0&&a<=3&&dy<=3)return B.AIR;
  if(z===-50&&a>=62&&a<=65&&dy<=3)return B.AIR; // joins side wing corridors
- if(a===75&&within(z,-62,-53)&&dy>=1&&dy<=3&&mod(z+65,5)<3)return B.PART_WINDOW_3;
- if(z===-65&&a<=60&&within(bay,3,9)&&(dy===2||dy===3))return B.PART_WINDOW_1;
- if(z===-50&&a<=60&&within(bay,4,8)&&(dy===2||dy===3))return B.PART_WINDOW_2;
- if(z===-65&&a>60&&within(a,66,71)&&dy>=2&&dy<=3)return B.PART_WINDOW_3;
+ if(a===75&&within(z,-62,-53)&&dy>=2&&dy<=3&&mod(z+65,5)<3)return hallwayWindow;
+ if(z===-65&&a<=60&&within(bay,3,9)&&(dy===2||dy===3))return hallwayWindow;
+ if(z===-50&&a<=60&&within(bay,4,8)&&(dy===2||dy===3))return hallwayWindow;
+ if(z===-65&&a>60&&within(a,66,71)&&dy>=2&&dy<=3)return hallwayWindow;
+ // The corridor-facing facade and stairwells must not display outdoor brick.
+ if(z===-50||a===75)return schoolWall(dy,style);
  return facade(dy,style);
 }
 function schoolMain(x,y,z,style){
@@ -115,42 +128,48 @@ function schoolMain(x,y,z,style){
  if(core){const tread=stairCell(x,y,z);if(tread!==null)return tread;}
  if(dy===0){
   if(core&&level>0&&stairVoid(x,z))return B.AIR;
-  return within(z,-54,-51)?corridorFloor(x,z):B.ARCH_FLOOR_LINOLEUM;
+  // Photo-referenced yellow tactile warning at each landing entrance.
+  if(core&&z===-54&&(within(a,64,66)||within(a,70,72)))return B.STATION_PLATFORM_TACTILE;
+  return within(z,-54,-51)?corridorFloor(x,z):classroomFloor;
  }
  if(dy===4){
   if(a===75||z===-65||z===-50)return facade(dy,style);
-  return core&&stairVoid(x,z)?B.AIR:B.CEILING_FINISH;
+  return core&&stairVoid(x,z)?B.AIR:schoolCeiling;
  }
  if(a===75||z===-65||z===-50)return mainFacade(x,z,dy,level,style);
  if(dy===3&&((within(z,-54,-51)&&z===-53&&mod(x+3,8)===3)||(a<=60&&z===-60&&mod(x+60,12)===6)))return B.FLUORESCENT;
  if(core){
-  if(a===61&&z<=-55)return plaster;
+  if(a===61&&z<=-55)return schoolWall(dy,style);
   if(level>0&&dy===1&&within(z,-61,-55)&&(a===63||a===73))return B.PART_BALCONY_3;
   return B.AIR;
+ }
+ if(!core){
+  const detail=corridorDetails(x,y,z,base);
+  if(detail!==null)return detail;
  }
  if(z===-55){
   const bay=mod(x+60,12);
   if(bay===2){
    if(dy===1)return B.DOOR;
    if(dy===2)return B.DOOR_TOP;
-   return B.PART_WINDOW_4;
+   return hallwayWindow;
   }
-  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:B.PART_WINDOW_2;
-  if(within(bay,5,8)&&dy>=2)return B.PART_WINDOW_1;
-  return schoolWall(dy);
+  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:hallwayWindow;
+  if(within(bay,5,8)&&dy>=2)return hallwayWindow;
+  return schoolWall(dy,style);
  }
  if(z<=-56){
   const bay=mod(x+60,12);
-  if(bay===0)return dy===2&&within(z,-62,-59)?B.ARCH_METAL_BLACK_PAINT:plaster;
+  if(bay===0)return dy===2&&within(z,-62,-59)?B.STATION_ALGAE:schoolWall(dy,style);
   return classFurniture(x,y,z,level,base);
  }
  return B.AIR;
 }
 function wingFacade(a,z,dy,style){
  const bay=mod(z+49,12);
- if(a===78&&within(bay,3,9)&&(dy===2||dy===3))return B.PART_WINDOW_1;
- if(a===61&&within(bay,4,6)&&(dy===2||dy===3))return B.PART_WINDOW_2;
- return facade(dy,style);
+ if(a===78&&within(bay,3,9)&&(dy===2||dy===3))return hallwayWindow;
+ if(a===61&&within(bay,4,6)&&(dy===2||dy===3))return hallwayWindow;
+ return a===61?schoolWall(dy,style):facade(dy,style);
 }
 function schoolWing(x,y,z,style){
  const west=westWing(x,z),east=eastWing(x,z);
@@ -165,35 +184,37 @@ function schoolWing(x,y,z,style){
  const library=west&&level===2&&within(z,-14,-3);
  const office=east&&level===0&&within(z,-25,-14);
  if(dy===0&&restroom&&!corridor)return B.ARCH_TILE_VERTICAL_WHITE;
- if(dy===0)return corridor&&(a===62||a===65)?B.TERRACOTTA:corridor?B.ARCH_TILE_LARGE_PORCELAIN:B.ARCH_FLOOR_LINOLEUM;
+ if(dy===0)return corridor?B.ARCH_STONE_TERRAZZO:classroomFloor;
  if(dy===4){
   if(a===61||a===78||z===-49||z===end)return facade(dy,style);
-  return B.CEILING_FINISH;
+  return schoolCeiling;
  }
  if(dy===3&&corridor&&a===63&&mod(z+49,8)===4)return B.FLUORESCENT;
  if(dy===3&&!corridor&&a===72&&bay===6)return B.FLUORESCENT;
  if(z===-49){
   if(corridor&&dy<=3)return B.AIR;
-  return facade(dy,style);
+  return schoolWall(dy,style);
  }
- if(z===end)return dy===2&&within(a,68,73)?B.PART_WINDOW_1:facade(dy,style);
+ if(z===end)return dy===2&&within(a,68,73)?hallwayWindow:facade(dy,style);
  if(a===61){
   if(level===0&&west&&within(z,6,8)&&dy<=2)return B.AIR;
   return wingFacade(a,z,dy,style);
  }
  if(a===78)return wingFacade(a,z,dy,style);
+ if(dy===3&&corridor&&a===65&&bay===3)return B.PART_SIGN_2; // mounted beside classroom wall
+ if(dy===1&&corridor&&a===63&&mod(z+49,24)===11)return B.PART_INTERIOR_1;
  if(a===66){
   if(bay===2){
    if(dy===1)return B.DOOR;
    if(dy===2)return B.DOOR_TOP;
-   return B.PART_WINDOW_4;
+   return hallwayWindow;
   }
-  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:B.PART_WINDOW_2;
-  if(within(bay,5,8)&&dy>=2)return B.PART_WINDOW_1;
-  return schoolWall(dy);
+  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:hallwayWindow;
+  if(within(bay,5,8)&&dy>=2)return hallwayWindow;
+  return schoolWall(dy,style);
  }
  if(corridor)return B.AIR;
- if(bay===0)return plaster;
+ if(bay===0)return schoolWall(dy,style);
  if(restroom){
   if(dy<=2&&(bay===8||bay===10)&&within(a,69,74))return B.PART_PARTITION_2;
   if(dy===1&&a===76&&(bay===7||bay===9))return B.PART_INTERIOR_5;
@@ -308,6 +329,7 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
  return B.AIR;
 }
 function schoolPartFacing(x,z,id){
+ if(id===B.PART_SIGN_2)return Math.abs(x)===65?2:0;
  if(id===B.DOOR)return Math.abs(x)===66?(x<0?1:3):2;
  if(id===B.PART_BALCONY_3)return 2;
  if(id!==B.PART_WINDOW_1&&id!==B.PART_WINDOW_2&&id!==B.PART_WINDOW_3&&id!==B.PART_WINDOW_4)return null;
