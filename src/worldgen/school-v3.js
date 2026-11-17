@@ -3,10 +3,11 @@
 import {SIZE,TURN_STYLE} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
 import {encodeSplitTread} from './eternal-night-stairs.js';
+import {APARTMENT_MAX_Y,apartmentVoxel,apartmentPartStyle,neighborhoodVoxel} from './school-apartments.js';
 export const SCHOOL_MODE='school-v3';
-export const SCHOOL_HEIGHT=64;
+export const SCHOOL_HEIGHT=96;
 export const SCHOOL_GROUND=12;
-export const SCHOOL_PERIOD=224;
+export const SCHOOL_PERIOD=448;
 export const SCHOOL_SEED=9999;
 export const SCHOOL_STOREY=5; // 4.0m, four above-ground floors
 const STORIES=4,HALF=SCHOOL_PERIOD/2;
@@ -318,6 +319,8 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
  const entry=schoolEntrance(x,y,z);if(entry!==null)return entry;
  const canopy=schoolFrontCanopy(x,y,z);if(canopy!==null)return canopy;
  const gym=schoolGym(x,y,z,style);if(gym!==null)return gym;
+ const home=apartmentVoxel(x,y,z,seed,cx,cz);if(home!==null)return home;
+ const neighborhood=neighborhoodVoxel(x,y,z,seed,cx,cz);if(neighborhood!==null)return neighborhood;
  if(y===SCHOOL_GROUND)return surface(x,z);
  if(y===13&&(Math.abs(x)===103||Math.abs(z)===103)){
   if(z===103&&within(x,43,55))return B.AIR;
@@ -341,14 +344,15 @@ function schoolPartFacing(x,z,id){
  return null; // windows mounted on the north/south facades face z
 }
 export function stampSchoolChunk(chunk,seed=SCHOOL_SEED){
- const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,SCHOOL_GROUND+STORIES*SCHOOL_STOREY+2);
+ const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,APARTMENT_MAX_Y+1);
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const wx=ox+x,wz=oz+z,local=schoolDistrict(wx,wz);
   for(let y=0;y<height;y++){
    const id=schoolVoxel(wx,y,wz,seed);
    if(id===B.AIR)continue;
    chunk.set(x,y,z,id);
-   const style=id===B.PART_STAIRCASE_2?splitStairStyle(local.x,y,local.z):schoolPartFacing(local.x,local.z,id);
+   let style=id===B.PART_STAIRCASE_2?splitStairStyle(local.x,y,local.z):schoolPartFacing(local.x,local.z,id);
+   if(style===null)style=apartmentPartStyle(local.x,y,local.z,id);
    if(style!==null){
     chunk.styles??=new Uint8Array(chunk.data.length);
     chunk.styles[(y*SIZE+z)*SIZE+x]=id===B.PART_STAIRCASE_2?style:TURN_STYLE|style;
