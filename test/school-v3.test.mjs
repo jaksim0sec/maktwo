@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Chunk,TURN_STYLE} from '../src/core/chunk.js';
+import {decodeSplitTread} from '../src/worldgen/eternal-night-stairs.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {World} from '../src/core/world.js';
 import {generateChunk} from '../src/worldgen/generators.js';
@@ -34,9 +35,10 @@ test('four floors contain clear corridors, classroom doors and partitions',()=>{
 test('half treads connect school levels instead of ladders or teleporting',()=>{
  for(const heightOffset of [0,5,10]){
   const base=12+heightOffset;
-  assert.equal(at(-70,base+1,-55),B.CONCRETE_SLAB);
-  assert.equal(at(-70,base+3,-59),B.CONCRETE_SLAB);
-  assert.equal(at(-65,base+5,-55),B.UPPER_STAIR_TREAD);
+  assert.equal(at(-70,base+1,-55),B.PART_STAIRCASE_2);
+  assert.equal(at(-70,base+3,-59),B.PART_STAIRCASE_2);
+  assert.equal(at(-65,base+5,-55),B.PART_STAIRCASE_2);
+  assert.equal(at(-68,base+3,-60),B.CONCRETE_SLAB);
   assert.equal(at(-71,base+5,-55),B.ARCH_FLOOR_LINOLEUM);
   assert.equal(at(-68,base+5,-60),B.AIR); // landing headroom
  }
@@ -123,4 +125,14 @@ test('stair landings get metallic rail parts, not a wooden fence',()=>{
  // Left hand rail at world x=-63, z=-60, y=18.
  assert.equal(c.get(1,18,4),B.PART_BALCONY_3);
  assert.equal(c.styles[Chunk.index(1,18,4)],TURN_STYLE|2);
+});
+
+test('split-tread stair geometry uses 0.2m risers and oriented outside rails',()=>{
+ const chunk=stampSchoolChunk(new Chunk(-5,-4),seed);
+ const tread=decodeSplitTread(chunk.styles[Chunk.index(10,13,9)]); // (-70,13,-55)
+ assert.deepEqual([tread.low,tread.high,tread.facing,tread.rail],[.25,.5,4,false]);
+ const outer=decodeSplitTread(chunk.styles[Chunk.index(8,13,9)]); // (-72,13,-55)
+ assert.equal(outer.rail,true);
+ const second=decodeSplitTread(chunk.styles[Chunk.index(10,13,8)]);
+ assert.deepEqual([second.low,second.high],[.75,1]);
 });
