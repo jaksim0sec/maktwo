@@ -3,7 +3,7 @@
 import {SIZE,TURN_STYLE} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
 import {encodeSplitTread} from './eternal-night-stairs.js';
-import {APARTMENT_MAX_Y,apartmentAt,apartmentVoxel,apartmentPartStyle,neighborhoodVoxel} from './school-apartments.js';
+import {APARTMENT_STOREY,apartmentAt,apartmentVoxel,apartmentPartStyle,neighborhoodVoxel} from './school-apartments.js';
 export const SCHOOL_MODE='school-v3';
 export const SCHOOL_HEIGHT=96;
 export const SCHOOL_GROUND=12;
@@ -345,9 +345,12 @@ function schoolPartFacing(x,z,id){
  return null; // windows mounted on the north/south facades face z
 }
 export function stampSchoolChunk(chunk,seed=SCHOOL_SEED){
- const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,APARTMENT_MAX_Y+1);
+ const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE;
+ const campusHeight=Math.min(chunk.height,SCHOOL_GROUND+STORIES*SCHOOL_STOREY+2);
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const wx=ox+x,wz=oz+z,local=schoolDistrict(wx,wz);
+  const home=apartmentAt(local.x,local.z);
+  const height=home?Math.min(chunk.height,SCHOOL_GROUND+home.floors*APARTMENT_STOREY+3):campusHeight;
   for(let y=0;y<height;y++){
    const id=schoolVoxel(wx,y,wz,seed);
    if(id===B.AIR)continue;
