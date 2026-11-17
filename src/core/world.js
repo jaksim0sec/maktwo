@@ -4,6 +4,7 @@ import {STATION_PREVIEW_MODE,STATION_PREVIEW_SPAWN} from '../worldgen/station-pr
 import {ARBORETUM_MODE,ARBORETUM_SPAWN} from '../worldgen/trees.js';
 import {CITY_MODE,CITY_HEIGHT,CITY_BLUEPRINT_VERSION,CITY_STATION_VERSION,CITY_STATION_REDESIGN_VERSION,CITY_BOTANICAL_VERSION,citySpawnCandidates,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {CANYON_MODE,CANYON_HEIGHT,CANYON_SHIFT,canyonShelter} from '../worldgen/canyon-v2-plan.js';
+import {SCHOOL_MODE,SCHOOL_HEIGHT,schoolSpawn} from '../worldgen/school-v3.js';
 import {partById} from './part-library.js';
 import {decodeSplitTread} from '../worldgen/eternal-night-stairs.js';
 import {stairConnections,stairRailRise,signConnections,bridgeGuardProfile} from './part-prisms.js';import {LightIndex} from './lighting.js';
@@ -14,7 +15,7 @@ import {FORMED,supportsForms} from './construction.js';
 import {isWallItem,mountCell} from './mounts.js';
 
 export class World{
- constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CANYON_MODE?CANYON_HEIGHT:mode===CITY_MODE?CITY_HEIGHT:HEIGHT;this.yOrigin=0;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.droppedItems=new Set();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
+ constructor({seed=12345,mode='normal',name='Overworld',storage=null}={}){this.seed=seed|0;this.mode=mode;this.height=mode===CANYON_MODE?CANYON_HEIGHT:mode===CITY_MODE?CITY_HEIGHT:mode===SCHOOL_MODE?SCHOOL_HEIGHT:HEIGHT;this.yOrigin=0;this.saveKey=mode===CITY_MODE?name+':precincts':name;this.version=mode===CITY_MODE?(name==='EternalNightCityV8'?CITY_STATION_REDESIGN_VERSION:CITY_BOTANICAL_VERSION):GENERATION_VERSION;this.name=name;this.storage=storage;this.chunks=new Map();this.droppedItems=new Set();this.edits=new Map();this.blockStates=new Map();this.forms=new Map();this.mounts=new Map();this.queue=[];this.queued=new Set();this.events=new EventBus();this.time=18000;this.lights=new LightIndex();this.lightRevision=0;this.lightChunkRevision=0;this.maxChunks=56;this.tickCount=0;this.loadEdits()}
  getChunk(cx,cz,create=true){
   const chunk=this.chunks.get(key(cx,cz));
   if(chunk||!create)return chunk;
@@ -361,6 +362,7 @@ export class World{
    this.recenterCanyon(p.y-this.yOrigin);
    return {...p,y:p.y-this.yOrigin};
   }
+  if(this.mode===SCHOOL_MODE)return schoolSpawn();
   if(this.mode===CITY_MODE){
    let fallback;
    for(const pos of citySpawnCandidates(this.seed,this.version>=CITY_BLUEPRINT_VERSION?this.version:false)){
