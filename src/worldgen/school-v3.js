@@ -128,6 +128,8 @@ function schoolMain(x,y,z,style){
  if(core){const tread=stairCell(x,y,z);if(tread!==null)return tread;}
  if(dy===0){
   if(core&&level>0&&stairVoid(x,z))return B.AIR;
+  // Photo-referenced yellow tactile warning at each landing entrance.
+  if(core&&z===-54&&(within(a,64,66)||within(a,70,72)))return B.STATION_PLATFORM_TACTILE;
   return within(z,-54,-51)?corridorFloor(x,z):classroomFloor;
  }
  if(dy===4){
