@@ -38,6 +38,13 @@ const schoolCeiling=B.CITY_PAINT_WHITE;
 const corridorFloor=(x,z)=>z===-54&&mod(x+60,12)===2?B.ARCH_STONE_PINK_GRANITE:B.ARCH_STONE_TERRAZZO;
 const classroomFloor=B.ARCH_STONE_TERRAZZO;
 const hallwayWindow=B.PART_WINDOW_4; // slim silver aluminum glazing
+function corridorDetails(x,y,z,base){
+ const bay=mod(x+60,12);
+ if(z===-54&&y===base+3&&bay===4)return B.PART_SIGN_2;
+ if(z===-51&&y===base+1&&mod(x+60,24)===11)return B.PART_INTERIOR_1;
+ if(z===-51&&y===base+1&&mod(x+60,48)===35)return B.PART_INTERIOR_4;
+ return null;
+}
 
 // Two U-shaped stair flights, 0.5-voxel risers, a real middle landing.
 // First lane climbs north, second returns south to the next-floor hallway.
@@ -93,10 +100,9 @@ function classFurniture(x,y,z,level,base){
   if([3,8].includes(bay)&&[-62,-58].includes(z))return B.PART_INTERIOR_2;
   return B.AIR;
  }
- if(bay===11&&z===-64)return B.PART_INTERIOR_1; // locker/storage
- if(bay===10&&z===-64)return B.PART_INTERIOR_2; // teacher's desk
- if([2,4,6,8,10].includes(bay)&&[-63,-61,-59,-57].includes(z))
-  return B.PART_INTERIOR_2;
+ if(bay===11&&z===-64)return B.PART_INTERIOR_1;
+ if(bay===6&&z===-57)return B.PART_INTERIOR_2;
+ if([2,4,6,8,10].includes(bay)&&[-63,-62,-61,-60,-59,-58].includes(z))return B.PART_INTERIOR_2;
  return B.AIR;
 }
 function mainFacade(x,z,dy,level,style){
@@ -135,16 +141,20 @@ function schoolMain(x,y,z,style){
   if(level>0&&dy===1&&within(z,-61,-55)&&(a===63||a===73))return B.PART_BALCONY_3;
   return B.AIR;
  }
+ if(!core){
+  const detail=corridorDetails(x,y,z,base);
+  if(detail!==null)return detail;
+ }
  if(z===-55){
   const bay=mod(x+60,12);
   if(bay===2){
    if(dy===1)return B.DOOR;
    if(dy===2)return B.DOOR_TOP;
-   return B.PART_WINDOW_4;
+   return hallwayWindow;
   }
-  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:B.PART_WINDOW_2;
-  if(within(bay,5,8)&&dy>=2)return B.PART_WINDOW_1;
-  return schoolWall(dy);
+  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:hallwayWindow;
+  if(within(bay,5,8)&&dy>=2)return hallwayWindow;
+  return schoolWall(dy,style);
  }
  if(z<=-56){
   const bay=mod(x+60,12);
@@ -189,15 +199,17 @@ function schoolWing(x,y,z,style){
   return wingFacade(a,z,dy,style);
  }
  if(a===78)return wingFacade(a,z,dy,style);
+ if(dy===3&&corridor&&a===63&&bay===3)return B.PART_SIGN_2;
+ if(dy===1&&corridor&&a===63&&mod(z+49,24)===11)return B.PART_INTERIOR_1;
  if(a===66){
   if(bay===2){
    if(dy===1)return B.DOOR;
    if(dy===2)return B.DOOR_TOP;
-   return B.PART_WINDOW_4;
+   return hallwayWindow;
   }
-  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:B.PART_WINDOW_2;
-  if(within(bay,5,8)&&dy>=2)return B.PART_WINDOW_1;
-  return schoolWall(dy);
+  if(bay===1||bay===3)return dy<=2?B.ARCH_FLOOR_WOOD:hallwayWindow;
+  if(within(bay,5,8)&&dy>=2)return hallwayWindow;
+  return schoolWall(dy,style);
  }
  if(corridor)return B.AIR;
  if(bay===0)return schoolWall(dy,style);
