@@ -17,7 +17,7 @@ export const APARTMENT_BLOCKS=Object.freeze([
  {id:102,x:-199,z:19,floors:10,flip:false,vertical:true,group:'west'},
  {id:103,x:181,z:-101,floors:13,flip:true,vertical:true,group:'east'},
  {id:104,x:151,z:21,floors:11,flip:false,group:'east'},
- {id:105,x:-128,z:-197,floors:12,flip:false,group:'north'},
+ {id:105,x:-96,z:-197,floors:12,flip:false,group:'north'},
  {id:106,x:34,z:-197,floors:9,flip:false,group:'north'},
  {id:107,x:-136,z:157,floors:11,flip:true,group:'south'},
  {id:108,x:94,z:157,floors:14,flip:true,group:'south'}
