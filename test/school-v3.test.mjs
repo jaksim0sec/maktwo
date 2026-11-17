@@ -184,3 +184,16 @@ test('all classrooms and wings get correctly facing interactive doors',()=>{
  assert.equal(west.get(14,13,1),B.DOOR); // (-66,13,-47)
  assert.equal(west.styles[Chunk.index(14,13,1)],TURN_STYLE|1);
 });
+
+test('school wings contain distinct working classrooms, library and bathroom volumes',()=>{
+ assert.equal(at(-72,12,7),B.ARCH_TILE_VERTICAL_WHITE);
+ assert.equal(at(-72,13,7),B.PART_PARTITION_2);
+ assert.equal(at(-75,23,-11),B.PART_BOOKSHELF_1);
+ assert.equal(at(68,13,-21),B.PART_INTERIOR_2);
+ assert.equal(at(72,15,-19),B.FLUORESCENT);
+ for(const level of [0,1,2,3]){
+  const y=SCHOOL_GROUND+level*SCHOOL_STOREY+1;
+  assert.equal(at(63,y,-50),B.AIR);
+  assert.equal(at(-63,y,-50),B.AIR);
+ }
+});
