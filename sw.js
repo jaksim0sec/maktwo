@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.91-descent-school-v3';
+const CACHE_NAME='maktwo-shell-v1.15.92-school-v3-rebuild';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
