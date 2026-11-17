@@ -180,7 +180,7 @@ export function apartmentPartStyle(x,y,z,id){
 // School boundary at ±103 is not touched. Internal streets and parkland are
 // evaluated only in the added residential ring, using local district coordinates.
 export function neighborhoodVoxel(x,y,z,seed=9999,cx=0,cz=0){
- if(Math.abs(x)<=105&&Math.abs(z)<=105)return null;
+ if(Math.abs(x)<=110&&Math.abs(z)<=110)return null; // preserve original asphalt ring beside the school
  if(y<APARTMENT_GROUND||y>APARTMENT_GROUND+8)return null;
  if(y===APARTMENT_GROUND){
   const ax=Math.abs(x),az=Math.abs(z);
