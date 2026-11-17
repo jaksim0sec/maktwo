@@ -161,12 +161,17 @@ function schoolWing(x,y,z,style){
  const level=Math.floor((y-SCHOOL_GROUND)/SCHOOL_STOREY);
  const base=SCHOOL_GROUND+level*SCHOOL_STOREY,dy=y-base;
  const corridor=within(a,62,65),bay=mod(z+49,12);
+ const restroom=west&&level===0&&within(z,5,16);
+ const library=west&&level===2&&within(z,-14,-3);
+ const office=east&&level===0&&within(z,-25,-14);
+ if(dy===0&&restroom&&!corridor)return B.ARCH_TILE_VERTICAL_WHITE;
  if(dy===0)return corridor&&(a===62||a===65)?B.TERRACOTTA:corridor?B.ARCH_TILE_LARGE_PORCELAIN:B.ARCH_FLOOR_LINOLEUM;
  if(dy===4){
   if(a===61||a===78||z===-49||z===end)return facade(dy,style);
   return B.CEILING_FINISH;
  }
  if(dy===3&&corridor&&a===63&&mod(z+49,8)===4)return B.FLUORESCENT;
+ if(dy===3&&!corridor&&a===72&&bay===6)return B.FLUORESCENT;
  if(z===-49){
   if(corridor&&dy<=3)return B.AIR;
   return facade(dy,style);
@@ -189,6 +194,21 @@ function schoolWing(x,y,z,style){
  }
  if(corridor)return B.AIR;
  if(bay===0)return plaster;
+ if(restroom){
+  if(dy<=2&&(bay===8||bay===10)&&within(a,69,74))return B.PART_PARTITION_2;
+  if(dy===1&&a===76&&(bay===7||bay===9))return B.PART_INTERIOR_5;
+  return B.AIR;
+ }
+ if(library){
+  if(dy===1&&a===75&&[2,4,6,8].includes(bay))return B.PART_BOOKSHELF_1;
+  if(dy===1&&[68,71].includes(a)&&[3,7].includes(bay))return B.PART_INTERIOR_2;
+  return B.AIR;
+ }
+ if(office){
+  if(dy===1&&a===77&&bay===10)return B.PART_INTERIOR_1;
+  if(dy===1&&[68,72,75].includes(a)&&[4,8].includes(bay))return B.PART_INTERIOR_2;
+  return B.AIR;
+ }
  if(dy===1){
   if(a===77&&bay===10)return B.PART_INTERIOR_1;
   if([68,70,72,74].includes(a)&&[2,4,6,8,10].includes(bay))
