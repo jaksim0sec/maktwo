@@ -178,6 +178,24 @@ export function apartmentPartStyle(x,y,z,id){
  if(id===B.PART_SIGN_2)return 2;
  return null;
 }
+// Each lobby has an uninterrupted paved connection to the public superblock
+// sidewalk. A terrace visible on a roof is not a replacement for ground access.
+function residentialApproach(x,z){
+ for(const p of APARTMENT_BLOCKS){
+  const gx=p.vertical?(p.flip?p.x:p.x+p.depth-1):p.x+5;
+  const gz=p.vertical?p.z+5:(p.flip?p.z:p.z+p.depth-1);
+  if(p.group==='north'||p.group==='south'){
+   const end=p.group==='north'?-131:131;
+   if(Math.abs(x-gx)<=1&&within(z,Math.min(gz,end),Math.max(gz,end)))return true;
+  }else{
+   const end=p.group==='west'?-131:131;
+   const routeZ=p.vertical?gz:gz+(p.flip?-3:3);
+   if(Math.abs(z-routeZ)<=1&&within(x,Math.min(gx,end),Math.max(gx,end)))return true;
+   if(!p.vertical&&Math.abs(x-gx)<=1&&within(z,Math.min(gz,routeZ),Math.max(gz,routeZ)))return true;
+  }
+ }
+ return false;
+}
 // School boundary at ±103 is not touched. Internal streets and parkland are
 // evaluated only in the added residential ring, using local district coordinates.
 export function neighborhoodVoxel(x,y,z,seed=9999,cx=0,cz=0){
@@ -194,6 +212,7 @@ export function neighborhoodVoxel(x,y,z,seed=9999,cx=0,cz=0){
   // 1st generation Bundang-style complete superblock with a modest grid.
   if(within(ax,116,130)||within(az,116,130)||ax>=206||az>=206)return B.ARCH_FLOOR_ASPHALT;
   if(within(ax,107,115)||within(ax,131,139)||within(az,107,115)||within(az,131,139))return B.ARCH_FLOOR_PAVERS;
+  if(residentialApproach(x,z))return B.ARCH_FLOOR_PAVERS;
   // Street-side parking bays with alternating tree islands.
   if((within(ax,142,148)||within(az,143,150))&&mod(Math.floor((x+z)/7),4)!==0)return B.ARCH_FLOOR_ASPHALT;
   if((within(ax,140,146)||within(az,138,144))&&mod(x+z,9)===0)return B.ARCH_TILE_VERTICAL_WHITE;
