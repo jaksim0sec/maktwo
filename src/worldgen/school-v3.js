@@ -319,7 +319,7 @@ function schoolPartFacing(x,z,id){
  return null; // windows mounted on the north/south facades face z
 }
 export function stampSchoolChunk(chunk,seed=SCHOOL_SEED){
- const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,SCHOOL_HEIGHT);
+ const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,SCHOOL_GROUND+STORIES*SCHOOL_STOREY+2);
  for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){
   const wx=ox+x,wz=oz+z,local=schoolDistrict(wx,wz);
   for(let y=0;y<height;y++){
