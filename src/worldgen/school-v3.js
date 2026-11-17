@@ -43,7 +43,12 @@ function stairProfile(x,z){
  if(within(a,64,72)&&within(z,-61,-60))return {step:5};
  return null;
 }
-const stairVoid=(x,z)=>within(Math.abs(x),64,72)&&within(z,-61,-55);
+const stairVoid=(x,z)=>{
+ const a=Math.abs(x);
+ return within(a,64,72)&&within(z,-61,-60)||
+  within(a,64,66)&&within(z,-59,-55)||
+  within(a,70,72)&&within(z,-59,-58);
+};
 function stairCell(x,y,z){
  const profile=stairProfile(x,z);
  if(!profile)return null;
@@ -87,6 +92,7 @@ function schoolMain(x,y,z,style){
   return within(z,-54,-51)?corridorFloor(x,z):B.ARCH_FLOOR_LINOLEUM;
  }
  if(dy===4){
+  if(a===75||z===-65||z===-50)return facade(dy,style);
   if(core&&stairVoid(x,z))return B.AIR;
   const lit=within(z,-54,-51)&&z===-52&&mod(x,9)===0||
     a<=60&&z===-60&&mod(x+60,12)===6;
@@ -128,7 +134,10 @@ function schoolWing(x,y,z,style){
  const base=SCHOOL_GROUND+level*SCHOOL_STOREY,dy=y-base;
  const corridor=within(a,62,65),bay=mod(z+49,12);
  if(dy===0)return corridor?B.ARCH_TILE_LARGE_PORCELAIN:B.ARCH_FLOOR_LINOLEUM;
- if(dy===4)return corridor&&a===63&&mod(z+49,8)===4?B.FLUORESCENT:B.CEILING_FINISH;
+ if(dy===4){
+  if(a===61||a===78||z===-49||z===end)return facade(dy,style);
+  return corridor&&a===63&&mod(z+49,8)===4?B.FLUORESCENT:B.CEILING_FINISH;
+ }
  if(z===-49){
   if(corridor&&dy<=3)return B.AIR;
   return facade(dy,style);
