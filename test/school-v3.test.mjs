@@ -136,3 +136,18 @@ test('split-tread stair geometry uses 0.2m risers and oriented outside rails',()
  const second=decodeSplitTread(chunk.styles[Chunk.index(10,13,8)]);
  assert.deepEqual([second.low,second.high],[.75,1]);
 });
+
+test('all exterior window parts inherit their correct wall-plane orientation',()=>{
+ const side=stampSchoolChunk(new Chunk(4,-4),seed); // main side wall x=75
+ assert.equal(side.get(11,14,6),B.PART_WINDOW_3);
+ assert.equal(side.styles[Chunk.index(11,14,6)],TURN_STYLE|2);
+ const back=stampSchoolChunk(new Chunk(4,-5),seed); // main rear wall x=66
+ assert.equal(back.get(2,14,15),B.PART_WINDOW_3);
+ assert.equal(back.styles?.[Chunk.index(2,14,15)]||0,0);
+ const entrance=stampSchoolChunk(new Chunk(0,-3),seed); // lobby side x=8
+ assert.equal(entrance.get(8,14,2),B.PART_WINDOW_3);
+ assert.equal(entrance.styles[Chunk.index(8,14,2)],TURN_STYLE|2);
+ const gym=stampSchoolChunk(new Chunk(5,0),seed); // gym side x=80
+ assert.equal(gym.get(0,19,10),B.PART_WINDOW_3);
+ assert.equal(gym.styles[Chunk.index(0,19,10)],TURN_STYLE|2);
+});
