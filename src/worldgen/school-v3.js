@@ -60,9 +60,19 @@ function stairCell(x,y,z){
  }
  return null;
 }
-function classFurniture(x,y,z,base){
+function classFurniture(x,y,z,level,base){
  if(y!==base+1)return B.AIR;
- const bay=mod(x+60,12);
+ const bay=mod(x+60,12),room=Math.floor((x+60)/12);
+ if(level===3&&room===4){ // shared reading room, shelved wall and tables
+  if([2,4,6,8,10].includes(bay)&&[-63,-61].includes(z))return B.PART_BOOKSHELF_1;
+  if([4,8].includes(bay)&&z===-58)return B.PART_INTERIOR_2;
+  return B.AIR;
+ }
+ if(level===0&&room===2){ // administration room, not another classroom
+  if(bay===10&&[-63,-61,-59].includes(z))return B.PART_INTERIOR_1;
+  if([3,8].includes(bay)&&[-62,-58].includes(z))return B.PART_INTERIOR_2;
+  return B.AIR;
+ }
  if(bay===11&&z===-64)return B.PART_INTERIOR_1; // locker/storage
  if(bay===10&&z===-64)return B.PART_INTERIOR_2; // teacher's desk
  if([2,4,6,8,10].includes(bay)&&[-63,-61,-59,-57].includes(z))
@@ -101,7 +111,7 @@ function schoolMain(x,y,z,style){
  if(a===75||z===-65||z===-50)return mainFacade(x,z,dy,level,style);
  if(core){
   if(a===61&&z<=-55)return plaster;
-  if(level>0&&dy===1&&within(z,-61,-55)&&(a===63||a===73))return B.FENCE;
+  if(level>0&&dy===1&&within(z,-61,-55)&&(a===63||a===73))return B.PART_BALCONY_3;
   return B.AIR;
  }
  if(z===-55){
@@ -114,7 +124,7 @@ function schoolMain(x,y,z,style){
  if(z<=-56){
   const bay=mod(x+60,12);
   if(bay===0)return dy===2&&within(z,-62,-59)?B.ARCH_METAL_BLACK_PAINT:plaster;
-  return classFurniture(x,y,z,base);
+  return classFurniture(x,y,z,level,base);
  }
  return B.AIR;
 }
@@ -220,7 +230,7 @@ function plants(x,y,z,seed,cx,cz){
   const dx=x-tx,dz=z-tz,dy=y-(12+height);
   if(within(y,12+height-1,12+height+2)&&dx*dx+dz*dz+(dy*.8)**2<=10&&hash(x,z,seed,y+i)%13!==0)return B.LEAVES;
  }
- if(y===13&&within(x,-50,50)&&z===-36&&mod(x,5)<4)return B.LEAVES;
+ if(y===13&&within(x,-50,50)&&Math.abs(x)>=10&&z===-36&&mod(x,5)<4)return B.LEAVES;
  return null;
 }
 export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
@@ -244,6 +254,7 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
  return B.AIR;
 }
 function schoolPartFacing(x,z,id){
+ if(id===B.PART_BALCONY_3)return 2;
  if(id!==B.PART_WINDOW_1&&id!==B.PART_WINDOW_2&&id!==B.PART_WINDOW_3)return null;
  if(Math.abs(x)===78||Math.abs(x)===75||Math.abs(x)===61||Math.abs(x)===66)return 2;
  return null;
