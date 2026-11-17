@@ -3,7 +3,7 @@
 import {SIZE,TURN_STYLE} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
 import {encodeSplitTread} from './eternal-night-stairs.js';
-import {APARTMENT_MAX_Y,apartmentVoxel,apartmentPartStyle,neighborhoodVoxel} from './school-apartments.js';
+import {APARTMENT_MAX_Y,apartmentAt,apartmentVoxel,apartmentPartStyle,neighborhoodVoxel} from './school-apartments.js';
 export const SCHOOL_MODE='school-v3';
 export const SCHOOL_HEIGHT=96;
 export const SCHOOL_GROUND=12;
@@ -332,6 +332,7 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
  return B.AIR;
 }
 function schoolPartFacing(x,z,id){
+ if(apartmentAt(x,z))return null;
  if(id===B.PART_SIGN_2)return Math.abs(x)===65?2:0;
  if(id===B.DOOR)return Math.abs(x)===66?(x<0?1:3):2;
  if(id===B.PART_BALCONY_3)return 2;
