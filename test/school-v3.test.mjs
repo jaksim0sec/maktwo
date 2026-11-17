@@ -26,8 +26,8 @@ test('V3 has an independent playable world preset and entrance',()=>{
 test('four floors contain clear corridors, classroom doors and partitions',()=>{
  assert.equal(SCHOOL_STOREY,5); // 4m per storey at 0.8m/voxel
  assert.equal(at(1,13,-53),B.AIR); // 3.2m corridor
- assert.equal(at(1,13,-55),B.ARCH_CONCRETE_SMOOTH_PLASTER);
- assert.equal(at(-58,13,-55),B.AIR); // double-width classroom entry
+ assert.equal(at(0,13,-55),B.ARCH_TILE_MOSAIC);
+ assert.equal(at(-58,13,-55),B.DOOR); // real, interactive classroom door
  assert.equal(at(-56,13,-61),B.PART_INTERIOR_2);
  assert.equal(at(-60,14,-60),B.ARCH_METAL_BLACK_PAINT);
  for(const floorY of [12,17,22,27])assert.equal(at(1,floorY,-60),B.ARCH_FLOOR_LINOLEUM);
@@ -150,4 +150,37 @@ test('all exterior window parts inherit their correct wall-plane orientation',()
  const gym=stampSchoolChunk(new Chunk(5,0),seed); // gym side x=80
  assert.equal(gym.get(0,19,10),B.PART_WINDOW_3);
  assert.equal(gym.styles[Chunk.index(0,19,10)],TURN_STYLE|2);
+});
+
+test('photographic classroom corridor: wood doors, transoms and tiled wall bands',()=>{
+ assert.equal(at(-58,13,-55),B.DOOR);
+ assert.equal(at(-58,14,-55),B.DOOR_TOP);
+ assert.equal(at(-58,15,-55),B.PART_WINDOW_4);
+ assert.equal(at(-59,13,-55),B.ARCH_FLOOR_WOOD);
+ assert.equal(at(0,13,-55),B.ARCH_TILE_MOSAIC);
+ assert.equal(at(0,14,-55),B.ARCH_CONCRETE_PEBBLE_PAINT);
+ assert.equal(at(1,12,-54),B.TERRACOTTA);
+ assert.equal(at(1,12,-52),B.ARCH_TILE_LARGE_PORCELAIN);
+ assert.equal(at(0,15,-53),B.FLUORESCENT);
+ assert.equal(at(0,16,-53),B.CEILING_FINISH);
+});
+test('photographic school facade: covered approach, canopy posts and stair signage',()=>{
+ assert.equal(at(42,17,-38),B.ARCH_METAL_GALVANIZED);
+ assert.equal(at(42,13,-37),B.PART_COLUMN_4);
+ assert.equal(at(14,16,-38),B.FLUORESCENT);
+ assert.equal(at(-75,14,-54),B.CITY_STAIR_MARKER);
+ for(let z=-42;z<=-30;z++)assert.equal(at(0,13,z),B.AIR);
+});
+test('all classrooms and wings get correctly facing interactive doors',()=>{
+ const main=stampSchoolChunk(new Chunk(-4,-4),seed);
+ assert.equal(main.get(6,13,9),B.DOOR); // (-58,13,-55)
+ assert.equal(main.get(6,14,9),B.DOOR_TOP);
+ assert.equal(main.styles[Chunk.index(6,13,9)],TURN_STYLE|2);
+ const east=stampSchoolChunk(new Chunk(4,-3),seed);
+ assert.equal(east.get(2,13,1),B.DOOR); // (66,13,-47)
+ assert.equal(east.get(2,15,1),B.PART_WINDOW_4);
+ assert.equal(east.styles[Chunk.index(2,13,1)],TURN_STYLE|3);
+ const west=stampSchoolChunk(new Chunk(-5,-3),seed);
+ assert.equal(west.get(14,13,1),B.DOOR); // (-66,13,-47)
+ assert.equal(west.styles[Chunk.index(14,13,1)],TURN_STYLE|1);
 });
