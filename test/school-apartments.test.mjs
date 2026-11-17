@@ -93,3 +93,10 @@ test('two perpendicular apartment slabs keep doors and galleries facing the cour
  assert.equal(east.get(10,13,7),B.DOOR);
  assert.equal(east.styles[Chunk.index(10,13,7)],TURN_STYLE|1);
 });
+
+test('every apartment lobby has a dry paved connection to the district sidewalk',()=>{
+ for(const [x,z] of [[-170,-80],[-165,24],[165,-96],[140,40],[-123,-149],[39,-149],[-131,146],[99,146]]){
+  assert.equal(at(x,12,z),B.ARCH_FLOOR_PAVERS,`unconnected lobby approach ${x},${z}`);
+  assert.equal(at(x,13,z),B.AIR,`blocked pavement at ${x},${z}`);
+ }
+});
