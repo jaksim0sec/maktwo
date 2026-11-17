@@ -2,6 +2,7 @@ import {BLOCK as B,BLOCKS,HOTBAR,LIGHTBAR,itemId,portableLight,RETIRED_BLOCK_IDS
 import {RECIPES} from './crafting.js';
 import {CITY_MODE,CITY_SEED} from '../worldgen/eternal-night-game.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
+import {SCHOOL_MODE,SCHOOL_SEED} from '../worldgen/school-v3.js';
 import {PART_ID_START} from './part-library.js';
 import {TREE_BLOCKS,FALLEN_LEAF_BLOCKS} from './tree-assets.js';
 // One canonical registry for user-visible categories and world definitions.
@@ -12,7 +13,8 @@ export const WORLD_PRESETS=Object.freeze([
  {name:'EternalNightCityLab',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 도시 실험'},
  {name:'EternalNightCityV8',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 공중 폐역 v8'},
  {name:'SubwayAssemblyPreview',seed:9999,mode:'station-preview',label:'폐역 · 전동차 조립 예시'},
- {name:'EternalNightCanyonV2',seed:CITY_SEED,mode:CANYON_MODE,label:'복층 · 대단지 V2'},
+ {name:'EternalNightCanyonV2',seed:CITY_SEED,mode:CANYON_MODE,label:'하강 · 대단지 V2'},
+ {name:'DescentSchoolV3',seed:SCHOOL_SEED,mode:SCHOOL_MODE,label:'하강 · 한국 학교 V3'},
  {name:'AbandonedArboretum',seed:9999,mode:'arboretum',label:'폐허 속의 나무 · 4종 전시장'},
  {name:'EternalNightGardenV9',seed:CITY_SEED,mode:CITY_MODE,label:'영원한 밤 · 이질적인 수목 v9'},
 ]);
