@@ -12,8 +12,8 @@ import {SCHOOL_MODE,SCHOOL_HEIGHT,SCHOOL_GROUND,SCHOOL_PERIOD,SCHOOL_STOREY,scho
 const seed=9999,at=(x,y,z,s=seed)=>schoolVoxel(x,y,z,s);
 test('V3 has an independent playable world preset and entrance',()=>{
  assert.equal(SCHOOL_MODE,'school-v3');
- assert.equal(SCHOOL_HEIGHT,64);
- assert.equal(SCHOOL_PERIOD,224);
+ assert.equal(SCHOOL_HEIGHT,96);
+ assert.equal(SCHOOL_PERIOD,448);
  assert(WORLD_PRESETS.some(p=>p.mode===SCHOOL_MODE&&p.label.includes('하강')));
  const world=new World({seed,mode:SCHOOL_MODE,name:'DescentSchoolV3'});
  assert.equal(world.height,SCHOOL_HEIGHT);

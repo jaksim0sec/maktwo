@@ -1,5 +1,5 @@
 /* App-shell cache for offline play. This intentionally never caches remote resources. */
-const CACHE_NAME='maktwo-shell-v1.15.94-school-v3-finishes';
+const CACHE_NAME='maktwo-shell-v1.15.95-bundang-school-apartments';
 const SNAPSHOT_PREFIX='maktwo-shell-snapshot-';
 const APP_FILES=[
  './','./index.html','./style.css','./manifest.webmanifest',
@@ -13,7 +13,7 @@ const APP_FILES=[
  './src/core/scale.js','./src/core/train-collision.js','./src/core/part-library.js','./src/core/station-parts.js','./src/core/station-materials.js','./src/core/tree-assets.js','./src/core/part-prisms.js','./src/core/architectural-materials.js','./src/core/construction.js','./src/core/mounts.js','./src/core/door.js','./src/core/systems.js','./src/core/world.js',
  './assets/observer.mesh','./assets/observer-head.mesh','./assets/observer-face.jpg','./assets/observer-eye.jpg','./src/client/observer-render.js','./src/client/observer-head-detail.js','./src/entities/observers.js','./src/entities/observer-poses.js','./src/entities/observer-motion.js',
  './src/entities/entities.js','./src/util/math.js','./src/core/catalog.js','./src/core/shapes.js',
- './src/worldgen/generators.js','./src/worldgen/school-v3.js','./src/worldgen/canyon-v2.js','./src/worldgen/canyon-v2-core.js','./src/worldgen/canyon-v2-plan.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/trees.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
+ './src/worldgen/generators.js','./src/worldgen/school-v3.js','./src/worldgen/school-apartments.js','./src/worldgen/canyon-v2.js','./src/worldgen/canyon-v2-core.js','./src/worldgen/canyon-v2-plan.js','./src/worldgen/station-preview.js','./src/worldgen/station-train.js','./src/worldgen/trees.js','./src/worldgen/part-gallery.js','./src/worldgen/material-gallery.js','./src/worldgen/integrated.js','./src/worldgen/architecture-v3.js',
  './src/worldgen/eternal-night-game.js','./src/worldgen/eternal-night-street-details.js','./src/worldgen/eternal-night-core-floor.js','./src/worldgen/eternal-night-districts.js',
  './src/worldgen/eternal-night-buildings.js','./src/worldgen/eternal-night-blueprints.js','./src/worldgen/eternal-night-stations.js','./src/worldgen/eternal-night-walkways.js','./src/worldgen/eternal-night-kits.js',
  './src/worldgen/eternal-night-precincts.js','./src/worldgen/eternal-night-station-build.js','./src/worldgen/eternal-night-decay.js','./src/worldgen/eternal-night-facade.js','./src/worldgen/eternal-night-interiors.js','./src/worldgen/eternal-night-stairs.js','./src/worldgen/eternal-night-tower.js','./src/worldgen/eternal-night-library.js'
