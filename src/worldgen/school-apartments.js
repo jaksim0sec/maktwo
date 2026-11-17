@@ -14,8 +14,8 @@ export const APARTMENT_MAX_FLOORS=14;
 export const APARTMENT_MAX_Y=APARTMENT_GROUND+APARTMENT_MAX_FLOORS*APARTMENT_STOREY+4;
 export const APARTMENT_BLOCKS=Object.freeze([
  {id:101,x:-199,z:-99,floors:12,flip:false,group:'west'},
- {id:102,x:-199,z:19,floors:10,flip:false,group:'west'},
- {id:103,x:151,z:-101,floors:13,flip:false,group:'east'},
+ {id:102,x:-199,z:19,floors:10,flip:false,vertical:true,group:'west'},
+ {id:103,x:181,z:-101,floors:13,flip:true,vertical:true,group:'east'},
  {id:104,x:151,z:21,floors:11,flip:false,group:'east'},
  {id:105,x:-128,z:-197,floors:12,flip:false,group:'north'},
  {id:106,x:34,z:-197,floors:9,flip:false,group:'north'},
@@ -31,9 +31,9 @@ const galleryFloor=floorFinish({program:'housing'},{corridor:{kind:'open-corrido
 const homeWall=interiorWallFinish({program:'housing'},B.CITY_PAINT_WHITE);
 const homeKit=cityFloorKit({floor:B.ARCH_FLOOR_WOOD},{program:'housing',luxury:.48},1);
 const apartmentDoor=cityPart('door',homeKit.door);
-const inside=(p,x,z)=>rect(x,z,p.x,p.x+p.width-1,p.z,p.z+p.depth-1);
+const inside=(p,x,z)=>p.vertical?rect(x,z,p.x,p.x+p.depth-1,p.z,p.z+p.width-1):rect(x,z,p.x,p.x+p.width-1,p.z,p.z+p.depth-1);
 export const apartmentAt=(x,z)=>APARTMENT_BLOCKS.find(p=>inside(p,x,z))??null;
-const coords=(p,x,z)=>({u:x-p.x,v:p.flip?p.z+p.depth-1-z:z-p.z});
+const coords=(p,x,z)=>p.vertical?{u:z-p.z,v:p.flip?p.x+p.depth-1-x:x-p.x}:{u:x-p.x,v:p.flip?p.z+p.depth-1-z:z-p.z};
 const roofHeight=p=>APARTMENT_GROUND+p.floors*APARTMENT_STOREY;
 const outsideWall=(p,u,v,dy,level,seed)=>{
  const variant=hash(p.id,level,seed)&3;
@@ -77,7 +77,7 @@ function stairStyle(p,u,v,y){
   const base=APARTMENT_GROUND+level*APARTMENT_STOREY;
   if(y!==base+1+Math.floor((shape.step-1)/2))continue;
   const low=shape.step%2?1:3;
-  return encodeSplitTread(low,low+1,shape.facing,shape.rail);
+  return encodeSplitTread(low,low+1,p.vertical?(shape.facing+2)%8:shape.facing,shape.rail);
  }
  return null;
 }
@@ -169,11 +169,12 @@ export function apartmentPartStyle(x,y,z,id){
  const p=apartmentAt(x,z);if(!p)return null;
  const {u,v}=coords(p,x,z);
  if(id===B.PART_STAIRCASE_2)return stairStyle(p,u,v,y);
- if(id===B.DOOR)return p.flip?2:0; // doors face the open gallery
- if(id===B.PART_BALCONY_3||id===B.PART_BALCONY_2)return p.flip?2:0;
- if(id===B.PART_WINDOW_4&&u===0)return 2;
- if(id===B.PART_WINDOW_4&&v===0)return p.flip?2:0;
- if(id===B.PART_WINDOW_4&&v===11)return p.flip?2:0;
+ if(id===B.DOOR)return p.vertical?(p.flip?1:3):(p.flip?2:0); // unit entrances face open gallery
+ if(id===apartmentDoor)return p.vertical?2:0;
+ if(id===B.PART_BALCONY_3||id===B.PART_BALCONY_2)return p.vertical?2:(p.flip?2:0);
+ if(id===B.PART_WINDOW_4&&u===0)return p.vertical?0:2;
+ if(id===B.PART_WINDOW_4&&v===0)return p.vertical?2:(p.flip?2:0);
+ if(id===B.PART_WINDOW_4&&v===11)return p.vertical?2:(p.flip?2:0);
  if(id===B.PART_SIGN_2)return 2;
  return null;
 }
