@@ -55,7 +55,7 @@ const outsideWall=(p,u,v,dy,level,seed)=>{
 };
 const stairShape=(u,v)=>{
  if(within(u,1,3)&&within(v,2,6))return {step:v-1,facing:4,rail:u===1};
- if(within(u,6,8)&&within(v,2,6))return {step:11-v,facing:0,rail:u===8};
+ if(within(u,6,8)&&within(v,2,6))return {step:12-v,facing:0,rail:u===8};
  if(within(u,1,8)&&within(v,7,8))return {step:5,landing:true};
  return null;
 };
@@ -100,9 +100,9 @@ function apartmentRoom(p,u,v,dy,level,seed){
   if(v===3&&inUnit===6)return B.PART_INTERIOR_1; // shelving
   if(v===7&&inUnit===2)return B.PART_INTERIOR_1; // kitchen cabinets
   if(v===9&&inUnit===5)return B.PART_INTERIOR_2; // bedroom
-  if(v===9&&inUnit===1)return B.PART_INTERIOR_3; // light furniture
   if(v===10&&inUnit===6)return B.PART_INTERIOR_5; // utility cabinet
  }
+ if(dy===3&&v===9&&inUnit===1)return B.PART_INTERIOR_3; // ceiling fixture
  if(dy===2&&v===3&&inUnit===3)return B.PART_PARTITION_4;
  return B.AIR;
 }
@@ -158,6 +158,7 @@ export function apartmentVoxel(x,y,z,seed=9999,cx=0,cz=0){
   if(u===8&&v<=10)return homeWall;
   if(dy===1&&u===6&&v===10)return B.PART_SIGN_2; // stair storey sign
   if(dy===3&&u===5&&v===9)return B.FLUORESCENT;
+  if(dy===1&&v===1&&u===4)return apartmentDoor; // rated elevator fire door from housing kit
   if(dy===1&&v===1&&u===5)return B.PART_INTERIOR_5; // lifts
   return B.AIR;
  }
@@ -207,7 +208,6 @@ export function neighborhoodVoxel(x,y,z,seed=9999,cx=0,cz=0){
   if(Math.abs(z)===138&&mod(x+217,29)===0)return B.PART_COLUMN_2;
  }
  // Tree-lined internal walkways, but no leaves in the road or school path.
- const trunks=[[x,z],[]]; // only the deterministic grid below matters
  const nearX=Math.abs(x)===139&&mod(z+190,27)===0;
  const nearZ=Math.abs(z)===139&&mod(x+190,29)===0;
  if(nearX||nearZ){
