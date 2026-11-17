@@ -2,6 +2,7 @@
 // World scale is 0.8m/voxel; geometry is authored in dimensions, not decoration.
 import {SIZE,TURN_STYLE} from '../core/chunk.js';
 import {BLOCK as B} from '../core/blocks.js';
+import {encodeSplitTread} from './eternal-night-stairs.js';
 export const SCHOOL_MODE='school-v3';
 export const SCHOOL_HEIGHT=64;
 export const SCHOOL_GROUND=12;
@@ -40,7 +41,7 @@ function stairProfile(x,z){
  if(a<64||a>72)return null;
  if(within(a,70,72)&&within(z,-59,-55))return {step:-55-z+1};
  if(within(a,64,66)&&within(z,-59,-55))return {step:6+z+59};
- if(within(a,64,72)&&within(z,-61,-60))return {step:5};
+ if(within(a,64,72)&&within(z,-61,-60))return {step:5,landing:true};
  return null;
 }
 const stairVoid=(x,z)=>{
@@ -53,10 +54,24 @@ function stairCell(x,y,z){
  const profile=stairProfile(x,z);
  if(!profile)return null;
  for(let level=0;level<STORIES-1;level++){
-  const base=SCHOOL_GROUND+level*SCHOOL_STOREY,top=base+1+profile.step*.5;
-  const treadY=Math.ceil(top)-1;
-  if(y===treadY)return Number.isInteger(top)?B.UPPER_STAIR_TREAD:B.CONCRETE_SLAB;
+  const base=SCHOOL_GROUND+level*SCHOOL_STOREY;
+  const treadY=base+1+Math.floor((profile.step-1)/2);
+  if(y===treadY)return profile.landing?B.CONCRETE_SLAB:B.PART_STAIRCASE_2;
   if(y>base&&y<treadY)return B.ARCH_CONCRETE_FORMWORK;
+ }
+ return null;
+}
+function splitStairStyle(x,y,z){
+ const profile=stairProfile(x,z);
+ if(!profile||profile.landing)return null;
+ for(let level=0;level<STORIES-1;level++){
+  const base=SCHOOL_GROUND+level*SCHOOL_STOREY;
+  if(y!==base+1+Math.floor((profile.step-1)/2))continue;
+  // Each voxel contains two risers of 0.25 voxel = 0.2m.
+  const low=profile.step%2?1:3,high=low+1;
+  const ascendingNorth=profile.step<=5;
+  const outerRail=ascendingNorth?Math.abs(x)===72:Math.abs(x)===64;
+  return encodeSplitTread(low,high,ascendingNorth?4:0,outerRail);
  }
  return null;
 }
@@ -267,10 +282,10 @@ export function stampSchoolChunk(chunk,seed=SCHOOL_SEED){
    const id=schoolVoxel(wx,y,wz,seed);
    if(id===B.AIR)continue;
    chunk.set(x,y,z,id);
-   const facing=schoolPartFacing(local.x,local.z,id);
-   if(facing!==null){
+   const style=id===B.PART_STAIRCASE_2?splitStairStyle(local.x,y,local.z):schoolPartFacing(local.x,local.z,id);
+   if(style!==null){
     chunk.styles??=new Uint8Array(chunk.data.length);
-    chunk.styles[(y*SIZE+z)*SIZE+x]=TURN_STYLE|facing;
+    chunk.styles[(y*SIZE+z)*SIZE+x]=id===B.PART_STAIRCASE_2?style:TURN_STYLE|style;
    }
   }
  }
