@@ -31,7 +31,9 @@ test('eight residential slabs keep school and gym clear, with realistic floor va
  assert.equal(apartmentAt(160,37)?.id,104);
  assert.equal(apartmentAt(0,0),null);
  for(const p of APARTMENT_BLOCKS){
-  assert.equal(at(p.x+2,12,p.flip?p.z+p.depth-3:p.z+2),B.ARCH_FLOOR_WOOD);
+  const sx=p.vertical?(p.flip?p.x+p.depth-3:p.x+2):p.x+2;
+  const sz=p.vertical?p.z+2:(p.flip?p.z+p.depth-3:p.z+2);
+  assert.equal(at(sx,12,sz),B.ARCH_FLOOR_WOOD);
   assert.equal(at(p.x,12+p.floors*5,p.z),B.ARCH_METAL_GALVANIZED);
  }
  assert.equal(at(90,12,0),B.ARCH_FLOOR_WOOD);
@@ -75,4 +77,19 @@ test('residential campus is deterministic and repeats without seams',()=>{
   assert.equal(at(x,12,z),at(x+SCHOOL_PERIOD,12,z));
   assert.equal(at(x,12,z),at(x,12,z+SCHOOL_PERIOD));
  }
+});
+
+test('two perpendicular apartment slabs keep doors and galleries facing the court',()=>{
+ assert.equal(apartmentAt(-188,31)?.id,102);
+ assert.equal(at(-188,13,31),B.DOOR);
+ assert.equal(at(-183,13,31),B.PART_BALCONY_3);
+ assert.equal(apartmentAt(186,-89)?.id,103);
+ assert.equal(at(186,13,-89),B.DOOR);
+ assert.equal(at(181,13,-89),B.PART_BALCONY_3);
+ const west=stampSchoolChunk(new Chunk(-12,1,SCHOOL_HEIGHT),9999);
+ assert.equal(west.get(4,13,15),B.DOOR);
+ assert.equal(west.styles[Chunk.index(4,13,15)],TURN_STYLE|3);
+ const east=stampSchoolChunk(new Chunk(11,-6,SCHOOL_HEIGHT),9999);
+ assert.equal(east.get(10,13,7),B.DOOR);
+ assert.equal(east.styles[Chunk.index(10,13,7)],TURN_STYLE|1);
 });
