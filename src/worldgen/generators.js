@@ -1,6 +1,7 @@
 import {SIZE,HEIGHT} from '../core/chunk.js';
 import {integratedTerrain} from './integrated.js';
 import {stampArchitectureV3} from './architecture-v3.js';
+import {SCHOOL_MODE,stampSchoolChunk} from './school-v3.js';
 import {stampMaterialGallery} from './material-gallery.js';
 import {stampPartGallery} from './part-gallery.js';
 import {STATION_PREVIEW_MODE,stampStationPreview} from './station-preview.js';
@@ -40,6 +41,7 @@ const BIOME_MATERIALS={
  forest:{soil:B.DIRT,surface:r=>r>.7?B.MOSS:B.GRASS}
 };
 export function generateChunk(chunk,seed,mode='normal',cityBlueprints=true,yOrigin=0){
+ if(mode===SCHOOL_MODE)return stampSchoolChunk(chunk,seed);
  if(mode===CANYON_MODE)return stampCanyonChunk(chunk,seed,yOrigin);
  if(mode===CITY_MODE)return stampCityChunk(chunk,seed,cityBlueprints);
  if(mode===STATION_PREVIEW_MODE)return stampStationPreview(chunk,seed);
