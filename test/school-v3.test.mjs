@@ -26,11 +26,11 @@ test('V3 has an independent playable world preset and entrance',()=>{
 test('four floors contain clear corridors, classroom doors and partitions',()=>{
  assert.equal(SCHOOL_STOREY,5); // 4m per storey at 0.8m/voxel
  assert.equal(at(1,13,-53),B.AIR); // 3.2m corridor
- assert.equal(at(0,13,-55),B.ARCH_TILE_MOSAIC);
+ assert([B.ARCH_CONCRETE_PEBBLE_PAINT,B.STATION_TRAIN_ENAMEL].includes(at(0,13,-55)));
  assert.equal(at(-58,13,-55),B.DOOR); // real, interactive classroom door
  assert.equal(at(-56,13,-61),B.PART_INTERIOR_2);
- assert.equal(at(-60,14,-60),B.ARCH_METAL_BLACK_PAINT);
- for(const floorY of [12,17,22,27])assert.equal(at(1,floorY,-60),B.ARCH_FLOOR_LINOLEUM);
+ assert.equal(at(-60,14,-60),B.STATION_ALGAE);
+ for(const floorY of [12,17,22,27])assert.equal(at(1,floorY,-60),B.ARCH_STONE_TERRAZZO);
 });
 test('half treads connect school levels instead of ladders or teleporting',()=>{
  for(const heightOffset of [0,5,10]){
@@ -85,16 +85,16 @@ test('new school saves are isolated from legacy V2 saves',()=>{
 test('facade materials, stair glazing and differentiated ceiling remain continuous',()=>{
  assert.equal(at(1,16,-65),B.ARCH_TILE_LARGE_PORCELAIN);
  assert.equal(at(78,16,-20),B.ARCH_TILE_LARGE_PORCELAIN);
- assert.equal(at(1,16,-60),B.CEILING_FINISH);
+ assert.equal(at(1,16,-60),B.CITY_PAINT_WHITE);
  assert.equal(at(0,13,-43),B.AIR);
  assert.equal(at(0,18,-40),B.ARCH_METAL_GALVANIZED);
  assert.notEqual(at(-75,14,-58),B.AIR);
 });
 test('existing architectural parts retain real rotation in a generated chunk',()=>{
  const chunk=stampSchoolChunk(new Chunk(-5,-3),seed);
- assert.equal(chunk.get(2,14,6),B.PART_WINDOW_1);
+ assert.equal(chunk.get(2,14,6),B.PART_WINDOW_4);
  assert.equal(chunk.styles[Chunk.index(2,14,6)],TURN_STYLE|2);
- assert.equal(at(-78,14,-42),B.PART_WINDOW_1);
+ assert.equal(at(-78,14,-42),B.PART_WINDOW_4);
 });
 test('main building wings and schoolyard do not overwrite each other',()=>{
  assert.equal(at(-78,13,0),B.ARCH_TILE_LARGE_PORCELAIN);
@@ -139,10 +139,10 @@ test('split-tread stair geometry uses 0.2m risers and oriented outside rails',()
 
 test('all exterior window parts inherit their correct wall-plane orientation',()=>{
  const side=stampSchoolChunk(new Chunk(4,-4),seed); // main side wall x=75
- assert.equal(side.get(11,14,6),B.PART_WINDOW_3);
+ assert.equal(side.get(11,14,6),B.PART_WINDOW_4);
  assert.equal(side.styles[Chunk.index(11,14,6)],TURN_STYLE|2);
  const back=stampSchoolChunk(new Chunk(4,-5),seed); // main rear wall x=66
- assert.equal(back.get(2,14,15),B.PART_WINDOW_3);
+ assert.equal(back.get(2,14,15),B.PART_WINDOW_4);
  assert.equal(back.styles?.[Chunk.index(2,14,15)]||0,0);
  const entrance=stampSchoolChunk(new Chunk(0,-3),seed); // lobby side x=8
  assert.equal(entrance.get(8,14,2),B.PART_WINDOW_3);
@@ -157,12 +157,12 @@ test('photographic classroom corridor: wood doors, transoms and tiled wall bands
  assert.equal(at(-58,14,-55),B.DOOR_TOP);
  assert.equal(at(-58,15,-55),B.PART_WINDOW_4);
  assert.equal(at(-59,13,-55),B.ARCH_FLOOR_WOOD);
- assert.equal(at(0,13,-55),B.ARCH_TILE_MOSAIC);
- assert.equal(at(0,14,-55),B.ARCH_CONCRETE_PEBBLE_PAINT);
- assert.equal(at(1,12,-54),B.TERRACOTTA);
- assert.equal(at(1,12,-52),B.ARCH_TILE_LARGE_PORCELAIN);
+ assert([B.ARCH_CONCRETE_PEBBLE_PAINT,B.STATION_TRAIN_ENAMEL].includes(at(0,13,-55)));
+ assert.equal(at(0,14,-55),B.CITY_PAINT_WHITE);
+ assert.equal(at(1,12,-54),B.ARCH_STONE_TERRAZZO);
+ assert.equal(at(1,12,-52),B.ARCH_STONE_TERRAZZO);
  assert.equal(at(0,15,-53),B.FLUORESCENT);
- assert.equal(at(0,16,-53),B.CEILING_FINISH);
+ assert.equal(at(0,16,-53),B.CITY_PAINT_WHITE);
 });
 test('photographic school facade: covered approach, canopy posts and stair signage',()=>{
  assert.equal(at(42,17,-38),B.ARCH_METAL_GALVANIZED);
@@ -196,4 +196,33 @@ test('school wings contain distinct working classrooms, library and bathroom vol
   assert.equal(at(63,y,-50),B.AIR);
   assert.equal(at(-63,y,-50),B.AIR);
  }
+});
+
+test('school-only finishes keep exterior masonry but replace exposed internal brick',()=>{
+ const base=12,white=B.CITY_PAINT_WHITE,window=B.PART_WINDOW_4;
+ // The former red brick strip on the corridor side is now painted.
+ assert([B.ARCH_CONCRETE_PEBBLE_PAINT,B.STATION_TRAIN_ENAMEL].includes(at(12,base+1,-50)));
+ assert.equal(at(12,base+2,-50),white);
+ assert.equal(at(4,base+2,-50),window);
+ assert([B.ARCH_BRICK_RED,B.ARCH_BRICK_RENDERED,window].includes(at(0,base+2,-65)));
+ assert.equal(at(-61,base+2,-44),window);
+ assert.equal(at(-78,base+2,-42),window);
+ for(const y of [16,21,26,31])assert.equal(at(0,y,-53),white); // flat matte ceilings
+});
+test('old thick floor strips are replaced by terrazzo with only room thresholds',()=>{
+ for(const z of [-54,-53,-52,-51])assert.equal(at(1,12,z),B.ARCH_STONE_TERRAZZO);
+ assert.equal(at(-58,12,-54),B.ARCH_STONE_PINK_GRANITE); // narrow doorway threshold
+ assert.equal(at(68,12,-47),B.ARCH_STONE_TERRAZZO);
+});
+test('school signage, storage and denser seating repeat without blocking walkways',()=>{
+ assert.equal(at(-56,15,-54),B.PART_SIGN_2);
+ assert.equal(at(-65,15,-46),B.PART_SIGN_2);
+ assert.equal(at(-49,13,-51),B.PART_INTERIOR_1);
+ assert.equal(at(-56,13,-62),B.PART_INTERIOR_2);
+ assert.equal(at(-54,13,-57),B.PART_INTERIOR_2);
+ for(const x of [-58,-46,-34,-22])assert.equal(at(x,13,-55),B.DOOR);
+ for(let z=-54;z<=-52;z++)assert.equal(at(0,13,z),B.AIR);
+ const wing=stampSchoolChunk(new Chunk(-5,-3),seed);
+ assert.equal(wing.get(15,15,2),B.PART_SIGN_2); // (-65,15,-46)
+ assert.equal(wing.styles[Chunk.index(15,15,2)],TURN_STYLE|2);
 });
