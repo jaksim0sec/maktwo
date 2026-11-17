@@ -271,8 +271,12 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
 function schoolPartFacing(x,z,id){
  if(id===B.PART_BALCONY_3)return 2;
  if(id!==B.PART_WINDOW_1&&id!==B.PART_WINDOW_2&&id!==B.PART_WINDOW_3)return null;
- if(Math.abs(x)===78||Math.abs(x)===75||Math.abs(x)===61||Math.abs(x)===66)return 2;
- return null;
+ const a=Math.abs(x),inWing=westWing(x,z)||eastWing(x,z);
+ if(inWing&&(a===61||a===66||a===78))return 2;
+ if(a===75&&z>-65&&z<-50)return 2;
+ if(hallFootprint(x,z)&&(a===80||a===104))return 2;
+ if(entryFootprint(x,z)&&a===8)return 2;
+ return null; // windows mounted on the north/south facades face z
 }
 export function stampSchoolChunk(chunk,seed=SCHOOL_SEED){
  const ox=chunk.cx*SIZE,oz=chunk.cz*SIZE,height=Math.min(chunk.height,SCHOOL_HEIGHT);
