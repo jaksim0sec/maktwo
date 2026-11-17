@@ -1,9 +1,10 @@
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
+import {SCHOOL_MODE} from '../worldgen/school-v3.js';
 // Local city save slots are an index, never a replacement for legacy world keys.
 export const WORLD_SLOT_KEY='maktwo:city-worlds:v1';
 export const ACTIVE_WORLD_KEY='maktwo:active-world:v1';
 export const playerKey=name=>`maktwo:player:${name}`;
-const valid=p=>p&&/^CitySave-[0-9]+-[a-z0-9]+$/.test(p.name)&&(p.mode==='eternal-city-lab'||p.mode===CANYON_MODE)
+const valid=p=>p&&/^CitySave-[0-9]+-[a-z0-9]+$/.test(p.name)&&(p.mode==='eternal-city-lab'||p.mode===CANYON_MODE||p.mode===SCHOOL_MODE)
  &&Number.isInteger(p.seed)&&p.seed>=-2147483648&&p.seed<=2147483647
  &&typeof p.label==='string'&&p.label.length<=50;
 export function loadWorldSlots(storage){
@@ -14,7 +15,7 @@ export function addWorldSlot(storage,seed,nonce=Date.now(),mode='eternal-city-la
  if(!Number.isInteger(seed)||seed< -2147483648||seed>2147483647)throw Error('Invalid world seed');
  const slots=loadWorldSlots(storage),name=`CitySave-${nonce}-${(seed>>>0).toString(36)}`;
  if(slots.some(slot=>slot.name===name))throw Error('World already exists');
- const value={name,seed,mode,label:`${mode===CANYON_MODE?'대단지 V2':'내 게임'} ${slots.length+1}`};
+ const value={name,seed,mode,label:`${mode===CANYON_MODE?'하강 · 대단지 V2':mode===SCHOOL_MODE?'하강 · 한국 학교 V3':'내 게임'} ${slots.length+1}`};
  if(!valid(value))throw Error('Invalid world slot');
  storage.setItem(WORLD_SLOT_KEY,JSON.stringify([...slots,value]));return value;
 }
