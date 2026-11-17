@@ -17,6 +17,7 @@ test('V3 has an independent playable world preset and entrance',()=>{
  const world=new World({seed,mode:SCHOOL_MODE,name:'DescentSchoolV3'});
  assert.equal(world.height,SCHOOL_HEIGHT);
  assert.deepEqual(world.firstSpawn(),schoolSpawn());
+ assert.equal(schoolSpawn().yaw,0); // face the school entrance (-Z), not the playground
  assert.equal(at(0,SCHOOL_GROUND,-31),B.FLOOR_TILE);
  assert.equal(at(0,SCHOOL_GROUND+1,-31),B.AIR);
  assert.equal(at(0,SCHOOL_GROUND+2,-35),B.AIR);
