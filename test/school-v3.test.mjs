@@ -32,14 +32,14 @@ test('four floors contain clear corridors, classroom doors and partitions',()=>{
  assert.equal(at(-60,14,-60),B.STATION_ALGAE);
  for(const floorY of [12,17,22,27])assert.equal(at(1,floorY,-60),B.ARCH_STONE_TERRAZZO);
 });
-test('half treads connect school levels instead of ladders or teleporting',()=>{
+test('split treads connect the school storeys while the landing floor remains solid',()=>{
  for(const heightOffset of [0,5,10]){
   const base=12+heightOffset;
   assert.equal(at(-70,base+1,-55),B.PART_STAIRCASE_2);
   assert.equal(at(-70,base+3,-59),B.PART_STAIRCASE_2);
   assert.equal(at(-65,base+5,-55),B.PART_STAIRCASE_2);
   assert.equal(at(-68,base+3,-60),B.CONCRETE_SLAB);
-  assert.equal(at(-71,base+5,-55),B.ARCH_FLOOR_LINOLEUM);
+  assert.equal(at(-71,base+5,-55),B.ARCH_STONE_TERRAZZO);
   assert.equal(at(-68,base+5,-60),B.AIR); // landing headroom
  }
 });
@@ -152,7 +152,7 @@ test('all exterior window parts inherit their correct wall-plane orientation',()
  assert.equal(gym.styles[Chunk.index(0,19,10)],TURN_STYLE|2);
 });
 
-test('photographic classroom corridor: wood doors, transoms and tiled wall bands',()=>{
+test('photographic classroom corridor: wood doors, transoms and painted wall bands',()=>{
  assert.equal(at(-58,13,-55),B.DOOR);
  assert.equal(at(-58,14,-55),B.DOOR_TOP);
  assert.equal(at(-58,15,-55),B.PART_WINDOW_4);
