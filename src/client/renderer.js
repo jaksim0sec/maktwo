@@ -3,7 +3,7 @@ import {weaponView} from './weapon-view.js';
 import {HeldLight,heldLightView,heldLightUniforms,HELD_LIGHT_SHADER} from './held-light.js';
 import {weaponBasis} from '../core/combat.js';
 import {raycast} from '../core/physics.js';
-import {block as itemBlock} from '../core/blocks.js';
+import {BLOCK as B,block as itemBlock} from '../core/blocks.js';
 import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} from '../core/chunk.js';import {clamp} from '../util/math.js';
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_BASE_Y,CITY_BLUEPRINT_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
@@ -16,7 +16,7 @@ import {FAR_LOOK} from './far-look.js';
 import {LIGHT_WIDTH,LIGHT_HEIGHT,LIGHT_DEPTH,makeOccluderSnapshot,makeDaylightSnapshot,buildLightVolume} from '../core/lightVolume.js';
 import {cameraEyeY,dampStepOffset,VERTICAL_FOV,FOV_TAN} from './camera.js';
 import {frustumPlanes,boxIntersectsFrustum,chunkMeshBounds} from './frustum.js';
-import {makeTextureLayers} from './textures.js';
+import {makeTextureLayers,materialFor} from './textures.js';
 import {skyClarityAt} from './atmosphere.js';
 import {TRAIN,trainDoorMotion} from '../worldgen/station-train.js';
 import {stationTrainMesh} from './station-train-mesh.js';
@@ -117,8 +117,8 @@ void main(){
  vec3 tinted=vColor;
  // School-only pastel wainscoting; never recolor shared blocks in V2/city.
  // 52 = pebbled paint, 82 = enameled wall surface (existing material layers).
- if(uSchoolFinish&&vMaterial==52)tinted*=vec3(.95,.92,1.075); // pale lavender
- if(uSchoolFinish&&vMaterial==82)tinted*=vec3(.87,1.035,.915); // soft sage
+ if(uSchoolFinish&&vMaterial==${materialFor(B.ARCH_CONCRETE_PEBBLE_PAINT,0)})tinted*=vec3(.95,.92,1.075); // pale lavender
+ if(uSchoolFinish&&vMaterial==${materialFor(B.STATION_TRAIN_ENAMEL,0)})tinted*=vec3(.87,1.035,.915); // soft sage
  if(vMaterial>0&&(!canyonFar||surfaceFog<.82)){
   vec3 axis=abs(normal);vec2 uv=axis.y>axis.x&&axis.y>axis.z?vMaterialPos.xz:(axis.x>axis.z?vMaterialPos.zy:vMaterialPos.xy);
   // D4 symmetry with turn/reflection bits already packed in aShade.
