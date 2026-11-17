@@ -226,3 +226,13 @@ test('school signage, storage and denser seating repeat without blocking walkway
  assert.equal(wing.get(15,15,2),B.PART_SIGN_2); // (-65,15,-46)
  assert.equal(wing.styles[Chunk.index(15,15,2)],TURN_STYLE|2);
 });
+
+test('yellow tactile warnings mark stair mouths while open corridors stay walkable',()=>{
+ for(const level of [0,1,2,3]){
+  const floorY=SCHOOL_GROUND+level*SCHOOL_STOREY;
+  assert.equal(at(-70,floorY,-54),B.STATION_PLATFORM_TACTILE);
+  assert.equal(at(65,floorY,-54),B.STATION_PLATFORM_TACTILE);
+  assert.equal(at(-69,floorY,-53),B.ARCH_STONE_TERRAZZO);
+  assert.equal(at(-70,floorY+1,-54),B.AIR);
+ }
+});
