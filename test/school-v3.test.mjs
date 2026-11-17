@@ -102,3 +102,25 @@ test('main building wings and schoolyard do not overwrite each other',()=>{
  assert.equal(at(-25,12,40),B.GRASS);
  assert.equal(at(90,12,10),B.ARCH_FLOOR_WOOD);
 });
+
+test('entrance path is traversable without crossing hedges or walls',()=>{
+ for(let z=-42;z<=-30;z++){
+  assert.equal(at(0,13,z),B.AIR,`blocked entrance at z=${z}`);
+  assert.equal(at(0,14,z),B.AIR,`blocked headroom at z=${z}`);
+ }
+ assert.equal(at(0,12,-36),B.ARCH_FLOOR_PAVERS);
+ assert.equal(at(15,13,-36),B.LEAVES);
+});
+test('staff office and library use specialized furniture instead of identical desks',()=>{
+ assert.equal(at(-34,13,-61),B.AIR);
+ assert.equal(at(-26,13,-61),B.PART_INTERIOR_1);
+ assert.equal(at(-8,28,-61),B.PART_BOOKSHELF_1);
+ assert.equal(at(-8,28,-58),B.PART_INTERIOR_2);
+});
+test('stair landings get metallic rail parts, not a wooden fence',()=>{
+ assert.equal(at(-63,18,-60),B.PART_BALCONY_3);
+ const c=stampSchoolChunk(new Chunk(-4,-4),seed);
+ // Left hand rail at world x=-63, z=-60, y=18.
+ assert.equal(c.get(1,18,4),B.PART_BALCONY_3);
+ assert.equal(c.styles[Chunk.index(1,18,4)],TURN_STYLE|2);
+});
