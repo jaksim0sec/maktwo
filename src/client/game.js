@@ -12,6 +12,7 @@ import {PART_FAMILIES,partById} from '../core/part-library.js';
 import {partGallerySpawn} from '../worldgen/part-gallery.js';
 import {canyonCore,prepareCanyonCore} from '../worldgen/canyon-v2-core.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
+import {SCHOOL_MODE} from '../worldgen/school-v3.js';
 import {CITY_MODE,CITY_BLUEPRINT_VERSION,createCityPlan,prepareCityPlan} from '../worldgen/eternal-night-game.js';
 import {screenRay} from './picking.js';
 import {FORMS,buildType,placementRotation,orientedForm} from '../core/construction.js';
@@ -581,7 +582,7 @@ class Game{
  }
  refreshWorldChoices(){
   const menu=$('world');if(!menu)return;
-  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode===CITY_MODE||w.mode===CANYON_MODE||w.mode==='station-preview').map(w=>{
+  menu.replaceChildren(...this.worldPresets.filter(w=>w.mode===CITY_MODE||w.mode===CANYON_MODE||w.mode===SCHOOL_MODE||w.mode==='station-preview').map(w=>{
    const option=document.createElement('option');option.value=w.name;option.textContent=w.label+' · '+w.seed;return option;
   }));
   menu.value=this.world.name;
@@ -617,7 +618,7 @@ class Game{
    if(globalThis.crypto?.getRandomValues)crypto.getRandomValues(rand);
    else rand[0]=Math.floor(Math.random()*0x100000000);
    const nonce=Date.now().toString()+String(Math.floor(Math.random()*1000)).padStart(3,'0');
-   const slot=addWorldSlot(localStorage,rand[0]|0,nonce,this.world.mode===CANYON_MODE?CANYON_MODE:undefined);
+   const slot=addWorldSlot(localStorage,rand[0]|0,nonce,this.world.mode===CANYON_MODE?CANYON_MODE:this.world.mode===SCHOOL_MODE?SCHOOL_MODE:undefined);
    this.worldPresets.push(slot);this.manager.add(slot.name,slot.seed,slot.mode);
    if(await this.travel(slot.name)){this.refreshWorldChoices();this.requestGameFocus();}
   }catch(error){console.warn('[MakTwo] New game failed',error);this.status('새 게임 생성 실패 · 로컬 저장 공간 확인')}
