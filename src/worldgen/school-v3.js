@@ -199,7 +199,7 @@ function schoolWing(x,y,z,style){
   return wingFacade(a,z,dy,style);
  }
  if(a===78)return wingFacade(a,z,dy,style);
- if(dy===3&&corridor&&a===63&&bay===3)return B.PART_SIGN_2;
+ if(dy===3&&corridor&&a===65&&bay===3)return B.PART_SIGN_2; // mounted beside classroom wall
  if(dy===1&&corridor&&a===63&&mod(z+49,24)===11)return B.PART_INTERIOR_1;
  if(a===66){
   if(bay===2){
@@ -327,6 +327,7 @@ export function schoolVoxel(wx,y,wz,seed=SCHOOL_SEED){
  return B.AIR;
 }
 function schoolPartFacing(x,z,id){
+ if(id===B.PART_SIGN_2)return Math.abs(x)===65?2:0;
  if(id===B.DOOR)return Math.abs(x)===66?(x<0?1:3):2;
  if(id===B.PART_BALCONY_3)return 2;
  if(id!==B.PART_WINDOW_1&&id!==B.PART_WINDOW_2&&id!==B.PART_WINDOW_3&&id!==B.PART_WINDOW_4)return null;
