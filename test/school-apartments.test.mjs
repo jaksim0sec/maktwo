@@ -31,7 +31,7 @@ test('eight residential slabs keep school and gym clear, with realistic floor va
  assert.equal(apartmentAt(160,37)?.id,104);
  assert.equal(apartmentAt(0,0),null);
  for(const p of APARTMENT_BLOCKS){
-  assert.equal(at(p.x+2,12,p.z+2),B.ARCH_FLOOR_WOOD);
+  assert.equal(at(p.x+2,12,p.flip?p.z+p.depth-3:p.z+2),B.ARCH_FLOOR_WOOD);
   assert.equal(at(p.x,12+p.floors*5,p.z),B.ARCH_METAL_GALVANIZED);
  }
  assert.equal(at(90,12,0),B.ARCH_FLOOR_WOOD);
