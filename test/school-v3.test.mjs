@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Chunk} from '../src/core/chunk.js';
+import {Chunk,TURN_STYLE} from '../src/core/chunk.js';
 import {BLOCK as B} from '../src/core/blocks.js';
 import {World} from '../src/core/world.js';
 import {generateChunk} from '../src/worldgen/generators.js';
 import {WORLD_PRESETS} from '../src/core/catalog.js';
 import {addWorldSlot,loadWorldSlots} from '../src/core/world-slots.js';
-import {SCHOOL_MODE,SCHOOL_HEIGHT,SCHOOL_GROUND,SCHOOL_PERIOD,schoolVoxel,stampSchoolChunk,schoolSpawn,schoolStyle} from '../src/worldgen/school-v3.js';
+import {SCHOOL_MODE,SCHOOL_HEIGHT,SCHOOL_GROUND,SCHOOL_PERIOD,SCHOOL_STOREY,schoolVoxel,stampSchoolChunk,schoolSpawn,schoolStyle} from '../src/worldgen/school-v3.js';
 
 const seed=9999,at=(x,y,z,s=seed)=>schoolVoxel(x,y,z,s);
 test('V3 has an independent playable world preset and entrance',()=>{
@@ -18,33 +18,37 @@ test('V3 has an independent playable world preset and entrance',()=>{
  assert.equal(world.height,SCHOOL_HEIGHT);
  assert.deepEqual(world.firstSpawn(),schoolSpawn());
  assert.equal(schoolSpawn().yaw,0); // face the school entrance (-Z), not the playground
- assert.equal(at(0,SCHOOL_GROUND,-31),B.FLOOR_TILE);
+ assert.equal(at(0,SCHOOL_GROUND,-31),B.ARCH_FLOOR_PAVERS);
  assert.equal(at(0,SCHOOL_GROUND+1,-31),B.AIR);
  assert.equal(at(0,SCHOOL_GROUND+2,-35),B.AIR);
 });
 test('four floors contain clear corridors, classroom doors and partitions',()=>{
- assert.equal(at(0,13,-40),B.AIR);
- assert.notEqual(at(3,13,-43),B.AIR);
- assert.equal(at(0,13,-43),B.AIR);
- assert.equal(at(0,13,-55),B.AIR);
- for(const floorY of [12,19,26,33])assert.equal(at(0,floorY,-55),B.FLOOR_TILE);
+ assert.equal(SCHOOL_STOREY,5); // 4m per storey at 0.8m/voxel
+ assert.equal(at(1,13,-53),B.AIR); // 3.2m corridor
+ assert.equal(at(1,13,-55),B.ARCH_CONCRETE_SMOOTH_PLASTER);
+ assert.equal(at(-58,13,-55),B.AIR); // double-width classroom entry
+ assert.equal(at(-56,13,-61),B.PART_INTERIOR_2);
+ assert.equal(at(-60,14,-60),B.ARCH_METAL_BLACK_PAINT);
+ for(const floorY of [12,17,22,27])assert.equal(at(1,floorY,-60),B.ARCH_FLOOR_LINOLEUM);
 });
 test('half treads connect school levels instead of ladders or teleporting',()=>{
- for(const heightOffset of [0,7,14]){
-  const side=heightOffset===7?-69:-76,base=12+heightOffset;
-  assert.equal(at(side,base+1,-58),B.CONCRETE_SLAB);
-  assert.equal(at(side,base+7,-46),B.CONCRETE_SLAB);
-  assert.equal(at(side,base+7,-45),B.UPPER_STAIR_TREAD);
+ for(const heightOffset of [0,5,10]){
+  const base=12+heightOffset;
+  assert.equal(at(-70,base+1,-55),B.CONCRETE_SLAB);
+  assert.equal(at(-70,base+3,-59),B.CONCRETE_SLAB);
+  assert.equal(at(-65,base+5,-55),B.UPPER_STAIR_TREAD);
+  assert.equal(at(-71,base+5,-55),B.ARCH_FLOOR_LINOLEUM);
+  assert.equal(at(-68,base+5,-60),B.AIR); // landing headroom
  }
 });
 test('schoolyard, indoor gym, gate and campus road remain separate',()=>{
  assert.equal(at(-25,12,40),B.GRASS);
- assert.equal(at(-74,12,40),B.TERRACOTTA);
- assert.equal(at(90,12,0),B.PLANKS);
- assert.notEqual(at(76,19,0),B.AIR);
+ assert.equal(at(-54,12,40),B.TERRACOTTA);
+ assert.equal(at(90,12,0),B.ARCH_FLOOR_WOOD);
+ assert.notEqual(at(80,19,10),B.AIR);
  assert.equal(at(49,13,103),B.AIR);
  assert.equal(at(0,13,103),B.FENCE);
- assert.equal(at(107,12,0),B.CONCRETE);
+ assert.equal(at(107,12,0),B.ARCH_FLOOR_ASPHALT);
 });
 test('chunk order and negative district boundaries have identical voxels',()=>{
  const coords=[[0,0],[-1,-3],[-6,-2],[-5,-4],[7,3],[0,-4]];
@@ -74,4 +78,27 @@ test('new school saves are isolated from legacy V2 saves',()=>{
  const canyon=new World({name:'EternalNightCanyonV2',seed,mode:'canyon-v2',storage});
  assert.notEqual(canyon.saveKey,school.saveKey);
  assert.equal(new World({name:slot.name,seed,mode:SCHOOL_MODE,storage}).get(0,13,-39),B.CRATE);
+});
+
+test('facade materials, stair glazing and differentiated ceiling remain continuous',()=>{
+ assert.equal(at(1,16,-65),B.ARCH_TILE_LARGE_PORCELAIN);
+ assert.equal(at(78,16,-20),B.ARCH_TILE_LARGE_PORCELAIN);
+ assert.equal(at(1,16,-60),B.CEILING_FINISH);
+ assert.equal(at(0,13,-43),B.AIR);
+ assert.equal(at(0,18,-40),B.ARCH_METAL_GALVANIZED);
+ assert.notEqual(at(-75,14,-58),B.AIR);
+});
+test('existing architectural parts retain real rotation in a generated chunk',()=>{
+ const chunk=stampSchoolChunk(new Chunk(-5,-3),seed);
+ assert.equal(chunk.get(2,14,6),B.PART_WINDOW_1);
+ assert.equal(chunk.styles[Chunk.index(2,14,6)],TURN_STYLE|2);
+ assert.equal(at(-78,14,-42),B.PART_WINDOW_1);
+});
+test('main building wings and schoolyard do not overwrite each other',()=>{
+ assert.equal(at(-78,13,0),B.ARCH_TILE_LARGE_PORCELAIN);
+ assert.equal(at(-61,13,7),B.AIR);
+ assert.equal(at(0,12,-33),B.ARCH_FLOOR_PAVERS);
+ assert.equal(at(0,13,-33),B.AIR);
+ assert.equal(at(-25,12,40),B.GRASS);
+ assert.equal(at(90,12,10),B.ARCH_FLOOR_WOOD);
 });
