@@ -8,6 +8,7 @@ import {meshChunkData,cube,rgb} from './mesher.js';import {SIZE,MESH_NEIGHBORS} 
 import {BLOCK_SIZE,toMeters} from '../core/scale.js';
 import {CITY_MODE,CITY_BASE_Y,CITY_BLUEPRINT_VERSION,createCityPlan} from '../worldgen/eternal-night-game.js';
 import {CANYON_MODE} from '../worldgen/canyon-v2-plan.js';
+import {SCHOOL_MODE} from '../worldgen/school-v3.js';
 import {distantCanyonMesh} from './canyon-distance.js';
 import {distantCityMesh,distanceSectorVisible} from './city-distance.js';
 import {cityFarMesh} from './city-far.js';
@@ -552,7 +553,7 @@ export class Renderer{
   if(requestKey===this.lightAppliedKey||this.lightBusy||performance.now()-this.lightLastRequest<170)return;
   const sources=world.lights.inBounds(ox,ox+LIGHT_WIDTH,oz,oz+LIGHT_DEPTH,{minY:oy,maxY:oy+LIGHT_HEIGHT,limit:32,focus}).map(l=>({...l,rgb:rgb(l.color)}));
   const token=++this.lightSerial;this.lightBusy=true;this.lightLastRequest=performance.now();this.lightRequestedKey=requestKey;this.lightRequestWorld=world;this.lightRequestRevision=world.lightRevision;
-  const city=world.mode===CITY_MODE||world.mode===CANYON_MODE;
+  const city=world.mode===CITY_MODE||world.mode===CANYON_MODE||world.mode===SCHOOL_MODE;
   if(!sources.length&&!city){
    if(this.lightHasSources)glClearLight(this.gl,this.lightTexture);
    this.lightHasSources=false;this.lightAppliedKey=requestKey;this.lightBusy=false;
@@ -616,11 +617,11 @@ export class Renderer{
   this.walkAmount+=(Math.min(1,walkingSpeed/5)-this.walkAmount)*(1-Math.exp(-dt*8));
   this.walkPhase+=walkingSpeed*dt*2.2;
   const walkSway=Math.sin(this.walkPhase)*this.walkAmount*.012;
-  const canyon=world.mode===CANYON_MODE,city=world.mode===CITY_MODE||canyon,farLook=world.mode===CITY_MODE&&this.farEnabled;
+  const canyon=world.mode===CANYON_MODE,school=world.mode===SCHOOL_MODE,city=world.mode===CITY_MODE||canyon,daylit=city||school,farLook=world.mode===CITY_MODE&&this.farEnabled;
   const blurActive=city&&this.distanceBlurEnabled&&!this.hologram?.opened&&this.prepareDistanceBlur(width,height);
   if(blurActive)gl.bindFramebuffer(gl.FRAMEBUFFER,this.distanceBlurTarget.fbo);
-  const clarity=skyClarityAt(canyon?360:cameraEyeY(player)),skyLight=player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
-  const fog=city?[.139,.212,.253]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const clarity=school?.42:skyClarityAt(canyon?360:cameraEyeY(player)),skyLight=school?.48:player.creative?Math.max(0,Math.min(1,this.skyBrightness)):0;
+  const fog=school?[.46,.60,.70]:city?[.139,.212,.253]:[.067+.53*clarity+.17*skyLight,.067+.70*clarity+.19*skyLight,.075+.83*clarity+.22*skyLight];gl.clearColor(...fog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   const aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);
   const swing=combat?.pose(),baseYaw=player.yaw+walkSway;
   const eye=[player.x,cameraEyeY(player),player.z];
@@ -644,7 +645,7 @@ export class Renderer{
   const horizon=Math.max(-.6,Math.min(1.6,.5-Math.tan(pitch)/(2*FOV_TAN)));
   gl.uniform1f(this.skyHorizon,horizon);
   gl.uniform2f(this.skyGround,pitch,canyon?240:Math.max(1,toMeters(eye[1]-CITY_BASE_Y)));
-  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,city?1:0);gl.uniform2f(this.skyGradient,this.citySkyTone,this.cityGroundFade);
+  gl.uniform1f(this.skyClarity,clarity);gl.uniform1f(this.skyLight,skyLight);gl.uniform1f(this.skyCity,daylit?1:0);gl.uniform2f(this.skyGradient,this.citySkyTone,this.cityGroundFade);
   gl.bindVertexArray(this.skyVao);gl.drawArrays(gl.TRIANGLES,0,3);
   if(city&&!canyon){
    const towers=new Float32Array(48),horizontalScale=2*FOV_TAN*aspect;
@@ -662,8 +663,8 @@ export class Renderer{
   const [camX,camY,camZ]=eye.map(toMeters);
   const vp=matMultiply(perspective(VERTICAL_FOV,aspect,farLook?FAR_LOOK.nearPlaneMeters:.05,farLook?FAR_LOOK.farPlaneMeters:canyon?300:city?260:140),view(yaw,pitch,camX,camY,camZ));
   gl.uniformMatrix4fv(this.u.vp,false,vp);gl.uniform3f(this.u.camera,camX,camY,camZ);gl.uniform3fv(this.u.fog,fog);gl.uniform2f(this.u.fogRange,24,canyon?132:62);gl.uniform1f(this.u.brightness,.35+.43*skyLight);gl.uniform1f(this.u.time,performance.now()*.001);gl.uniform1f(this.u.alpha,1);
-  gl.uniform1i(this.u.CityDaylight,city?1:0);
-  if(city)gl.uniform3f(this.u.LowerFog,.094,.148,.177);
+  gl.uniform1i(this.u.CityDaylight,daylit?1:0);
+  if(daylit)gl.uniform3f(this.u.LowerFog,...(school?[.24,.33,.39]:[.094,.148,.177]));
   this.updateLightVolume(world,player);
   const frameTime=performance.now();
   this.heldLight.update(world,heldLamp,[player.x,cameraEyeY(player)-.32,player.z],frameTime);
