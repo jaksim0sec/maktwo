@@ -17,7 +17,7 @@ const hash=(x,z,seed,salt=0)=>{
  n=Math.imul(n^(n>>>13),1274126177);return (n^(n>>>16))>>>0;
 };
 export const schoolStyle=(seed,campusX=0,campusZ=0)=>hash(campusX,campusZ,seed,0x5ab17)%4;
-export const schoolSpawn=()=>({x:.5,y:SCHOOL_GROUND+1,z:-30.5,yaw:Math.PI});
+export const schoolSpawn=()=>({x:.5,y:SCHOOL_GROUND+1,z:-30.5,yaw:0});
 export function schoolDistrict(x,z){
  const cx=Math.floor((x+HALF)/SCHOOL_PERIOD),cz=Math.floor((z+HALF)/SCHOOL_PERIOD);
  return {cx,cz,x:x-cx*SCHOOL_PERIOD,z:z-cz*SCHOOL_PERIOD};
